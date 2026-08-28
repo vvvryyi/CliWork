@@ -1,6 +1,6 @@
 # Развёртывание Personal CRM на VPS
 
-Инструкция подготовлена для Ubuntu 26.04 и VPS `78.141.223.56`. Проект рассчитан на запуск через Gunicorn за Nginx. Домен и SSH-адрес Git-репозитория пока неизвестны, поэтому в командах используются маркеры `<DOMAIN>`, `<REPOSITORY_SSH_URL>` и `<GIT_HOST>`.
+Инструкция подготовлена для Ubuntu 26.04, VPS `78.141.223.56`, домена `cliwork.iteacher-alex.org` и GitHub-репозитория `vvvryyi/CliWork`. Проект запускается через Gunicorn за Nginx, а DNS Cloudflare уже настроен как proxied-запись `A -> 78.141.223.56`.
 
 ## Принятая схема размещения
 
@@ -77,12 +77,12 @@ sudo chmod 644 /srv/personal-crm/deploy-keys/repository_ed25519.pub
 sudo cat /srv/personal-crm/deploy-keys/repository_ed25519.pub
 ```
 
-Последнюю выведенную строку нужно добавить в настройках будущего репозитория как **Deploy key** только для чтения. Право на запись этому ключу не требуется.
+Последнюю выведенную строку нужно добавить в настройках репозитория `vvvryyi/CliWork` как **Deploy key** только для чтения. Право на запись этому ключу не требуется.
 
-После получения адреса репозитория определить его хост, например `github.com` или `gitlab.com`, сверить опубликованный провайдером SSH fingerprint и создать отдельный `known_hosts`:
+Сверить SSH fingerprint GitHub с официальной документацией GitHub и создать отдельный `known_hosts`:
 
 ```bash
-sudo -u personal-crm ssh-keyscan -H <GIT_HOST> \
+sudo -u personal-crm ssh-keyscan -H github.com \
   | sudo tee /srv/personal-crm/deploy-keys/known_hosts >/dev/null
 sudo chown personal-crm:personal-crm /srv/personal-crm/deploy-keys/known_hosts
 sudo chmod 600 /srv/personal-crm/deploy-keys/known_hosts
@@ -95,7 +95,7 @@ sudo chmod 600 /srv/personal-crm/deploy-keys/known_hosts
 ```bash
 sudo -u personal-crm env \
   GIT_SSH_COMMAND="ssh -i /srv/personal-crm/deploy-keys/repository_ed25519 -o IdentitiesOnly=yes -o UserKnownHostsFile=/srv/personal-crm/deploy-keys/known_hosts" \
-  git clone <REPOSITORY_SSH_URL> /srv/personal-crm/app
+  git clone --branch main git@github.com:vvvryyi/CliWork.git /srv/personal-crm/app
 ```
 
 Если каталог `app` должен быть пустым для клонирования, удалить только созданный пустой каталог командой `sudo rmdir /srv/personal-crm/app`, затем повторить `git clone`. Не помещать deploy-ключ внутрь `/srv/personal-crm/app`: рабочее дерево Git может заменяться при обновлениях.
@@ -134,6 +134,8 @@ CRM_TIMEZONE=Europe/Moscow
 DATABASE_URL=sqlite:////srv/personal-crm/shared/instance/crm.sqlite3
 UPLOAD_FOLDER=/srv/personal-crm/shared/instance/uploads
 MAX_CONTENT_LENGTH=20971520
+TRUST_PROXY_HEADERS=true
+SESSION_COOKIE_SECURE=true
 ```
 
 Секрет можно сгенерировать командой `openssl rand -hex 32`. Пароль CRM должен быть другим и не должен совпадать с паролем администратора VPS.
@@ -225,9 +227,9 @@ sudo journalctl -u personal-crm -n 100 --no-pager
 sudo journalctl -u personal-crm -f
 ```
 
-## 6. Nginx и будущий домен Cloudflare
+## 6. Nginx, HTTPS и Cloudflare
 
-До получения домена не создавать универсальный `default_server`: на VPS уже размещены другие проекты. После получения домена создать отдельный файл `/etc/nginx/sites-available/personal-crm`:
+Не создавать универсальный `default_server`: на VPS уже размещены другие проекты. Создать отдельный файл `/etc/nginx/sites-available/personal-crm`:
 
 ```bash
 sudoedit /etc/nginx/sites-available/personal-crm
@@ -239,7 +241,7 @@ sudoedit /etc/nginx/sites-available/personal-crm
 server {
     listen 80;
     listen [::]:80;
-    server_name <DOMAIN>;
+    server_name cliwork.iteacher-alex.org;
 
     client_max_body_size 20M;
 
@@ -261,7 +263,7 @@ server {
 }
 ```
 
-Заменить `<DOMAIN>` на реальный домен до включения конфигурации, затем выполнить:
+Включить конфигурацию:
 
 ```bash
 sudo ln -s /etc/nginx/sites-available/personal-crm \
@@ -273,10 +275,31 @@ sudo systemctl reload nginx
 Проверить выбор правильного virtual host ещё до переключения DNS:
 
 ```bash
-curl --resolve <DOMAIN>:80:127.0.0.1 http://<DOMAIN>/healthz
+curl --resolve cliwork.iteacher-alex.org:80:127.0.0.1 \
+  http://cliwork.iteacher-alex.org/healthz
 ```
 
-В Cloudflare потребуется создать DNS-запись `A`, направленную на `78.141.223.56`. Для рабочего режима следует использовать HTTPS и режим SSL/TLS **Full (strict)**. Финальный способ установки сертификата — Let's Encrypt либо Cloudflare Origin Certificate — нужно выбрать после получения домена и сведений о текущей конфигурации Nginx на сервере. Режим **Flexible** использовать не следует.
+DNS-запись Cloudflare уже создана: `cliwork.iteacher-alex.org`, тип `A`, адрес `78.141.223.56`, proxy включён, TTL Auto.
+
+Для выпуска публичного Let's Encrypt-сертификата установить Certbot и указать реальный административный email:
+
+```bash
+sudo apt install -y certbot python3-certbot-nginx
+sudo certbot --nginx \
+  --domain cliwork.iteacher-alex.org \
+  --email <ADMIN_EMAIL> \
+  --agree-tos \
+  --no-eff-email \
+  --redirect
+
+sudo certbot renew --dry-run
+```
+
+После успешного выпуска сертификата в Cloudflare выбрать SSL/TLS mode **Full (strict)** и включить Always Use HTTPS. Режим **Flexible** использовать нельзя. Проверить внешний адрес:
+
+```bash
+curl --fail https://cliwork.iteacher-alex.org/healthz
+```
 
 ## 7. Firewall
 
@@ -341,16 +364,14 @@ sudo -u personal-crm tar -C /srv/personal-crm/shared \
 - `flask --app run.py db upgrade` завершён без ошибок.
 - `personal-crm.service` активен и запускается после перезагрузки.
 - `curl http://127.0.0.1:8010/healthz` возвращает `{"status":"ok"}`.
-- Nginx-конфигурация содержит только будущий реальный домен и не конфликтует с другими проектами.
-- В Cloudflare задан `A -> 78.141.223.56`, а после установки сертификата включён Full (strict).
+- Nginx-конфигурация содержит только `cliwork.iteacher-alex.org` и не конфликтует с другими проектами.
+- В Cloudflare задана proxied-запись `A -> 78.141.223.56`, а после установки сертификата включён Full (strict).
+- `TRUST_PROXY_HEADERS=true` и `SESSION_COOKIE_SECURE=true` заданы только в серверном `.env`.
 - Порт Gunicorn не открыт в UFW.
 - Создана и проверена внешняя резервная копия.
 
 ## Данные, которые ещё нужны
 
-1. SSH URL репозитория и Git-хост (`github.com`, `gitlab.com` или другой).
-2. Основная ветка репозитория, если это не ветка по умолчанию.
-3. Домен или поддомен в Cloudflare.
-4. Фактический SSH-порт и имя администратора VPS.
-5. Подтверждение, свободен ли локальный порт `8010`, либо выбранный альтернативный порт.
-6. Выбор TLS-сертификата: Let's Encrypt или Cloudflare Origin Certificate.
+1. Фактический SSH-порт и имя администратора VPS.
+2. Подтверждение, свободен ли локальный порт `8010`, либо выбранный альтернативный порт.
+3. Административный email для уведомлений Let's Encrypt.

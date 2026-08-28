@@ -58,6 +58,12 @@ python run.py
 .\.venv\Scripts\python.exe -m pytest
 ```
 
+## Развёртывание на VPS
+
+Production-инструкция для Ubuntu, systemd, Nginx, HTTPS и Cloudflare находится в
+[`deploy.md`](deploy.md). Секреты, deploy-ключ, база данных и загруженные файлы не
+должны добавляться в Git.
+
 ## Локальные данные
 
 - база: `instance/crm.sqlite3`;
@@ -72,4 +78,3 @@ python run.py
 - Telegram, Instagram, Facebook и MAX могут не поддерживать автоматическую подстановку текста или файлов;
 - напоминания видны внутри CRM, но фоновые системные уведомления пока не реализованы;
 - текущий этап тестируется на одном Windows-компьютере.
-

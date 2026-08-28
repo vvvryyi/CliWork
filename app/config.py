@@ -8,6 +8,13 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / ".env")
 
 
+def env_flag(name, default=False):
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
 class Config:
     SECRET_KEY = os.getenv("SECRET_KEY", "")
     CRM_USERNAME = os.getenv("CRM_USERNAME", "")
@@ -18,6 +25,10 @@ class Config:
         f"sqlite:///{(BASE_DIR / 'instance' / 'crm.sqlite3').as_posix()}",
     )
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+    TRUST_PROXY_HEADERS = env_flag("TRUST_PROXY_HEADERS")
+    SESSION_COOKIE_SECURE = env_flag("SESSION_COOKIE_SECURE")
+    SESSION_COOKIE_HTTPONLY = True
+    SESSION_COOKIE_SAMESITE = "Lax"
     UPLOAD_FOLDER = os.getenv(
         "UPLOAD_FOLDER",
         str(BASE_DIR / "instance" / "uploads"),
