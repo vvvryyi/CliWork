@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Новое сообщение — Персональная CRM{% endblock %}
+{% block content %}
+<div class="page-heading">
+    <div>
+        <p class="eyebrow">Связь</p>
+        <h1>Подготовить сообщение</h1>
+        <p class="muted">CRM сохранит текст и откроет выбранный канал. Фактическую отправку подтвердите отдельно.</p>
+    </div>
+</div>
+
+<form method="post" enctype="multipart/form-data" class="panel form-stack">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="form-grid">
+        <label>
+            Клиент <span class="required">*</span>
+            <select name="client_id" required>
+                <option value="">Выберите клиента</option>
+                {% for client in clients %}
+                    <option value="{{ client.id }}" {% if selected_client_id == client.id %}selected{% endif %}>{{ client.full_name }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <label>
+            Канал <span class="required">*</span>
+            <select name="channel" required>
+                <option value="">Выберите канал</option>
+                {% for value, label in channels.items() %}
+                    <option value="{{ value }}">{{ label }}</option>
+                {% endfor %}
+            </select>
+        </label>
+    </div>
+    <label>
+        Сообщение <span class="required">*</span>
+        <textarea id="message-text" name="message" rows="9" required placeholder="Введите текст для клиента"></textarea>
+    </label>
+    <label class="file-field">
+        <span>Прикрепить файлы</span>
+        <input name="files" type="file" multiple>
+        <small>Внешнее приложение может не принять вложения автоматически. CRM сохранит их в истории.</small>
+    </label>
+    <div><button class="button button-primary" type="submit">Подготовить и продолжить</button></div>
+</form>
+{% endblock %}
+

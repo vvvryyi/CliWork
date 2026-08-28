@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} — Персональная CRM{% endblock %}
+{% block content %}
+<div class="page-heading">
+    <div>
+        <a class="back-link" href="{{ url_for('clients.detail', client_id=client.id) if client.id else url_for('clients.index') }}">← Назад</a>
+        <h1>{{ title }}</h1>
+    </div>
+</div>
+
+<form method="post" class="panel form-stack">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="form-grid">
+        <label class="span-2">
+            ФИО <span class="required">*</span>
+            <input name="full_name" value="{{ client.full_name or '' }}" required maxlength="200">
+        </label>
+        <label>
+            Телефон
+            <input name="phone" type="tel" value="{{ client.phone or '' }}" maxlength="50">
+        </label>
+        <label>
+            E-mail
+            <input name="email" type="email" value="{{ client.email or '' }}" maxlength="200">
+        </label>
+        <label>
+            Предпочтительный канал
+            <select name="preferred_channel">
+                <option value="">Не выбран</option>
+                {% for value, label in channels.items() %}
+                    <option value="{{ value }}" {% if client.preferred_channel == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <label class="span-2">
+            Дополнительные контакты
+            <textarea name="additional_contacts" rows="3" placeholder="Другие телефоны, e-mail или пояснения">{{ client.additional_contacts or '' }}</textarea>
+        </label>
+    </div>
+
+    <fieldset>
+        <legend>Контакты каналов связи</legend>
+        <div class="form-grid">
+            <label>WhatsApp<input name="whatsapp" value="{{ client.whatsapp or '' }}" placeholder="+7 999 000-00-00"></label>
+            <label>Telegram<input name="telegram" value="{{ client.telegram or '' }}" placeholder="@username"></label>
+            <label>MAX<input name="max_contact" value="{{ client.max_contact or '' }}" placeholder="Ссылка на контакт"></label>
+            <label>Instagram<input name="instagram" value="{{ client.instagram or '' }}" placeholder="@username"></label>
+            <label class="span-2">Facebook<input name="facebook" value="{{ client.facebook or '' }}" placeholder="Ссылка на профиль"></label>
+        </div>
+    </fieldset>
+
+    <label>
+        Общий комментарий
+        <textarea name="notes" rows="5">{{ client.notes or '' }}</textarea>
+    </label>
+    <div class="form-actions">
+        <button class="button button-primary" type="submit">Сохранить</button>
+        <a class="button button-ghost" href="{{ url_for('clients.detail', client_id=client.id) if client.id else url_for('clients.index') }}">Отмена</a>
+    </div>
+</form>
+{% endblock %}
+

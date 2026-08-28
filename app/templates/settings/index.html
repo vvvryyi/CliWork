@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Настройки — Персональная CRM{% endblock %}
+{% block content %}
+<div class="page-heading"><div><p class="eyebrow">Система</p><h1>Настройки</h1></div></div>
+<form class="panel form-stack settings-form" method="post">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div>
+        <h2>Дата и время</h2>
+        <p class="muted">Часовой пояс применяется при показе истории, календаря и напоминаний.</p>
+    </div>
+    <label>
+        Часовой пояс
+        <input name="timezone" value="{{ timezone_name }}" required list="timezone-list">
+        <datalist id="timezone-list">
+            <option value="Europe/Moscow">
+            <option value="Europe/Kaliningrad">
+            <option value="Europe/Samara">
+            <option value="Asia/Yekaterinburg">
+            <option value="Asia/Omsk">
+            <option value="Asia/Krasnoyarsk">
+            <option value="Asia/Irkutsk">
+            <option value="Asia/Yakutsk">
+            <option value="Asia/Vladivostok">
+            <option value="Asia/Magadan">
+            <option value="Asia/Kamchatka">
+        </datalist>
+        <small>Формат IANA, например Europe/Moscow</small>
+    </label>
+    <div><button class="button button-primary" type="submit">Сохранить настройки</button></div>
+</form>
+{% endblock %}
+

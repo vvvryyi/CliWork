@@ -1,0 +1,29 @@
+services:
+  - type: web
+    name: personal-crm
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: flask --app run.py db upgrade && gunicorn run:app
+    healthCheckPath: /healthz
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.8
+      - key: SECRET_KEY
+        generateValue: true
+      - key: CRM_USERNAME
+        value: admin
+      - key: CRM_PASSWORD
+        sync: false
+      - key: CRM_TIMEZONE
+        value: Europe/Moscow
+      - key: DATABASE_URL
+        fromDatabase:
+          name: personal-crm-db
+          property: connectionString
+
+databases:
+  - name: personal-crm-db
+    plan: free
+    databaseName: personal_crm
+    user: personal_crm

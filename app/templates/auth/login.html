@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Вход — Персональная CRM{% endblock %}
+{% block content %}
+<section class="login-card">
+    <div class="brand login-brand">
+        <span class="brand-mark">C</span>
+        <span>Персональная CRM</span>
+    </div>
+    <h1>Вход</h1>
+    <p class="muted">Введите данные из локального файла .env</p>
+    <form method="post" class="form-stack">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <label>
+            Логин
+            <input name="username" type="text" autocomplete="username" required autofocus>
+        </label>
+        <label>
+            Пароль
+            <input name="password" type="password" autocomplete="current-password" required>
+        </label>
+        <button class="button button-primary button-wide" type="submit">Войти</button>
+    </form>
+</section>
+{% endblock %}
+

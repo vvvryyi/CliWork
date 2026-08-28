@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}Клиенты — Персональная CRM{% endblock %}
+{% block content %}
+<div class="page-heading">
+    <div>
+        <p class="eyebrow">База</p>
+        <h1>{{ "Архив клиентов" if show_archived else "Клиенты" }}</h1>
+    </div>
+    <div class="heading-actions">
+        {% if show_archived %}
+            <a class="button" href="{{ url_for('clients.index') }}">Активные клиенты</a>
+        {% else %}
+            <a class="button" href="{{ url_for('clients.index', archived=1) }}">Архив</a>
+            <a class="button button-primary" href="{{ url_for('clients.create') }}">+ Новый клиент</a>
+        {% endif %}
+    </div>
+</div>
+
+<form class="filter-bar" method="get">
+    {% if show_archived %}<input type="hidden" name="archived" value="1">{% endif %}
+    <label class="grow">
+        <span class="sr-only">Поиск</span>
+        <input name="q" type="search" value="{{ query_text }}" placeholder="ФИО, телефон или e-mail">
+    </label>
+    <label>
+        <span class="sr-only">Канал</span>
+        <select name="channel">
+            <option value="">Все каналы</option>
+            {% for value, label in channels.items() %}
+                <option value="{{ value }}" {% if selected_channel == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+        </select>
+    </label>
+    <button class="button" type="submit">Найти</button>
+    {% if query_text or selected_channel %}
+        <a class="button button-ghost" href="{{ url_for('clients.index', archived=1 if show_archived else None) }}">Сбросить</a>
+    {% endif %}
+</form>
+
+{% if clients %}
+    <div class="client-grid">
+        {% for client in clients %}
+            <article class="client-card">
+                <a class="card-link" href="{{ url_for('clients.detail', client_id=client.id) }}">
+                    <span class="avatar">{{ client.full_name[:1]|upper }}</span>
+                    <span class="client-main">
+                        <strong>{{ client.full_name }}</strong>
+                        <small>{{ client.phone or "Телефон не указан" }}</small>
+                        <small>{{ client.email or "E-mail не указан" }}</small>
+                    </span>
+                    {% if client.preferred_channel %}
+                        <span class="tag">{{ channels.get(client.preferred_channel, client.preferred_channel) }}</span>
+                    {% endif %}
+                </a>
+                {% if show_archived %}
+                    <form action="{{ url_for('clients.restore', client_id=client.id) }}" method="post">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button class="button button-small" type="submit">Восстановить</button>
+                    </form>
+                {% endif %}
+            </article>
+        {% endfor %}
+    </div>
+{% else %}
+    <div class="panel empty-state">
+        <h2>Клиенты не найдены</h2>
+        <p>{{ "В архиве пока ничего нет." if show_archived else "Добавьте первого клиента или измените параметры поиска." }}</p>
+    </div>
+{% endif %}
+{% endblock %}
+

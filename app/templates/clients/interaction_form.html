@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Редактирование записи — Персональная CRM{% endblock %}
+{% block content %}
+<div class="page-heading">
+    <div>
+        <a class="back-link" href="{{ url_for('clients.detail', client_id=client.id) }}">← {{ client.full_name }}</a>
+        <h1>Редактирование записи</h1>
+        <p class="muted">Создано {{ interaction.created_at|local_datetime }} · дата истории {{ interaction.created_at|history_date }}</p>
+    </div>
+</div>
+<form class="panel form-stack" method="post" enctype="multipart/form-data">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <label>
+        Тип взаимодействия
+        <select name="interaction_type">
+            {% for value, label in [("note", "Заметка"), ("call", "Звонок"), ("meeting", "Встреча"), ("message", "Сообщение"), ("documents", "Документы")] %}
+                <option value="{{ value }}" {% if interaction.interaction_type == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+        </select>
+    </label>
+    <label>
+        Текст
+        <textarea name="text" rows="7">{{ interaction.text }}</textarea>
+    </label>
+    {% if interaction.attachments %}
+        <div>
+            <span class="field-label">Прикреплённые файлы</span>
+            <div class="attachment-list">
+                {% for attachment in interaction.attachments %}
+                    <div class="attachment-row">
+                        <a class="attachment" href="{{ url_for('clients.download_attachment', attachment_id=attachment.id) }}">📎 {{ attachment.original_name }}</a>
+                        <button class="link-danger" type="submit" formmethod="post" formaction="{{ url_for('clients.delete_attachment', attachment_id=attachment.id) }}" data-confirm-button="Удалить файл?">Удалить</button>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    {% endif %}
+    <label class="file-field">
+        <span>Добавить файлы</span>
+        <input name="files" type="file" multiple>
+    </label>
+    <div class="form-actions">
+        <button class="button button-primary" type="submit">Сохранить</button>
+        <a class="button button-ghost" href="{{ url_for('clients.detail', client_id=client.id) }}">Отмена</a>
+    </div>
+</form>
+{% endblock %}

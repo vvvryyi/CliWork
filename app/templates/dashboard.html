@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}Главная — Персональная CRM{% endblock %}
+{% block content %}
+<div class="page-heading">
+    <div>
+        <p class="eyebrow">Рабочий стол</p>
+        <h1>Добро пожаловать</h1>
+        <p class="muted">Клиенты и ближайшие дела в одном месте.</p>
+    </div>
+    <div class="heading-actions">
+        <a class="button button-primary" href="{{ url_for('clients.create') }}">+ Новый клиент</a>
+        <a class="button" href="{{ url_for('reminders.create') }}">+ Напоминание</a>
+    </div>
+</div>
+
+<div class="stat-grid">
+    <a class="stat-card" href="{{ url_for('clients.index') }}">
+        <span class="stat-value">{{ client_count }}</span>
+        <span class="stat-label">Активных клиентов</span>
+    </a>
+    <a class="stat-card stat-card-alert" href="{{ url_for('reminders.index', status='planned') }}">
+        <span class="stat-value">{{ overdue_count }}</span>
+        <span class="stat-label">Просроченных напоминаний</span>
+    </a>
+    <div class="stat-card">
+        <span class="stat-value">{{ current_timezone() }}</span>
+        <span class="stat-label">Текущий часовой пояс</span>
+    </div>
+</div>
+
+<div class="dashboard-grid">
+    <section class="panel">
+        <div class="panel-heading">
+            <h2>Ближайшие напоминания</h2>
+            <a href="{{ url_for('reminders.index') }}">Все</a>
+        </div>
+        {% if upcoming_reminders %}
+            <div class="item-list">
+                {% for reminder in upcoming_reminders %}
+                    <a class="list-item" href="{{ url_for('reminders.edit', reminder_id=reminder.id) }}">
+                        <span class="item-icon">{{ "☎" if reminder.reminder_type == "call" else "⌂" }}</span>
+                        <span>
+                            <strong>{{ reminder.topic }}</strong>
+                            <small>{{ reminder.client.full_name }} · {{ reminder.starts_at|local_datetime }}</small>
+                        </span>
+                    </a>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="empty-state">На ближайшие семь дней напоминаний нет.</div>
+        {% endif %}
+    </section>
+
+    <section class="panel">
+        <div class="panel-heading">
+            <h2>События недели</h2>
+            <a href="{{ url_for('calendar.index') }}">Календарь</a>
+        </div>
+        {% if upcoming_events %}
+            <div class="item-list">
+                {% for event in upcoming_events %}
+                    <a class="list-item" href="{{ url_for('calendar.edit_event', event_id=event.id) }}">
+                        <span class="event-dot event-{{ event.event_type }}"></span>
+                        <span>
+                            <strong>{{ event_type_labels[event.event_type] }}</strong>
+                            <small>{{ event.client.full_name }} · {{ event.starts_at|local_datetime }}</small>
+                        </span>
+                    </a>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="empty-state">На ближайшие семь дней событий нет.</div>
+        {% endif %}
+    </section>
+</div>
+{% endblock %}
+

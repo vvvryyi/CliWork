@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light">
+    <title>{% block title %}Персональная CRM{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    {% if current_user.is_authenticated %}
+        <header class="topbar">
+            <a class="brand" href="{{ url_for('main.dashboard') }}">
+                <span class="brand-mark">C</span>
+                <span>Персональная CRM</span>
+            </a>
+            <button class="nav-toggle" type="button" aria-label="Открыть меню" data-nav-toggle>☰</button>
+            <nav class="main-nav" data-main-nav>
+                <a href="{{ url_for('main.dashboard') }}">Главная</a>
+                <a href="{{ url_for('clients.index') }}">Клиенты</a>
+                <a href="{{ url_for('messaging.compose') }}">Сообщение</a>
+                <a href="{{ url_for('calendar.index') }}">Календарь</a>
+                <a href="{{ url_for('reminders.index') }}">Напоминания</a>
+                <a href="{{ url_for('settings.index') }}">Настройки</a>
+                <form action="{{ url_for('auth.logout') }}" method="post">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button class="nav-button" type="submit">Выйти</button>
+                </form>
+            </nav>
+        </header>
+    {% endif %}
+
+    <main class="{% if current_user.is_authenticated %}page-shell{% else %}auth-shell{% endif %}">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="flash-stack" aria-live="polite">
+                    {% for category, message in messages %}
+                        <div class="flash flash-{{ category }}">{{ message }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+        {% block content %}{% endblock %}
+    </main>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>
+

@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}Календарь — Персональная CRM{% endblock %}
+{% block content %}
+<div class="page-heading">
+    <div>
+        <p class="eyebrow">Планирование</p>
+        <h1>Календарь</h1>
+    </div>
+    <a class="button button-primary" href="{{ url_for('calendar.create_event', date=selected_date.isoformat()) }}">+ Событие</a>
+</div>
+
+<div class="calendar-toolbar">
+    <div class="segmented">
+        <a class="{% if view == 'day' %}active{% endif %}" href="{{ url_for('calendar.index', view='day', date=selected_date.isoformat()) }}">День</a>
+        <a class="{% if view == 'week' %}active{% endif %}" href="{{ url_for('calendar.index', view='week', date=selected_date.isoformat()) }}">Неделя</a>
+        <a class="{% if view == 'month' %}active{% endif %}" href="{{ url_for('calendar.index', view='month', date=selected_date.isoformat()) }}">Месяц</a>
+    </div>
+    <div class="calendar-navigation">
+        <a class="icon-button" href="{{ url_for('calendar.index', view=view, date=previous_date.isoformat()) }}">←</a>
+        <strong>
+            {% if view == "day" %}{{ selected_date.strftime("%d.%m.%Y") }}
+            {% elif view == "week" %}{{ first_day.strftime("%d.%m") }} — {{ last_day.strftime("%d.%m.%Y") }}
+            {% else %}{{ first_day.strftime("%m.%Y") }}{% endif %}
+        </strong>
+        <a class="icon-button" href="{{ url_for('calendar.index', view=view, date=next_date.isoformat()) }}">→</a>
+        <a class="button button-small" href="{{ url_for('calendar.index', view=view, date=today.isoformat()) }}">Сегодня</a>
+    </div>
+</div>
+
+{% if view == "day" %}
+    <section class="panel">
+        {% if events %}
+            <div class="agenda-list">
+                {% for event in events %}
+                    <a class="agenda-item" href="{{ url_for('calendar.edit_event', event_id=event.id) }}">
+                        <time>{{ event.starts_at|local_datetime("%H:%M") }}</time>
+                        <span class="event-dot event-{{ event.event_type }}"></span>
+                        <span><strong>{{ event_type_labels[event.event_type] }}</strong><small>{{ event.client.full_name }} · {{ event.comment or status_labels[event.status] }}</small></span>
+                    </a>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="empty-state">На этот день событий нет.</div>
+        {% endif %}
+    </section>
+{% else %}
+    <div class="calendar-grid {% if view == 'week' %}calendar-week{% endif %}">
+        <div class="calendar-weekdays">
+            {% for weekday in ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"] %}<div>{{ weekday }}</div>{% endfor %}
+        </div>
+        {% for week in weeks %}
+            <div class="calendar-row">
+                {% for day in week %}
+                    <section class="calendar-day {% if day == today %}is-today{% endif %} {% if view == 'month' and day.month != first_day.month %}outside{% endif %}">
+                        <div class="calendar-day-header">
+                            <a href="{{ url_for('calendar.index', view='day', date=day.isoformat()) }}">{{ day.day }}</a>
+                            <a class="quick-add" href="{{ url_for('calendar.create_event', date=day.isoformat()) }}" title="Добавить событие">+</a>
+                        </div>
+                        <div class="day-events">
+                            {% for event in events_by_date.get(day, []) %}
+                                <a class="calendar-event event-bg-{{ event.event_type }}" href="{{ url_for('calendar.edit_event', event_id=event.id) }}">
+                                    <time>{{ event.starts_at|local_datetime("%H:%M") }}</time>
+                                    <span>{{ event.client.full_name }}</span>
+                                </a>
+                            {% endfor %}
+                        </div>
+                    </section>
+                {% endfor %}
+            </div>
+        {% endfor %}
+    </div>
+{% endif %}
+{% endblock %}
+

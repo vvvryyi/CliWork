@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} — Персональная CRM{% endblock %}
+{% block content %}
+<div class="page-heading">
+    <div><a class="back-link" href="{{ url_for('calendar.index') }}">← Календарь</a><h1>{{ title }}</h1></div>
+</div>
+<form class="panel form-stack" method="post">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="form-grid">
+        <label>
+            Клиент <span class="required">*</span>
+            <select name="client_id" required>
+                <option value="">Выберите клиента</option>
+                {% for client in clients %}
+                    <option value="{{ client.id }}" {% if event.client_id == client.id %}selected{% endif %}>{{ client.full_name }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <label>
+            Вид события
+            <select name="event_type">
+                {% for value, label in event_types.items() %}<option value="{{ value }}" {% if event.event_type == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+            </select>
+        </label>
+        <label>
+            Начало <span class="required">*</span>
+            <input name="starts_at" type="datetime-local" required value="{% if event.starts_at %}{{ event.starts_at|local_datetime('%Y-%m-%dT%H:%M') }}{% elif preset_date %}{{ preset_date.isoformat() }}T09:00{% endif %}">
+        </label>
+        <label>
+            Окончание
+            <input name="ends_at" type="datetime-local" value="{% if event.ends_at %}{{ event.ends_at|local_datetime('%Y-%m-%dT%H:%M') }}{% endif %}">
+        </label>
+        <label>
+            Статус
+            <select name="status">
+                {% for value, label in statuses.items() %}<option value="{{ value }}" {% if event.status == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+            </select>
+        </label>
+        <label class="span-2">
+            Комментарий
+            <textarea name="comment" rows="5">{{ event.comment or "" }}</textarea>
+        </label>
+    </div>
+    <div class="form-actions">
+        <button class="button button-primary" type="submit">Сохранить</button>
+        <a class="button button-ghost" href="{{ url_for('calendar.index') }}">Отмена</a>
+        {% if event.id %}
+            <button class="button button-danger-ghost push-right" type="submit" formmethod="post" formaction="{{ url_for('calendar.delete_event', event_id=event.id) }}" data-confirm-button="Удалить событие?">Удалить</button>
+        {% endif %}
+    </div>
+</form>
+{% endblock %}

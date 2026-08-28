@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+{% block title %}{{ client.full_name }} — Персональная CRM{% endblock %}
+{% block content %}
+<div class="page-heading">
+    <div>
+        <a class="back-link" href="{{ url_for('clients.index') }}">← Клиенты</a>
+        <div class="title-with-avatar">
+            <span class="avatar avatar-large">{{ client.full_name[:1]|upper }}</span>
+            <div>
+                <h1>{{ client.full_name }}</h1>
+                {% if client.preferred_channel %}
+                    <span class="tag">Предпочитает {{ channel_labels.get(client.preferred_channel, client.preferred_channel) }}</span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    <div class="heading-actions">
+        <a class="button button-primary" href="{{ url_for('messaging.compose', client_id=client.id) }}">Написать</a>
+        <a class="button" href="{{ url_for('clients.edit', client_id=client.id) }}">Редактировать</a>
+        <form action="{{ url_for('clients.archive', client_id=client.id) }}" method="post" data-confirm="Переместить клиента в архив?">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="button button-danger-ghost" type="submit">В архив</button>
+        </form>
+    </div>
+</div>
+
+<div class="detail-grid">
+    <aside class="panel contact-panel">
+        <h2>Контакты</h2>
+        <dl class="definition-list">
+            <dt>Телефон</dt><dd>{{ client.phone or "—" }}</dd>
+            <dt>E-mail</dt><dd>{{ client.email or "—" }}</dd>
+            <dt>WhatsApp</dt><dd>{{ client.whatsapp or client.phone or "—" }}</dd>
+            <dt>Telegram</dt><dd>{{ client.telegram or "—" }}</dd>
+            <dt>MAX</dt><dd>{{ client.max_contact or "—" }}</dd>
+            <dt>Instagram</dt><dd>{{ client.instagram or "—" }}</dd>
+            <dt>Facebook</dt><dd>{{ client.facebook or "—" }}</dd>
+        </dl>
+        {% if client.additional_contacts %}
+            <h3>Дополнительно</h3>
+            <p class="pre-wrap">{{ client.additional_contacts }}</p>
+        {% endif %}
+        {% if client.notes %}
+            <h3>Комментарий</h3>
+            <p class="pre-wrap">{{ client.notes }}</p>
+        {% endif %}
+    </aside>
+
+    <section>
+        <form class="panel form-stack" method="post" action="{{ url_for('clients.create_interaction', client_id=client.id) }}" enctype="multipart/form-data">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="panel-heading">
+                <h2>Новая запись</h2>
+                <span class="muted">Дата подставится автоматически</span>
+            </div>
+            <label>
+                Тип взаимодействия
+                <select name="interaction_type">
+                    <option value="note">Заметка</option>
+                    <option value="call">Звонок</option>
+                    <option value="meeting">Встреча</option>
+                    <option value="message">Сообщение</option>
+                    <option value="documents">Документы</option>
+                </select>
+            </label>
+            <label>
+                Результат или комментарий
+                <textarea name="text" rows="4" placeholder="Что обсудили и какое следующее действие?"></textarea>
+            </label>
+            <label class="file-field">
+                <span>Прикрепить файлы</span>
+                <input name="files" type="file" multiple>
+                <small>До 20 МБ на один запрос</small>
+            </label>
+            <div><button class="button button-primary" type="submit">Добавить в историю</button></div>
+        </form>
+
+        <div class="section-heading">
+            <h2>История взаимодействий</h2>
+            <span class="muted">{{ interactions|length }} записей</span>
+        </div>
+        {% if interactions %}
+            <div class="timeline">
+                {% for interaction in interactions %}
+                    <article class="timeline-item">
+                        <div class="timeline-date">{{ interaction.created_at|history_date }}</div>
+                        <div class="timeline-card">
+                            <div class="timeline-meta">
+                                <span class="tag">
+                                    {% if interaction.interaction_type == "call" %}Звонок
+                                    {% elif interaction.interaction_type == "meeting" %}Встреча
+                                    {% elif interaction.interaction_type == "message" %}Сообщение
+                                    {% elif interaction.interaction_type == "documents" %}Документы
+                                    {% else %}Заметка{% endif %}
+                                </span>
+                                {% if interaction.channel %}<span>{{ channel_labels.get(interaction.channel, interaction.channel) }}</span>{% endif %}
+                                {% if interaction.delivery_status == "prepared" %}<span class="status status-warning">Подготовлено</span>{% endif %}
+                                {% if interaction.delivery_status == "sent" %}<span class="status status-success">Отправлено</span>{% endif %}
+                                {% if interaction.updated_at != interaction.created_at %}<span class="muted">Изменено {{ interaction.updated_at|local_datetime }}</span>{% endif %}
+                            </div>
+                            {% if interaction.text %}<p class="pre-wrap">{{ interaction.text }}</p>{% endif %}
+                            {% if interaction.attachments %}
+                                <div class="attachment-list">
+                                    {% for attachment in interaction.attachments %}
+                                        <a class="attachment" href="{{ url_for('clients.download_attachment', attachment_id=attachment.id) }}">📎 {{ attachment.original_name }}</a>
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                            <div class="inline-actions">
+                                <a href="{{ url_for('clients.edit_interaction', client_id=client.id, interaction_id=interaction.id) }}">Редактировать</a>
+                                <form action="{{ url_for('clients.delete_interaction', client_id=client.id, interaction_id=interaction.id) }}" method="post" data-confirm="Удалить эту запись истории?">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button class="link-danger" type="submit">Удалить</button>
+                                </form>
+                            </div>
+                        </div>
+                    </article>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="panel empty-state">История пока пуста. Добавьте первую запись.</div>
+        {% endif %}
+    </section>
+</div>
+{% endblock %}
+
