@@ -29,6 +29,19 @@ document.querySelectorAll("[data-copy-target]").forEach((button) => {
     });
 });
 
+document.querySelectorAll("[data-copy-value]").forEach((button) => {
+    button.addEventListener("click", async () => {
+        await navigator.clipboard.writeText(button.dataset.copyValue);
+        const initial = button.textContent;
+        button.textContent = "Скопировано";
+        window.setTimeout(() => { button.textContent = initial; }, 1600);
+    });
+});
+
+document.querySelectorAll("[data-auto-submit]").forEach((field) => {
+    field.addEventListener("change", () => field.form?.submit());
+});
+
 const reminderType = document.querySelector("[data-reminder-type]");
 const meetingFields = document.querySelector("[data-meeting-fields]");
 if (reminderType && meetingFields) {

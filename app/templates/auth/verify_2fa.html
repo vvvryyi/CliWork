@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Подтверждение входа — Персональная CRM{% endblock %}
+{% block content %}
+<section class="login-card">
+    <div class="brand login-brand">
+        <span class="brand-mark">C</span>
+        <span>Персональная CRM</span>
+    </div>
+    <h1>Код подтверждения</h1>
+    <p class="muted">Введите шестизначный код из приложения-аутентификатора.</p>
+    <form method="post" class="form-stack">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <label>
+            Одноразовый код
+            <input name="code" class="otp-input" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required autofocus>
+        </label>
+        <button class="button button-primary button-wide" type="submit">Подтвердить вход</button>
+        <a class="back-link centered" href="{{ url_for('auth.login') }}">Вернуться к вводу пароля</a>
+    </form>
+</section>
+{% endblock %}

@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Настройка 2FA — Персональная CRM{% endblock %}
+{% block content %}
+<div class="page-heading">
+    <div><a class="back-link" href="{{ url_for('settings.index') }}">← Настройки</a><h1>Настройка 2FA</h1></div>
+</div>
+<section class="panel form-stack settings-form">
+    <div>
+        <h2>1. Добавьте аккаунт</h2>
+        <p class="muted">В приложении Google Authenticator, Microsoft Authenticator, 1Password или другом TOTP-приложении выберите ручной ввод ключа.</p>
+    </div>
+    <div class="secret-box">
+        <span class="field-label">Ключ настройки</span>
+        <code>{{ secret }}</code>
+        <button class="button button-small" type="button" data-copy-value="{{ secret }}">Скопировать ключ</button>
+    </div>
+    <details>
+        <summary>Показать ссылку для приложения-аутентификатора</summary>
+        <p class="muted break-all">{{ uri }}</p>
+    </details>
+    <form method="post" class="form-stack">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div>
+            <h2>2. Подтвердите настройку</h2>
+            <p class="muted">Введите код, который появился в приложении. Ключ настройки действует 10 минут.</p>
+        </div>
+        <label>
+            Шестизначный код
+            <input name="code" class="otp-input" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required autofocus>
+        </label>
+        <div><button class="button button-primary" type="submit">Включить 2FA</button></div>
+    </form>
+</section>
+{% endblock %}

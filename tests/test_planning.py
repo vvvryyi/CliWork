@@ -24,6 +24,37 @@ def test_create_calendar_event(app, auth_client, sample_client):
     assert "Иван Петров".encode() in response.data
 
 
+def test_calendar_year_view_and_planning_limit(app, auth_client, sample_client):
+    response = auth_client.get("/calendar/?view=year&date=2031-01-01")
+    assert response.status_code == 200
+    assert "2031 год".encode() in response.data
+    assert "Январь".encode() in response.data
+    assert "Декабрь".encode() in response.data
+
+    response = auth_client.post(
+        "/calendar/events/new",
+        data={
+            "client_id": sample_client,
+            "event_type": "meeting",
+            "starts_at": "2032-01-01T10:00",
+            "status": "planned",
+        },
+        follow_redirects=True,
+    )
+    assert response.status_code == 200
+    assert "не позднее 31.12.2031".encode() in response.data
+    with app.app_context():
+        assert db.session.scalar(db.select(CalendarEvent)) is None
+
+
+def test_quick_planning_forms_preselect_client(auth_client, sample_client):
+    event_form = auth_client.get(f"/calendar/events/new?client_id={sample_client}")
+    reminder_form = auth_client.get(f"/reminders/new?client_id={sample_client}")
+    selected = f'<option value="{sample_client}" selected>'.encode()
+    assert selected in event_form.data
+    assert selected in reminder_form.data
+
+
 def test_create_call_and_meeting_reminders(app, auth_client, sample_client):
     call = auth_client.post(
         "/reminders/new",

@@ -56,8 +56,7 @@
             <label>
                 Тип взаимодействия
                 <select name="interaction_type">
-                    <option value="note">Заметка</option>
-                    <option value="call">Звонок</option>
+                    <option value="call" selected>Звонок</option>
                     <option value="meeting">Встреча</option>
                     <option value="message">Сообщение</option>
                     <option value="documents">Документы</option>
@@ -91,7 +90,7 @@
                                     {% elif interaction.interaction_type == "meeting" %}Встреча
                                     {% elif interaction.interaction_type == "message" %}Сообщение
                                     {% elif interaction.interaction_type == "documents" %}Документы
-                                    {% else %}Заметка{% endif %}
+                                    {% else %}Запись{% endif %}
                                 </span>
                                 {% if interaction.channel %}<span>{{ channel_labels.get(interaction.channel, interaction.channel) }}</span>{% endif %}
                                 {% if interaction.delivery_status == "prepared" %}<span class="status status-warning">Подготовлено</span>{% endif %}
@@ -123,4 +122,3 @@
     </section>
 </div>
 {% endblock %}
-

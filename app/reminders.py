@@ -61,7 +61,10 @@ def validate_reminder(reminder):
 @bp.route("/new", methods=["GET", "POST"])
 @login_required
 def create():
-    reminder = Reminder(reminder_type=request.args.get("type", "call"))
+    reminder = Reminder(
+        reminder_type=request.args.get("type", "call"),
+        client_id=request.args.get("client_id", type=int),
+    )
     clients = db.session.scalars(
         db.select(Client)
         .where(Client.archived_at.is_(None))

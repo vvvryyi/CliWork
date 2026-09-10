@@ -28,5 +28,29 @@
     </label>
     <div><button class="button button-primary" type="submit">Сохранить настройки</button></div>
 </form>
-{% endblock %}
 
+<section class="panel form-stack settings-form settings-section">
+    <div>
+        <h2>Двухфакторная аутентификация</h2>
+        {% if two_factor_enabled %}
+            <p><span class="status status-success">Включена</span></p>
+            <p class="muted">После ввода пароля CRM запрашивает одноразовый код из приложения-аутентификатора.</p>
+        {% else %}
+            <p><span class="status status-neutral">Выключена</span></p>
+            <p class="muted">Защитите вход дополнительным шестизначным TOTP-кодом.</p>
+        {% endif %}
+    </div>
+    {% if two_factor_enabled %}
+        <form method="post" action="{{ url_for('settings.disable_2fa') }}" class="inline-form" data-confirm="Отключить двухфакторную аутентификацию?">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <label>
+                Текущий код для отключения
+                <input name="code" class="otp-input" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required>
+            </label>
+            <button class="button button-danger-ghost" type="submit">Отключить 2FA</button>
+        </form>
+    {% else %}
+        <div><a class="button button-primary" href="{{ url_for('settings.setup_2fa') }}">Настроить 2FA</a></div>
+    {% endif %}
+</section>
+{% endblock %}

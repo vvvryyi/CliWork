@@ -21,6 +21,8 @@ from .utils import CHANNEL_LABELS, save_uploads
 
 bp = Blueprint("clients", __name__, url_prefix="/clients")
 
+INTERACTION_TYPES = {"call", "meeting", "message", "documents"}
+
 
 def get_client_or_404(client_id, include_archived=False):
     client = db.get_or_404(Client, client_id)
@@ -165,10 +167,13 @@ def create_interaction(client_id):
         flash("Введите текст или приложите файл.", "error")
         return redirect(url_for("clients.detail", client_id=client.id))
 
+    interaction_type = request.form.get("interaction_type", "call")
+    if interaction_type not in INTERACTION_TYPES:
+        interaction_type = "call"
     interaction = Interaction(
         client_id=client.id,
         text=text,
-        interaction_type=request.form.get("interaction_type", "note"),
+        interaction_type=interaction_type,
     )
     db.session.add(interaction)
     db.session.flush()
@@ -196,8 +201,9 @@ def edit_interaction(client_id, interaction_id):
             flash("Запись не может быть пустой.", "error")
         else:
             interaction.text = text
-            interaction.interaction_type = request.form.get(
-                "interaction_type", interaction.interaction_type
+            interaction_type = request.form.get("interaction_type", "call")
+            interaction.interaction_type = (
+                interaction_type if interaction_type in INTERACTION_TYPES else "call"
             )
             try:
                 save_uploads(request.files.getlist("files"), client.id, interaction.id)

@@ -16,6 +16,13 @@ from .utils import (
 
 bp = Blueprint("calendar", __name__, url_prefix="/calendar")
 
+PLANNING_END = date(2031, 12, 31)
+CALENDAR_START_YEAR = 2020
+MONTH_NAMES = (
+    "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
+    "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь",
+)
+
 
 def parse_date(value, fallback=None):
     try:
@@ -34,9 +41,13 @@ def local_day_bounds(day):
 @login_required
 def index():
     view = request.args.get("view", "month")
-    if view not in {"day", "week", "month"}:
+    if view not in {"day", "week", "month", "year"}:
         view = "month"
     selected_date = parse_date(request.args.get("date"))
+    if selected_date > PLANNING_END:
+        selected_date = PLANNING_END
+    if selected_date.year < CALENDAR_START_YEAR:
+        selected_date = date(CALENDAR_START_YEAR, 1, 1)
 
     if view == "day":
         first_day = selected_date
@@ -46,7 +57,7 @@ def index():
         first_day = selected_date - timedelta(days=selected_date.weekday())
         last_day = first_day + timedelta(days=6)
         weeks = [list(first_day + timedelta(days=i) for i in range(7))]
-    else:
+    elif view == "month":
         first_day = selected_date.replace(day=1)
         if first_day.month == 12:
             next_month = first_day.replace(
@@ -56,6 +67,10 @@ def index():
             next_month = first_day.replace(month=first_day.month + 1, day=1)
         last_day = next_month - timedelta(days=1)
         weeks = month_grid(first_day.year, first_day.month)
+    else:
+        first_day = date(selected_date.year, 1, 1)
+        last_day = date(selected_date.year, 12, 31)
+        weeks = None
 
     query_start, _ = local_day_bounds(first_day)
     _, query_end = local_day_bounds(last_day)
@@ -72,16 +87,26 @@ def index():
         local_date = utc_naive_to_local(event.starts_at).date()
         events_by_date.setdefault(local_date, []).append(event)
 
-    previous_date = (
-        first_day - timedelta(days=1 if view == "day" else 7)
-        if view != "month"
-        else (first_day - timedelta(days=1)).replace(day=1)
-    )
-    next_date = (
-        first_day + timedelta(days=1 if view == "day" else 7)
-        if view != "month"
-        else (last_day + timedelta(days=1))
-    )
+    if view == "day":
+        previous_date = first_day - timedelta(days=1)
+        next_date = first_day + timedelta(days=1)
+    elif view == "week":
+        previous_date = first_day - timedelta(days=7)
+        next_date = first_day + timedelta(days=7)
+    elif view == "month":
+        previous_date = (first_day - timedelta(days=1)).replace(day=1)
+        next_date = last_day + timedelta(days=1)
+    else:
+        previous_date = date(first_day.year - 1, 1, 1)
+        next_date = date(first_day.year + 1, 1, 1)
+
+    year_months = []
+    if view == "year":
+        for month in range(1, 13):
+            month_first = date(selected_date.year, month, 1)
+            year_months.append(
+                (month_first, MONTH_NAMES[month - 1], month_grid(selected_date.year, month))
+            )
     return render_template(
         "calendar/index.html",
         view=view,
@@ -94,6 +119,9 @@ def index():
         previous_date=previous_date,
         next_date=next_date,
         today=utc_naive_to_local(utcnow()).date(),
+        year_months=year_months,
+        calendar_years=range(CALENDAR_START_YEAR, PLANNING_END.year + 1),
+        planning_end=PLANNING_END,
     )
 
 
@@ -106,10 +134,23 @@ def apply_event_form(event):
     event.status = request.form.get("status", "planned")
 
 
+def validate_event(event):
+    if not event.client_id or not event.starts_at:
+        return "Выберите клиента и дату события."
+    local_start = utc_naive_to_local(event.starts_at)
+    if local_start.date() > PLANNING_END:
+        return "События можно планировать не позднее 31.12.2031."
+    if event.ends_at and event.ends_at < event.starts_at:
+        return "Окончание не может быть раньше начала."
+    if event.ends_at and utc_naive_to_local(event.ends_at).date() > PLANNING_END:
+        return "События можно планировать не позднее 31.12.2031."
+    return None
+
+
 @bp.route("/events/new", methods=["GET", "POST"])
 @login_required
 def create_event():
-    event = CalendarEvent()
+    event = CalendarEvent(client_id=request.args.get("client_id", type=int))
     clients = db.session.scalars(
         db.select(Client)
         .where(Client.archived_at.is_(None))
@@ -118,10 +159,9 @@ def create_event():
     preset_date = parse_date(request.args.get("date"))
     if request.method == "POST":
         apply_event_form(event)
-        if not event.client_id or not event.starts_at:
-            flash("Выберите клиента и дату события.", "error")
-        elif event.ends_at and event.ends_at < event.starts_at:
-            flash("Окончание не может быть раньше начала.", "error")
+        error = validate_event(event)
+        if error:
+            flash(error, "error")
         else:
             db.session.add(event)
             db.session.commit()
@@ -135,6 +175,7 @@ def create_event():
         statuses=STATUS_LABELS,
         title="Новое событие",
         preset_date=preset_date,
+        planning_end=PLANNING_END,
     )
 
 
@@ -149,10 +190,9 @@ def edit_event(event_id):
     ).all()
     if request.method == "POST":
         apply_event_form(event)
-        if not event.client_id or not event.starts_at:
-            flash("Выберите клиента и дату события.", "error")
-        elif event.ends_at and event.ends_at < event.starts_at:
-            flash("Окончание не может быть раньше начала.", "error")
+        error = validate_event(event)
+        if error:
+            flash(error, "error")
         else:
             db.session.commit()
             flash("Событие обновлено.", "success")
@@ -165,6 +205,7 @@ def edit_event(event_id):
         statuses=STATUS_LABELS,
         title="Редактирование события",
         preset_date=None,
+        planning_end=PLANNING_END,
     )
 
 

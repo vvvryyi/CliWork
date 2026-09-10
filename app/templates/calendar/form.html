@@ -24,11 +24,11 @@
         </label>
         <label>
             Начало <span class="required">*</span>
-            <input name="starts_at" type="datetime-local" required value="{% if event.starts_at %}{{ event.starts_at|local_datetime('%Y-%m-%dT%H:%M') }}{% elif preset_date %}{{ preset_date.isoformat() }}T09:00{% endif %}">
+            <input name="starts_at" type="datetime-local" max="{{ planning_end.isoformat() }}T23:59" required value="{% if event.starts_at %}{{ event.starts_at|local_datetime('%Y-%m-%dT%H:%M') }}{% elif preset_date %}{{ preset_date.isoformat() }}T09:00{% endif %}">
         </label>
         <label>
             Окончание
-            <input name="ends_at" type="datetime-local" value="{% if event.ends_at %}{{ event.ends_at|local_datetime('%Y-%m-%dT%H:%M') }}{% endif %}">
+            <input name="ends_at" type="datetime-local" max="{{ planning_end.isoformat() }}T23:59" value="{% if event.ends_at %}{{ event.ends_at|local_datetime('%Y-%m-%dT%H:%M') }}{% endif %}">
         </label>
         <label>
             Статус

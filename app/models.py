@@ -79,7 +79,7 @@ class Interaction(TimestampMixin, db.Model):
         db.Integer, db.ForeignKey("clients.id"), nullable=False, index=True
     )
     text = db.Column(db.Text, nullable=False, default="")
-    interaction_type = db.Column(db.String(30), nullable=False, default="note")
+    interaction_type = db.Column(db.String(30), nullable=False, default="call")
     channel = db.Column(db.String(30), nullable=False, default="")
     delivery_status = db.Column(db.String(30), nullable=False, default="")
 

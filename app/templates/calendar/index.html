@@ -14,15 +14,36 @@
         <a class="{% if view == 'day' %}active{% endif %}" href="{{ url_for('calendar.index', view='day', date=selected_date.isoformat()) }}">День</a>
         <a class="{% if view == 'week' %}active{% endif %}" href="{{ url_for('calendar.index', view='week', date=selected_date.isoformat()) }}">Неделя</a>
         <a class="{% if view == 'month' %}active{% endif %}" href="{{ url_for('calendar.index', view='month', date=selected_date.isoformat()) }}">Месяц</a>
+        <a class="{% if view == 'year' %}active{% endif %}" href="{{ url_for('calendar.index', view='year', date=selected_date.isoformat()) }}">Год</a>
     </div>
     <div class="calendar-navigation">
-        <a class="icon-button" href="{{ url_for('calendar.index', view=view, date=previous_date.isoformat()) }}">←</a>
+        {% if previous_date.year >= calendar_years|first %}
+            <a class="icon-button" href="{{ url_for('calendar.index', view=view, date=previous_date.isoformat()) }}" aria-label="Предыдущий период">←</a>
+        {% else %}
+            <span class="icon-button is-disabled" aria-hidden="true">←</span>
+        {% endif %}
         <strong>
             {% if view == "day" %}{{ selected_date.strftime("%d.%m.%Y") }}
             {% elif view == "week" %}{{ first_day.strftime("%d.%m") }} — {{ last_day.strftime("%d.%m.%Y") }}
-            {% else %}{{ first_day.strftime("%m.%Y") }}{% endif %}
+            {% elif view == "month" %}{{ first_day.strftime("%m.%Y") }}
+            {% else %}{{ selected_date.year }} год{% endif %}
         </strong>
-        <a class="icon-button" href="{{ url_for('calendar.index', view=view, date=next_date.isoformat()) }}">→</a>
+        {% if next_date <= planning_end %}
+            <a class="icon-button" href="{{ url_for('calendar.index', view=view, date=next_date.isoformat()) }}" aria-label="Следующий период">→</a>
+        {% else %}
+            <span class="icon-button is-disabled" aria-hidden="true">→</span>
+        {% endif %}
+        <form class="year-picker" method="get">
+            <input type="hidden" name="view" value="{{ view }}">
+            <label>
+                <span class="sr-only">Год</span>
+                <select name="date" data-auto-submit>
+                    {% for year in calendar_years %}
+                        <option value="{{ year }}-01-01" {% if selected_date.year == year %}selected{% endif %}>{{ year }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+        </form>
         <a class="button button-small" href="{{ url_for('calendar.index', view=view, date=today.isoformat()) }}">Сегодня</a>
     </div>
 </div>
@@ -43,7 +64,7 @@
             <div class="empty-state">На этот день событий нет.</div>
         {% endif %}
     </section>
-{% else %}
+{% elif view in ("week", "month") %}
     <div class="calendar-grid {% if view == 'week' %}calendar-week{% endif %}">
         <div class="calendar-weekdays">
             {% for weekday in ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"] %}<div>{{ weekday }}</div>{% endfor %}
@@ -69,6 +90,25 @@
             </div>
         {% endfor %}
     </div>
+{% else %}
+    <div class="year-grid">
+        {% for month_first, month_name, month_weeks in year_months %}
+            <section class="mini-month">
+                <h2><a href="{{ url_for('calendar.index', view='month', date=month_first.isoformat()) }}">{{ month_name }}</a></h2>
+                <div class="mini-weekdays">
+                    {% for weekday in ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"] %}<span>{{ weekday }}</span>{% endfor %}
+                </div>
+                <div class="mini-days">
+                    {% for week in month_weeks %}
+                        {% for day in week %}
+                            <a class="mini-day {% if day.month != month_first.month %}outside{% endif %} {% if day == today %}is-today{% endif %} {% if events_by_date.get(day) %}has-events{% endif %}"
+                               href="{{ url_for('calendar.index', view='day', date=day.isoformat()) }}"
+                               {% if events_by_date.get(day) %}title="Событий: {{ events_by_date.get(day)|length }}"{% endif %}>{{ day.day }}</a>
+                        {% endfor %}
+                    {% endfor %}
+                </div>
+            </section>
+        {% endfor %}
+    </div>
 {% endif %}
 {% endblock %}
-

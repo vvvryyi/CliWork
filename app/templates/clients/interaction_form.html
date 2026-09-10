@@ -13,7 +13,7 @@
     <label>
         Тип взаимодействия
         <select name="interaction_type">
-            {% for value, label in [("note", "Заметка"), ("call", "Звонок"), ("meeting", "Встреча"), ("message", "Сообщение"), ("documents", "Документы")] %}
+            {% for value, label in [("call", "Звонок"), ("meeting", "Встреча"), ("message", "Сообщение"), ("documents", "Документы")] %}
                 <option value="{{ value }}" {% if interaction.interaction_type == value %}selected{% endif %}>{{ label }}</option>
             {% endfor %}
         </select>
