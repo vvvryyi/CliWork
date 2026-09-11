@@ -4,7 +4,10 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="color-scheme" content="light">
+    <meta name="theme-color" content="#246bfe">
     <title>{% block title %}Персональная CRM{% endblock %}</title>
+    <link rel="manifest" href="{{ url_for('static', filename='manifest.webmanifest') }}">
+    <link rel="icon" href="{{ url_for('static', filename='icon.svg') }}" type="image/svg+xml">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
@@ -20,7 +23,6 @@
                 <a href="{{ url_for('clients.index') }}">Клиенты</a>
                 <a href="{{ url_for('messaging.compose') }}">Сообщение</a>
                 <a href="{{ url_for('calendar.index') }}">Календарь</a>
-                <a href="{{ url_for('reminders.index') }}">Напоминания</a>
                 <a href="{{ url_for('settings.index') }}">Настройки</a>
                 <form action="{{ url_for('auth.logout') }}" method="post">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -47,4 +49,3 @@
     {% block scripts %}{% endblock %}
 </body>
 </html>
-

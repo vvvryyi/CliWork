@@ -1,7 +1,8 @@
 from io import BytesIO
 
 from app.extensions import db
-from app.models import Client, Interaction
+from app.models import CalendarEvent, Client, Interaction
+from app.utils import utc_naive_to_local
 
 
 def test_create_search_edit_and_archive_client(app, auth_client, sample_client):
@@ -62,12 +63,13 @@ def test_history_uses_compact_date(auth_client, sample_client):
     assert "Новая запись".encode() in response.data
 
 
-def test_client_cards_have_prefilled_quick_actions(auth_client, sample_client):
+def test_client_list_is_grouped_and_only_shows_names(auth_client, sample_client):
     response = auth_client.get("/clients/")
     assert response.status_code == 200
-    assert f"/messages/compose?client_id={sample_client}".encode() in response.data
-    assert f"/calendar/events/new?client_id={sample_client}".encode() in response.data
-    assert f"/reminders/new?client_id={sample_client}".encode() in response.data
+    assert "<summary><span>И</span>".encode() in response.data
+    assert f'/clients/{sample_client}'.encode() in response.data
+    assert "+7 999 111-22-33".encode() not in response.data
+    assert "ivan@example.com".encode() not in response.data
 
 
 def test_interaction_defaults_to_call_and_note_is_not_available(app, auth_client, sample_client):
@@ -82,3 +84,69 @@ def test_interaction_defaults_to_call_and_note_is_not_available(app, auth_client
     with app.app_context():
         interaction = db.session.scalar(db.select(Interaction))
         assert interaction.interaction_type == "call"
+
+
+def test_interaction_date_creates_calendar_event_without_copying_text(
+    app, auth_client, sample_client
+):
+    note = "Позвонить клиенту повторно 260911"
+    response = auth_client.post(
+        f"/clients/{sample_client}/interactions",
+        data={"interaction_type": "call", "text": note},
+        follow_redirects=True,
+    )
+    assert "событие добавлено на 11.09.2026 09:00".encode() in response.data
+
+    with app.app_context():
+        event = db.session.scalar(db.select(CalendarEvent))
+        assert event.client_id == sample_client
+        assert event.comment == ""
+        assert event.source_interaction_id is not None
+        assert utc_naive_to_local(event.starts_at).strftime("%y%m%d %H:%M") == "260911 09:00"
+
+    day = auth_client.get("/calendar/?view=day&date=2026-09-11")
+    assert "Иван Петров".encode() in day.data
+    assert note.encode() not in day.data
+    assert f'/clients/{sample_client}'.encode() in day.data
+
+
+def test_editing_interaction_reschedules_without_duplicate(
+    app, auth_client, sample_client
+):
+    auth_client.post(
+        f"/clients/{sample_client}/interactions",
+        data={"text": "Первый срок 260911"},
+    )
+    response = auth_client.post(
+        f"/clients/{sample_client}/interactions/1/edit",
+        data={"interaction_type": "call", "text": "Новый срок 260912 16:10"},
+    )
+    assert response.status_code == 302
+    with app.app_context():
+        events = db.session.scalars(db.select(CalendarEvent)).all()
+        assert len(events) == 1
+        assert utc_naive_to_local(events[0].starts_at).strftime("%y%m%d %H:%M") == "260912 16:10"
+
+
+def test_deleting_interaction_deletes_generated_event(app, auth_client, sample_client):
+    auth_client.post(
+        f"/clients/{sample_client}/interactions",
+        data={"text": "Созвон 260911"},
+    )
+    auth_client.post(f"/clients/{sample_client}/interactions/1/delete")
+    with app.app_context():
+        assert db.session.scalar(db.select(CalendarEvent)) is None
+
+
+def test_archiving_client_hides_its_planned_events(app, auth_client, sample_client):
+    auth_client.post(
+        f"/clients/{sample_client}/interactions",
+        data={"text": "Созвон 260911"},
+    )
+    auth_client.post(f"/clients/{sample_client}/archive")
+    with app.app_context():
+        event = db.session.scalar(db.select(CalendarEvent))
+        assert event.status == "cancelled"
+
+    response = auth_client.get("/calendar/?view=month&date=2026-09-01")
+    assert '<span class="calendar-count">1</span>'.encode() not in response.data

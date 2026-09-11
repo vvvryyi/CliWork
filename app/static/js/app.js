@@ -42,12 +42,8 @@ document.querySelectorAll("[data-auto-submit]").forEach((field) => {
     field.addEventListener("change", () => field.form?.submit());
 });
 
-const reminderType = document.querySelector("[data-reminder-type]");
-const meetingFields = document.querySelector("[data-meeting-fields]");
-if (reminderType && meetingFields) {
-    const updateMeetingFields = () => {
-        meetingFields.hidden = reminderType.value !== "meeting";
-    };
-    reminderType.addEventListener("change", updateMeetingFields);
-    updateMeetingFields();
+if ("serviceWorker" in navigator && window.isSecureContext) {
+    window.addEventListener("load", () => {
+        navigator.serviceWorker.register("/service-worker.js");
+    });
 }

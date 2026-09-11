@@ -15,7 +15,9 @@
         <a class="{% if view == 'week' %}active{% endif %}" href="{{ url_for('calendar.index', view='week', date=selected_date.isoformat()) }}">Неделя</a>
         <a class="{% if view == 'month' %}active{% endif %}" href="{{ url_for('calendar.index', view='month', date=selected_date.isoformat()) }}">Месяц</a>
         <a class="{% if view == 'year' %}active{% endif %}" href="{{ url_for('calendar.index', view='year', date=selected_date.isoformat()) }}">Год</a>
+        <a class="{% if view == 'overdue' %}active{% endif %}" href="{{ url_for('calendar.index', view='overdue') }}">Просроченные</a>
     </div>
+    {% if view != "overdue" %}
     <div class="calendar-navigation">
         {% if previous_date.year >= calendar_years|first %}
             <a class="icon-button" href="{{ url_for('calendar.index', view=view, date=previous_date.isoformat()) }}" aria-label="Предыдущий период">←</a>
@@ -46,49 +48,73 @@
         </form>
         <a class="button button-small" href="{{ url_for('calendar.index', view=view, date=today.isoformat()) }}">Сегодня</a>
     </div>
+    {% endif %}
 </div>
 
-{% if view == "day" %}
+{% if view in ("day", "overdue") %}
     <section class="panel">
+        {% if view == "overdue" %}<h2>Просроченные напоминания</h2>{% endif %}
         {% if events %}
             <div class="agenda-list">
                 {% for event in events %}
-                    <a class="agenda-item" href="{{ url_for('calendar.edit_event', event_id=event.id) }}">
+                    <div class="agenda-item">
                         <time>{{ event.starts_at|local_datetime("%H:%M") }}</time>
                         <span class="event-dot event-{{ event.event_type }}"></span>
-                        <span><strong>{{ event_type_labels[event.event_type] }}</strong><small>{{ event.client.full_name }} · {{ event.comment or status_labels[event.status] }}</small></span>
-                    </a>
+                        <span>
+                            {% if event.client %}
+                                <strong><a href="{{ url_for('clients.detail', client_id=event.client.id) }}">{{ event.client.full_name }}</a></strong>
+                            {% else %}
+                                <strong><a href="{{ url_for('calendar.edit_event', event_id=event.id) }}">{{ event.title }}</a></strong>
+                            {% endif %}
+                            {% if view == "overdue" %}<small>{{ event.starts_at|local_datetime("%d.%m.%Y") }}</small>{% endif %}
+                        </span>
+                    </div>
                 {% endfor %}
             </div>
         {% else %}
-            <div class="empty-state">На этот день событий нет.</div>
+            <div class="empty-state">{{ "Просроченных напоминаний нет." if view == "overdue" else "На этот день событий нет." }}</div>
         {% endif %}
     </section>
-{% elif view in ("week", "month") %}
-    <div class="calendar-grid {% if view == 'week' %}calendar-week{% endif %}">
+{% elif view == "month" %}
+    <div class="calendar-grid">
         <div class="calendar-weekdays">
             {% for weekday in ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"] %}<div>{{ weekday }}</div>{% endfor %}
         </div>
         {% for week in weeks %}
             <div class="calendar-row">
                 {% for day in week %}
-                    <section class="calendar-day {% if day == today %}is-today{% endif %} {% if view == 'month' and day.month != first_day.month %}outside{% endif %}">
-                        <div class="calendar-day-header">
-                            <a href="{{ url_for('calendar.index', view='day', date=day.isoformat()) }}">{{ day.day }}</a>
-                            <a class="quick-add" href="{{ url_for('calendar.create_event', date=day.isoformat()) }}" title="Добавить событие">+</a>
-                        </div>
-                        <div class="day-events">
-                            {% for event in events_by_date.get(day, []) %}
-                                <a class="calendar-event event-bg-{{ event.event_type }}" href="{{ url_for('calendar.edit_event', event_id=event.id) }}">
-                                    <time>{{ event.starts_at|local_datetime("%H:%M") }}</time>
-                                    <span>{{ event.client.full_name }}</span>
-                                </a>
-                            {% endfor %}
-                        </div>
-                    </section>
+                    <a class="calendar-day {% if day == today %}is-today{% endif %} {% if day.month != first_day.month %}outside{% endif %}"
+                       href="{{ url_for('calendar.index', view='day', date=day.isoformat()) }}"
+                       aria-label="{{ day.strftime('%d.%m.%Y') }}, событий: {{ events_by_date.get(day, [])|length }}">
+                        <span class="calendar-day-header"><strong>{{ day.day }}</strong></span>
+                        {% set day_count = events_by_date.get(day, [])|length %}
+                        {% if day_count %}<span class="calendar-count">{{ day_count }}</span>{% endif %}
+                    </a>
                 {% endfor %}
             </div>
         {% endfor %}
+    </div>
+{% elif view == "week" %}
+    <div class="calendar-grid calendar-week">
+        <div class="calendar-weekdays">
+            {% for weekday in ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"] %}<div>{{ weekday }}</div>{% endfor %}
+        </div>
+        <div class="calendar-row">
+            {% for day in weeks[0] %}
+                <section class="calendar-day {% if day == today %}is-today{% endif %}">
+                    <div class="calendar-day-header"><a href="{{ url_for('calendar.index', view='day', date=day.isoformat()) }}">{{ day.day }}</a></div>
+                    <div class="day-events">
+                        {% for event in events_by_date.get(day, []) %}
+                            {% if event.client %}
+                                <a class="calendar-event event-bg-{{ event.event_type }}" href="{{ url_for('clients.detail', client_id=event.client.id) }}">{{ event.client.full_name }}</a>
+                            {% else %}
+                                <a class="calendar-event event-bg-{{ event.event_type }}" href="{{ url_for('calendar.edit_event', event_id=event.id) }}">{{ event.title }}</a>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                </section>
+            {% endfor %}
+        </div>
     </div>
 {% else %}
     <div class="year-grid">

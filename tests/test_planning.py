@@ -1,5 +1,8 @@
 from app.extensions import db
-from app.models import CalendarEvent, Reminder
+from datetime import datetime
+
+from app.models import CalendarEvent
+from app.utils import local_to_utc_naive, parse_planning_suffix
 
 
 def test_create_calendar_event(app, auth_client, sample_client):
@@ -7,6 +10,7 @@ def test_create_calendar_event(app, auth_client, sample_client):
         "/calendar/events/new",
         data={
             "client_id": sample_client,
+            "title": "",
             "event_type": "meeting",
             "starts_at": "2026-07-28T10:00",
             "ends_at": "2026-07-28T11:00",
@@ -21,7 +25,8 @@ def test_create_calendar_event(app, auth_client, sample_client):
 
     response = auth_client.get("/calendar/?view=month&date=2026-07-01")
     assert response.status_code == 200
-    assert "Иван Петров".encode() in response.data
+    assert '<span class="calendar-count">1</span>'.encode() in response.data
+    assert "/calendar/?view=day&amp;date=2026-07-28".encode() in response.data
 
 
 def test_calendar_year_view_and_planning_limit(app, auth_client, sample_client):
@@ -49,44 +54,87 @@ def test_calendar_year_view_and_planning_limit(app, auth_client, sample_client):
 
 def test_quick_planning_forms_preselect_client(auth_client, sample_client):
     event_form = auth_client.get(f"/calendar/events/new?client_id={sample_client}")
-    reminder_form = auth_client.get(f"/reminders/new?client_id={sample_client}")
     selected = f'<option value="{sample_client}" selected>'.encode()
     assert selected in event_form.data
-    assert selected in reminder_form.data
 
 
-def test_create_call_and_meeting_reminders(app, auth_client, sample_client):
-    call = auth_client.post(
-        "/reminders/new",
+def test_create_personal_event_without_client(app, auth_client):
+    response = auth_client.post(
+        "/calendar/events/new",
         data={
-            "client_id": sample_client,
-            "reminder_type": "call",
+            "client_id": "",
+            "title": "Личное дело",
+            "event_type": "task",
             "starts_at": "2026-07-28T12:00",
-            "topic": "Обсудить документы",
-            "status": "planned",
-            "notify_before_minutes": 60,
         },
     )
-    meeting = auth_client.post(
-        "/reminders/new",
-        data={
-            "client_id": sample_client,
-            "reminder_type": "meeting",
-            "starts_at": "2026-07-29T15:00",
-            "topic": "Онлайн-встреча",
-            "status": "planned",
-            "notify_before_minutes": 1440,
-            "meeting_format": "online",
-            "location_or_url": "https://example.com/meeting",
-        },
-    )
-    assert call.status_code == 302
-    assert meeting.status_code == 302
+    assert response.status_code == 302
     with app.app_context():
-        reminders = db.session.scalars(
-            db.select(Reminder).order_by(Reminder.id)
-        ).all()
-        assert [item.reminder_type for item in reminders] == ["call", "meeting"]
+        event = db.session.scalar(db.select(CalendarEvent))
+        assert event.client_id is None
+        assert event.title == "Личное дело"
+
+
+def test_personal_event_requires_title(app, auth_client):
+    response = auth_client.post(
+        "/calendar/events/new",
+        data={"client_id": "", "title": "", "starts_at": "2026-07-28T12:00"},
+        follow_redirects=True,
+    )
+    assert "Для личного события укажите название".encode() in response.data
+    with app.app_context():
+        assert db.session.scalar(db.select(CalendarEvent)) is None
+
+
+def test_planning_suffix_uses_yymmdd_and_default_time():
+    planned, found = parse_planning_suffix("Позвонить повторно 260911")
+    assert found is True
+    assert planned == datetime(2026, 9, 11, 9, 0)
+
+    planned, found = parse_planning_suffix("Позвонить повторно 260911 15:30")
+    assert found is True
+    assert planned == datetime(2026, 9, 11, 15, 30)
+
+
+def test_planning_suffix_rejects_invalid_or_non_trailing_dates():
+    assert parse_planning_suffix("Дата 260911 не в конце") == (None, False)
+    assert parse_planning_suffix("Некорректная дата 261332") == (None, True)
+    assert parse_planning_suffix("Старый формат 26.09.11") == (None, False)
+
+
+def test_dashboard_uses_monday_to_sunday(app, auth_client, sample_client, monkeypatch):
+    import app.main as main_module
+
+    fixed_now = datetime(2026, 9, 9, 12, 0)
+    monkeypatch.setattr(main_module, "utcnow", lambda: fixed_now)
+    with app.app_context():
+        db.session.add_all(
+            [
+                CalendarEvent(
+                    client_id=sample_client,
+                    starts_at=local_to_utc_naive("2026-09-07T08:00"),
+                    title="",
+                    status="planned",
+                ),
+                CalendarEvent(
+                    client_id=sample_client,
+                    starts_at=local_to_utc_naive("2026-09-13T18:00"),
+                    title="",
+                    status="planned",
+                ),
+                CalendarEvent(
+                    client_id=sample_client,
+                    starts_at=local_to_utc_naive("2026-09-14T08:00"),
+                    title="",
+                    status="planned",
+                ),
+            ]
+        )
+        db.session.commit()
+
+    response = auth_client.get("/")
+    assert response.data.count("Иван Петров".encode()) == 2
+    assert "07.09 — 13.09.2026".encode() in response.data
 
 
 def test_prepare_and_confirm_message(app, auth_client, sample_client):

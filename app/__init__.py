@@ -44,7 +44,6 @@ def create_app(test_config=None):
     from .clients import bp as clients_bp
     from .main import bp as main_bp
     from .messaging import bp as messaging_bp
-    from .reminders import bp as reminders_bp
     from .settings import bp as settings_bp
 
     app.register_blueprint(auth_bp)
@@ -52,7 +51,6 @@ def create_app(test_config=None):
     app.register_blueprint(clients_bp)
     app.register_blueprint(messaging_bp)
     app.register_blueprint(calendar_bp)
-    app.register_blueprint(reminders_bp)
     app.register_blueprint(settings_bp)
 
     from .utils import (
@@ -90,5 +88,11 @@ def create_app(test_config=None):
     @app.get("/healthz")
     def healthz():
         return {"status": "ok"}
+
+    @app.get("/service-worker.js")
+    def service_worker():
+        response = app.send_static_file("service-worker.js")
+        response.headers["Cache-Control"] = "no-cache"
+        return response
 
     return app

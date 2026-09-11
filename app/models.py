@@ -46,13 +46,6 @@ class Client(TimestampMixin, db.Model):
     events = db.relationship(
         "CalendarEvent",
         back_populates="client",
-        cascade="all, delete-orphan",
-        lazy="dynamic",
-    )
-    reminders = db.relationship(
-        "Reminder",
-        back_populates="client",
-        cascade="all, delete-orphan",
         lazy="dynamic",
     )
 
@@ -90,6 +83,11 @@ class Interaction(TimestampMixin, db.Model):
         cascade="all, delete-orphan",
         lazy="selectin",
     )
+    calendar_event = db.relationship(
+        "CalendarEvent",
+        back_populates="source_interaction",
+        uselist=False,
+    )
 
 
 class Attachment(TimestampMixin, db.Model):
@@ -117,34 +115,29 @@ class CalendarEvent(TimestampMixin, db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     client_id = db.Column(
-        db.Integer, db.ForeignKey("clients.id"), nullable=False, index=True
+        db.Integer, db.ForeignKey("clients.id"), nullable=True, index=True
     )
+    source_interaction_id = db.Column(
+        db.Integer,
+        db.ForeignKey("interactions.id"),
+        nullable=True,
+        unique=True,
+        index=True,
+    )
+    title = db.Column(db.String(250), nullable=False, default="")
+    origin = db.Column(db.String(30), nullable=False, default="manual")
     event_type = db.Column(db.String(50), nullable=False, default="other")
     starts_at = db.Column(db.DateTime, nullable=False, index=True)
     ends_at = db.Column(db.DateTime, nullable=True)
     comment = db.Column(db.Text, nullable=False, default="")
     status = db.Column(db.String(30), nullable=False, default="planned")
-
-    client = db.relationship("Client", back_populates="events")
-
-
-class Reminder(TimestampMixin, db.Model):
-    __tablename__ = "reminders"
-
-    id = db.Column(db.Integer, primary_key=True)
-    client_id = db.Column(
-        db.Integer, db.ForeignKey("clients.id"), nullable=False, index=True
-    )
-    reminder_type = db.Column(db.String(20), nullable=False, index=True)
-    starts_at = db.Column(db.DateTime, nullable=False, index=True)
-    topic = db.Column(db.String(250), nullable=False)
-    comment = db.Column(db.Text, nullable=False, default="")
-    status = db.Column(db.String(30), nullable=False, default="planned")
-    notify_before_minutes = db.Column(db.Integer, nullable=False, default=60)
     meeting_format = db.Column(db.String(20), nullable=False, default="")
     location_or_url = db.Column(db.String(500), nullable=False, default="")
 
-    client = db.relationship("Client", back_populates="reminders")
+    client = db.relationship("Client", back_populates="events")
+    source_interaction = db.relationship(
+        "Interaction", back_populates="calendar_event"
+    )
 
 
 class AppSetting(db.Model):

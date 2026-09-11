@@ -1,4 +1,5 @@
 import calendar
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import quote
@@ -34,6 +35,28 @@ EVENT_TYPE_LABELS = {
     "documents": "Документы",
     "other": "Другое",
 }
+
+PLANNING_START_YEAR = 2020
+PLANNING_END_YEAR = 2031
+PLANNING_SUFFIX = re.compile(
+    r"(?:^|\s)(?P<date>\d{6})(?:\s+(?:в\s*)?(?P<hour>[01]\d|2[0-3]):(?P<minute>[0-5]\d))?\s*$"
+)
+
+
+def parse_planning_suffix(text):
+    """Return (local datetime, suffix_found) for a trailing YYMMDD date."""
+    match = PLANNING_SUFFIX.search(text or "")
+    if not match:
+        return None, False
+    try:
+        planned = datetime.strptime(match.group("date"), "%y%m%d")
+    except ValueError:
+        return None, True
+    if not PLANNING_START_YEAR <= planned.year <= PLANNING_END_YEAR:
+        return None, True
+    hour = int(match.group("hour") or 9)
+    minute = int(match.group("minute") or 0)
+    return planned.replace(hour=hour, minute=minute), True
 
 
 def get_timezone_name():

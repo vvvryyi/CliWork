@@ -51,7 +51,7 @@
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div class="panel-heading">
                 <h2>Новая запись</h2>
-                <span class="muted">Дата подставится автоматически</span>
+                <span class="muted">Дата события в конце: ГГММДД</span>
             </div>
             <label>
                 Тип взаимодействия
@@ -64,7 +64,8 @@
             </label>
             <label>
                 Результат или комментарий
-                <textarea name="text" rows="4" placeholder="Что обсудили и какое следующее действие?"></textarea>
+                <textarea name="text" rows="4" placeholder="Например: позвонить повторно 260911"></textarea>
+                <small>Добавьте время после даты при необходимости: 260911 15:00. Без времени событие создастся на 09:00.</small>
             </label>
             <label class="file-field">
                 <span>Прикрепить файлы</span>

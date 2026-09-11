@@ -37,31 +37,25 @@
     {% endif %}
 </form>
 
-{% if clients %}
-    <div class="client-grid">
-        {% for client in clients %}
-            <article class="client-card">
-                <a class="card-link" href="{{ url_for('clients.detail', client_id=client.id) }}">
-                    <span class="avatar">{{ client.full_name[:1]|upper }}</span>
-                    <span class="client-main">
-                        <strong>{{ client.full_name }}</strong>
-                        <small>{{ client.phone or "Телефон не указан" }}</small>
-                        <small>{{ client.email or "E-mail не указан" }}</small>
-                    </span>
-                </a>
-                {% if show_archived %}
-                    <form action="{{ url_for('clients.restore', client_id=client.id) }}" method="post">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                        <button class="button button-small" type="submit">Восстановить</button>
-                    </form>
-                {% else %}
-                    <div class="client-quick-actions" aria-label="Быстрые действия для {{ client.full_name }}">
-                        <a href="{{ url_for('messaging.compose', client_id=client.id) }}">Сообщение</a>
-                        <a href="{{ url_for('calendar.create_event', client_id=client.id) }}">Календарь</a>
-                        <a href="{{ url_for('reminders.create', client_id=client.id) }}">Напоминание</a>
-                    </div>
-                {% endif %}
-            </article>
+{% if client_groups %}
+    <div class="alphabet-list">
+        {% for letter, grouped_clients in client_groups.items() %}
+            <details class="alphabet-group" {% if query_text %}open{% endif %}>
+                <summary><span>{{ letter }}</span><small>{{ grouped_clients|length }}</small></summary>
+                <div class="alphabet-names">
+                    {% for client in grouped_clients %}
+                        <div class="alphabet-client">
+                            <a href="{{ url_for('clients.detail', client_id=client.id) }}">{{ client.full_name }}</a>
+                            {% if show_archived %}
+                                <form action="{{ url_for('clients.restore', client_id=client.id) }}" method="post">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button class="button button-small" type="submit">Восстановить</button>
+                                </form>
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+                </div>
+            </details>
         {% endfor %}
     </div>
 {% else %}

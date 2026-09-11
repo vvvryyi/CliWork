@@ -21,6 +21,7 @@
     <label>
         Текст
         <textarea name="text" rows="7">{{ interaction.text }}</textarea>
+        <small>Дата события указывается в конце как ГГММДД, например 260911. Необязательное время: 260911 15:00.</small>
     </label>
     {% if interaction.attachments %}
         <div>

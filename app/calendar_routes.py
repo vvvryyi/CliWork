@@ -7,17 +7,18 @@ from .extensions import db
 from .models import CalendarEvent, Client, utcnow
 from .utils import (
     EVENT_TYPE_LABELS,
-    STATUS_LABELS,
     local_to_utc_naive,
     month_grid,
+    PLANNING_END_YEAR,
+    PLANNING_START_YEAR,
     utc_naive_to_local,
 )
 
 
 bp = Blueprint("calendar", __name__, url_prefix="/calendar")
 
-PLANNING_END = date(2031, 12, 31)
-CALENDAR_START_YEAR = 2020
+PLANNING_END = date(PLANNING_END_YEAR, 12, 31)
+CALENDAR_START_YEAR = PLANNING_START_YEAR
 MONTH_NAMES = (
     "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
     "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь",
@@ -41,7 +42,7 @@ def local_day_bounds(day):
 @login_required
 def index():
     view = request.args.get("view", "month")
-    if view not in {"day", "week", "month", "year"}:
+    if view not in {"day", "week", "month", "year", "overdue"}:
         view = "month"
     selected_date = parse_date(request.args.get("date"))
     if selected_date > PLANNING_END:
@@ -49,7 +50,11 @@ def index():
     if selected_date.year < CALENDAR_START_YEAR:
         selected_date = date(CALENDAR_START_YEAR, 1, 1)
 
-    if view == "day":
+    if view == "overdue":
+        first_day = selected_date
+        last_day = selected_date
+        weeks = None
+    elif view == "day":
         first_day = selected_date
         last_day = selected_date
         weeks = None
@@ -72,22 +77,36 @@ def index():
         last_day = date(selected_date.year, 12, 31)
         weeks = None
 
-    query_start, _ = local_day_bounds(first_day)
-    _, query_end = local_day_bounds(last_day)
-    events = db.session.scalars(
-        db.select(CalendarEvent)
-        .where(
-            CalendarEvent.starts_at >= query_start,
-            CalendarEvent.starts_at < query_end,
-        )
-        .order_by(CalendarEvent.starts_at)
-    ).all()
+    if view == "overdue":
+        events = db.session.scalars(
+            db.select(CalendarEvent)
+            .where(
+                CalendarEvent.starts_at < utcnow(),
+                CalendarEvent.status == "planned",
+            )
+            .order_by(CalendarEvent.starts_at)
+        ).all()
+    else:
+        query_start, _ = local_day_bounds(first_day)
+        _, query_end = local_day_bounds(last_day)
+        events = db.session.scalars(
+            db.select(CalendarEvent)
+            .where(
+                CalendarEvent.starts_at >= query_start,
+                CalendarEvent.starts_at < query_end,
+                CalendarEvent.status == "planned",
+            )
+            .order_by(CalendarEvent.starts_at)
+        ).all()
     events_by_date = {}
     for event in events:
         local_date = utc_naive_to_local(event.starts_at).date()
         events_by_date.setdefault(local_date, []).append(event)
 
-    if view == "day":
+    if view == "overdue":
+        previous_date = selected_date
+        next_date = selected_date
+    elif view == "day":
         previous_date = first_day - timedelta(days=1)
         next_date = first_day + timedelta(days=1)
     elif view == "week":
@@ -127,16 +146,20 @@ def index():
 
 def apply_event_form(event):
     event.client_id = request.form.get("client_id", type=int)
+    event.title = request.form.get("title", "").strip()
     event.event_type = request.form.get("event_type", "other")
     event.starts_at = local_to_utc_naive(request.form.get("starts_at"))
     event.ends_at = local_to_utc_naive(request.form.get("ends_at"))
     event.comment = request.form.get("comment", "").strip()
-    event.status = request.form.get("status", "planned")
+    if not event.status:
+        event.status = "planned"
 
 
 def validate_event(event):
-    if not event.client_id or not event.starts_at:
-        return "Выберите клиента и дату события."
+    if not event.starts_at:
+        return "Укажите дату события."
+    if not event.client_id and not event.title:
+        return "Для личного события укажите название."
     local_start = utc_naive_to_local(event.starts_at)
     if local_start.date() > PLANNING_END:
         return "События можно планировать не позднее 31.12.2031."
@@ -150,7 +173,11 @@ def validate_event(event):
 @bp.route("/events/new", methods=["GET", "POST"])
 @login_required
 def create_event():
-    event = CalendarEvent(client_id=request.args.get("client_id", type=int))
+    event = CalendarEvent(
+        client_id=request.args.get("client_id", type=int),
+        origin="manual",
+        status="planned",
+    )
     clients = db.session.scalars(
         db.select(Client)
         .where(Client.archived_at.is_(None))
@@ -172,7 +199,6 @@ def create_event():
         event=event,
         clients=clients,
         event_types=EVENT_TYPE_LABELS,
-        statuses=STATUS_LABELS,
         title="Новое событие",
         preset_date=preset_date,
         planning_end=PLANNING_END,
@@ -202,7 +228,6 @@ def edit_event(event_id):
         event=event,
         clients=clients,
         event_types=EVENT_TYPE_LABELS,
-        statuses=STATUS_LABELS,
         title="Редактирование события",
         preset_date=None,
         planning_end=PLANNING_END,

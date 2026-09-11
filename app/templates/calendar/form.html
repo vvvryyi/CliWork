@@ -8,13 +8,17 @@
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <div class="form-grid">
         <label>
-            Клиент <span class="required">*</span>
-            <select name="client_id" required>
-                <option value="">Выберите клиента</option>
+            Клиент
+            <select name="client_id">
+                <option value="">Личное событие</option>
                 {% for client in clients %}
                     <option value="{{ client.id }}" {% if event.client_id == client.id %}selected{% endif %}>{{ client.full_name }}</option>
                 {% endfor %}
             </select>
+        </label>
+        <label>
+            Название личного события
+            <input name="title" maxlength="250" value="{{ event.title or '' }}" placeholder="Обязательно, если клиент не выбран">
         </label>
         <label>
             Вид события
@@ -29,12 +33,6 @@
         <label>
             Окончание
             <input name="ends_at" type="datetime-local" max="{{ planning_end.isoformat() }}T23:59" value="{% if event.ends_at %}{{ event.ends_at|local_datetime('%Y-%m-%dT%H:%M') }}{% endif %}">
-        </label>
-        <label>
-            Статус
-            <select name="status">
-                {% for value, label in statuses.items() %}<option value="{{ value }}" {% if event.status == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
-            </select>
         </label>
         <label class="span-2">
             Комментарий

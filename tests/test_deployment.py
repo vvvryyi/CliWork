@@ -26,3 +26,11 @@ def test_trusted_proxy_uses_forwarded_https(tmp_path):
 
     assert response.get_json() == {"scheme": "https"}
     assert application.config["SESSION_COOKIE_SECURE"] is True
+
+
+def test_pwa_files_are_available(client):
+    manifest = client.get("/static/manifest.webmanifest")
+    service_worker = client.get("/service-worker.js")
+    assert manifest.status_code == 200
+    assert service_worker.status_code == 200
+    assert manifest.get_json()["display"] == "standalone"

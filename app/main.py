@@ -5,7 +5,8 @@ from flask_login import login_required
 from sqlalchemy import func
 
 from .extensions import db
-from .models import CalendarEvent, Client, Reminder, utcnow
+from .models import CalendarEvent, Client, utcnow
+from .utils import local_to_utc_naive, utc_naive_to_local
 
 
 bp = Blueprint("main", __name__)
@@ -15,40 +16,34 @@ bp = Blueprint("main", __name__)
 @login_required
 def dashboard():
     now = utcnow()
-    upcoming_limit = now + timedelta(days=7)
+    local_today = utc_naive_to_local(now).date()
+    week_start = local_today - timedelta(days=local_today.weekday())
+    week_end = week_start + timedelta(days=7)
+    query_start = local_to_utc_naive(f"{week_start.isoformat()}T00:00")
+    query_end = local_to_utc_naive(f"{week_end.isoformat()}T00:00")
     client_count = db.session.scalar(
         db.select(func.count(Client.id)).where(Client.archived_at.is_(None))
     )
     overdue_count = db.session.scalar(
-        db.select(func.count(Reminder.id)).where(
-            Reminder.starts_at < now,
-            Reminder.status == "planned",
+        db.select(func.count(CalendarEvent.id)).where(
+            CalendarEvent.starts_at < now,
+            CalendarEvent.status == "planned",
         )
     )
-    upcoming_reminders = db.session.scalars(
-        db.select(Reminder)
-        .where(
-            Reminder.starts_at >= now,
-            Reminder.starts_at <= upcoming_limit,
-            Reminder.status == "planned",
-        )
-        .order_by(Reminder.starts_at)
-        .limit(8)
-    ).all()
-    upcoming_events = db.session.scalars(
+    week_events = db.session.scalars(
         db.select(CalendarEvent)
         .where(
-            CalendarEvent.starts_at >= now,
-            CalendarEvent.starts_at <= upcoming_limit,
+            CalendarEvent.starts_at >= query_start,
+            CalendarEvent.starts_at < query_end,
             CalendarEvent.status == "planned",
         )
         .order_by(CalendarEvent.starts_at)
-        .limit(8)
     ).all()
     return render_template(
         "dashboard.html",
         client_count=client_count or 0,
         overdue_count=overdue_count or 0,
-        upcoming_reminders=upcoming_reminders,
-        upcoming_events=upcoming_events,
+        week_events=week_events,
+        week_start=week_start,
+        week_end=week_end - timedelta(days=1),
     )

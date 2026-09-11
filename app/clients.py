@@ -15,8 +15,13 @@ from flask_login import login_required
 from sqlalchemy import or_
 
 from .extensions import db
-from .models import Attachment, Client, Interaction, utcnow
-from .utils import CHANNEL_LABELS, save_uploads
+from .models import Attachment, CalendarEvent, Client, Interaction, utcnow
+from .utils import (
+    CHANNEL_LABELS,
+    local_to_utc_naive,
+    parse_planning_suffix,
+    save_uploads,
+)
 
 
 bp = Blueprint("clients", __name__, url_prefix="/clients")
@@ -70,9 +75,16 @@ def index():
     if channel:
         statement = statement.where(Client.preferred_channel == channel)
     clients = db.session.scalars(statement.order_by(Client.full_name)).all()
+    clients.sort(key=lambda item: item.full_name.casefold())
+    client_groups = {}
+    for client in clients:
+        first = client.full_name.strip()[:1].upper()
+        letter = first if first.isalpha() else "#"
+        client_groups.setdefault(letter, []).append(client)
     return render_template(
         "clients/index.html",
         clients=clients,
+        client_groups=client_groups,
         query_text=query_text,
         selected_channel=channel,
         show_archived=show_archived,
@@ -142,6 +154,14 @@ def edit(client_id):
 def archive(client_id):
     client = get_client_or_404(client_id)
     client.archived_at = utcnow()
+    db.session.execute(
+        db.update(CalendarEvent)
+        .where(
+            CalendarEvent.client_id == client.id,
+            CalendarEvent.status == "planned",
+        )
+        .values(status="cancelled")
+    )
     db.session.commit()
     flash("Клиент перемещён в архив.", "success")
     return redirect(url_for("clients.index"))
@@ -177,6 +197,19 @@ def create_interaction(client_id):
     )
     db.session.add(interaction)
     db.session.flush()
+    planned_local, date_suffix_found = parse_planning_suffix(text)
+    calendar_event = None
+    if planned_local:
+        calendar_event = CalendarEvent(
+            client_id=client.id,
+            source_interaction_id=interaction.id,
+            origin="interaction",
+            event_type="task",
+            starts_at=local_to_utc_naive(planned_local.isoformat(timespec="minutes")),
+            comment="",
+            status="planned",
+        )
+        db.session.add(calendar_event)
     try:
         save_uploads(files, client.id, interaction.id)
         db.session.commit()
@@ -184,7 +217,18 @@ def create_interaction(client_id):
         db.session.rollback()
         flash(str(error), "error")
         return redirect(url_for("clients.detail", client_id=client.id))
-    flash("Запись добавлена в историю.", "success")
+    if calendar_event:
+        flash(
+            f"Запись сохранена, событие добавлено на {planned_local:%d.%m.%Y %H:%M}.",
+            "success",
+        )
+    elif date_suffix_found:
+        flash(
+            "Запись сохранена, но событие не создано: проверьте дату ГГММДД.",
+            "error",
+        )
+    else:
+        flash("Запись добавлена в историю.", "success")
     return redirect(url_for("clients.detail", client_id=client.id))
 
 
@@ -205,6 +249,24 @@ def edit_interaction(client_id, interaction_id):
             interaction.interaction_type = (
                 interaction_type if interaction_type in INTERACTION_TYPES else "call"
             )
+            planned_local, date_suffix_found = parse_planning_suffix(text)
+            calendar_event = interaction.calendar_event
+            if planned_local:
+                if calendar_event is None:
+                    calendar_event = CalendarEvent(
+                        client_id=client.id,
+                        source_interaction_id=interaction.id,
+                        origin="interaction",
+                        event_type="task",
+                    )
+                    db.session.add(calendar_event)
+                calendar_event.starts_at = local_to_utc_naive(
+                    planned_local.isoformat(timespec="minutes")
+                )
+                calendar_event.comment = ""
+                calendar_event.status = "planned"
+            elif calendar_event is not None:
+                db.session.delete(calendar_event)
             try:
                 save_uploads(request.files.getlist("files"), client.id, interaction.id)
                 db.session.commit()
@@ -212,7 +274,18 @@ def edit_interaction(client_id, interaction_id):
                 db.session.rollback()
                 flash(str(error), "error")
                 return redirect(request.url)
-            flash("Запись истории обновлена.", "success")
+            if planned_local:
+                flash(
+                    f"Запись обновлена, событие назначено на {planned_local:%d.%m.%Y %H:%M}.",
+                    "success",
+                )
+            elif date_suffix_found:
+                flash(
+                    "Запись обновлена, но событие удалено: проверьте дату ГГММДД.",
+                    "error",
+                )
+            else:
+                flash("Запись истории обновлена.", "success")
             return redirect(url_for("clients.detail", client_id=client.id))
     return render_template(
         "clients/interaction_form.html",
@@ -229,6 +302,8 @@ def delete_interaction(client_id, interaction_id):
     if interaction.client_id != client.id:
         abort(404)
     paths = [Path(item.file_path) for item in interaction.attachments]
+    if interaction.calendar_event is not None:
+        db.session.delete(interaction.calendar_event)
     db.session.delete(interaction)
     db.session.commit()
     for path in paths:
