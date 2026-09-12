@@ -8,6 +8,8 @@
             <span class="avatar avatar-large">{{ client.full_name[:1]|upper }}</span>
             <div>
                 <h1>{{ client.full_name }}</h1>
+                {% if client.client_group == "active" %}<span class="tag tag-success">Активный клиент</span>{% endif %}
+                {% if client.client_group == "potential" %}<span class="tag tag-warning">Потенциальный клиент</span>{% endif %}
                 {% if client.preferred_channel %}
                     <span class="tag">Предпочитает {{ channel_labels.get(client.preferred_channel, client.preferred_channel) }}</span>
                 {% endif %}
@@ -15,6 +17,20 @@
         </div>
     </div>
     <div class="heading-actions">
+        <form action="{{ url_for('clients.toggle_group', client_id=client.id) }}" method="post">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="group" value="active">
+            <button class="button {% if client.client_group == 'active' %}button-success{% endif %}" type="submit">
+                {{ "Убрать из активных" if client.client_group == "active" else "Сделать клиента активным" }}
+            </button>
+        </form>
+        <form action="{{ url_for('clients.toggle_group', client_id=client.id) }}" method="post">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="group" value="potential">
+            <button class="button" type="submit">
+                {{ "Убрать из потенциальных" if client.client_group == "potential" else "Сделать потенциальным" }}
+            </button>
+        </form>
         <a class="button button-primary" href="{{ url_for('messaging.compose', client_id=client.id) }}">Написать</a>
         <a class="button" href="{{ url_for('clients.edit', client_id=client.id) }}">Редактировать</a>
         <form action="{{ url_for('clients.archive', client_id=client.id) }}" method="post" data-confirm="Переместить клиента в архив?">
@@ -40,49 +56,28 @@
             <h3>Дополнительно</h3>
             <p class="pre-wrap">{{ client.additional_contacts }}</p>
         {% endif %}
-        {% if client.notes %}
-            <h3>Комментарий</h3>
-            <p class="pre-wrap">{{ client.notes }}</p>
-        {% endif %}
     </aside>
 
     <section>
-        <form class="panel form-stack" method="post" action="{{ url_for('clients.create_interaction', client_id=client.id) }}" enctype="multipart/form-data">
+        <form class="panel form-stack" method="post" action="{{ url_for('clients.create_interaction', client_id=client.id) }}" enctype="multipart/form-data" data-disable-on-submit>
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <div class="panel-heading">
-                <h2>Новая запись</h2>
-                <span class="muted">Дата события в конце: ГГММДД</span>
-            </div>
+            <input type="hidden" name="submission_token" value="{{ interaction_token }}">
             <label>
-                Тип взаимодействия
-                <select name="interaction_type">
-                    <option value="call" selected>Звонок</option>
-                    <option value="meeting">Встреча</option>
-                    <option value="message">Сообщение</option>
-                    <option value="documents">Документы</option>
-                </select>
-            </label>
-            <label>
-                Результат или комментарий
-                <textarea name="text" rows="4" placeholder="Например: позвонить повторно 260911"></textarea>
-                <small>Добавьте время после даты при необходимости: 260911 15:00. Без времени событие создастся на 09:00.</small>
+                <span class="sr-only">Запись о клиенте</span>
+                <textarea name="text" rows="5" placeholder="Добавьте запись о работе с клиентом"></textarea>
             </label>
             <label class="file-field">
                 <span>Прикрепить файлы</span>
                 <input name="files" type="file" multiple>
                 <small>До 20 МБ на один запрос</small>
             </label>
-            <div><button class="button button-primary" type="submit">Добавить в историю</button></div>
+            <div><button class="button button-primary" type="submit">Сохранить</button></div>
         </form>
 
-        <div class="section-heading">
-            <h2>История взаимодействий</h2>
-            <span class="muted">{{ interactions|length }} записей</span>
-        </div>
         {% if interactions %}
-            <div class="timeline">
+            <div class="timeline timeline-spaced">
                 {% for interaction in interactions %}
-                    <article class="timeline-item">
+                    <article class="timeline-item" id="interaction-{{ interaction.id }}">
                         <div class="timeline-date">{{ interaction.created_at|history_date }}</div>
                         <div class="timeline-card">
                             <div class="timeline-meta">

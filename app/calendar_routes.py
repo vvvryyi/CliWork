@@ -11,6 +11,7 @@ from .utils import (
     month_grid,
     PLANNING_END_YEAR,
     PLANNING_START_YEAR,
+    synchronize_event_statuses,
     utc_naive_to_local,
 )
 
@@ -41,6 +42,7 @@ def local_day_bounds(day):
 @bp.get("/")
 @login_required
 def index():
+    synchronize_event_statuses()
     view = request.args.get("view", "month")
     if view not in {"day", "week", "month", "year", "overdue"}:
         view = "month"
@@ -81,8 +83,7 @@ def index():
         events = db.session.scalars(
             db.select(CalendarEvent)
             .where(
-                CalendarEvent.starts_at < utcnow(),
-                CalendarEvent.status == "planned",
+                CalendarEvent.status == "overdue",
             )
             .order_by(CalendarEvent.starts_at)
         ).all()
@@ -94,7 +95,7 @@ def index():
             .where(
                 CalendarEvent.starts_at >= query_start,
                 CalendarEvent.starts_at < query_end,
-                CalendarEvent.status == "planned",
+                CalendarEvent.status.in_(("planned", "overdue")),
             )
             .order_by(CalendarEvent.starts_at)
         ).all()

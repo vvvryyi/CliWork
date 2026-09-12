@@ -29,6 +29,9 @@ class Client(TimestampMixin, db.Model):
     max_contact = db.Column(db.String(200), nullable=False, default="")
     instagram = db.Column(db.String(200), nullable=False, default="")
     facebook = db.Column(db.String(300), nullable=False, default="")
+    client_group = db.Column(
+        db.String(20), nullable=False, default="none", index=True
+    )
     archived_at = db.Column(db.DateTime, nullable=True)
 
     interactions = db.relationship(
@@ -75,6 +78,7 @@ class Interaction(TimestampMixin, db.Model):
     interaction_type = db.Column(db.String(30), nullable=False, default="call")
     channel = db.Column(db.String(30), nullable=False, default="")
     delivery_status = db.Column(db.String(30), nullable=False, default="")
+    submission_token = db.Column(db.String(64), nullable=True, unique=True)
 
     client = db.relationship("Client", back_populates="interactions")
     attachments = db.relationship(
@@ -87,6 +91,12 @@ class Interaction(TimestampMixin, db.Model):
         "CalendarEvent",
         back_populates="source_interaction",
         uselist=False,
+        foreign_keys="CalendarEvent.source_interaction_id",
+    )
+    completed_events = db.relationship(
+        "CalendarEvent",
+        back_populates="completed_by_interaction",
+        foreign_keys="CalendarEvent.completed_by_interaction_id",
     )
 
 
@@ -124,6 +134,12 @@ class CalendarEvent(TimestampMixin, db.Model):
         unique=True,
         index=True,
     )
+    completed_by_interaction_id = db.Column(
+        db.Integer,
+        db.ForeignKey("interactions.id"),
+        nullable=True,
+        index=True,
+    )
     title = db.Column(db.String(250), nullable=False, default="")
     origin = db.Column(db.String(30), nullable=False, default="manual")
     event_type = db.Column(db.String(50), nullable=False, default="other")
@@ -131,12 +147,21 @@ class CalendarEvent(TimestampMixin, db.Model):
     ends_at = db.Column(db.DateTime, nullable=True)
     comment = db.Column(db.Text, nullable=False, default="")
     status = db.Column(db.String(30), nullable=False, default="planned")
+    is_important = db.Column(db.Boolean, nullable=False, default=False)
+    completed_at = db.Column(db.DateTime, nullable=True)
     meeting_format = db.Column(db.String(20), nullable=False, default="")
     location_or_url = db.Column(db.String(500), nullable=False, default="")
 
     client = db.relationship("Client", back_populates="events")
     source_interaction = db.relationship(
-        "Interaction", back_populates="calendar_event"
+        "Interaction",
+        back_populates="calendar_event",
+        foreign_keys=[source_interaction_id],
+    )
+    completed_by_interaction = db.relationship(
+        "Interaction",
+        back_populates="completed_events",
+        foreign_keys=[completed_by_interaction_id],
     )
 
 

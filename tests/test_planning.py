@@ -2,7 +2,11 @@ from app.extensions import db
 from datetime import datetime
 
 from app.models import CalendarEvent
-from app.utils import local_to_utc_naive, parse_planning_suffix
+from app.utils import (
+    local_to_utc_naive,
+    parse_planning_details,
+    parse_planning_suffix,
+)
 
 
 def test_create_calendar_event(app, auth_client, sample_client):
@@ -100,6 +104,52 @@ def test_planning_suffix_rejects_invalid_or_non_trailing_dates():
     assert parse_planning_suffix("Дата 260911 не в конце") == (None, False)
     assert parse_planning_suffix("Некорректная дата 261332") == (None, True)
     assert parse_planning_suffix("Старый формат 26.09.11") == (None, False)
+
+
+def test_planning_suffix_marks_important_events():
+    planned, found, important = parse_planning_details("Срочный звонок 311231!")
+    assert found is True
+    assert important is True
+    assert planned == datetime(2031, 12, 31, 9, 0)
+
+    planned, found, important = parse_planning_details(
+        "Срочная встреча 311231 15:30!"
+    )
+    assert found is True
+    assert important is True
+    assert planned == datetime(2031, 12, 31, 15, 30)
+
+
+def test_calendar_marks_important_event_red(app, auth_client, sample_client):
+    auth_client.post(
+        f"/clients/{sample_client}/interactions",
+        data={"text": "Важная задача 311231!"},
+    )
+    response = auth_client.get("/calendar/?view=month&date=2031-12-01")
+    assert response.status_code == 200
+    assert "has-important".encode() in response.data
+
+    with app.app_context():
+        event = db.session.scalar(db.select(CalendarEvent))
+        assert event.is_important is True
+
+
+def test_past_planned_event_becomes_overdue(app, auth_client, sample_client):
+    with app.app_context():
+        db.session.add(
+            CalendarEvent(
+                client_id=sample_client,
+                starts_at=local_to_utc_naive("2020-01-01T09:00"),
+                status="planned",
+            )
+        )
+        db.session.commit()
+
+    response = auth_client.get("/calendar/?view=overdue")
+    assert response.status_code == 200
+    assert "Просрочено".encode() in response.data
+    with app.app_context():
+        assert db.session.scalar(db.select(CalendarEvent)).status == "overdue"
 
 
 def test_dashboard_uses_monday_to_sunday(app, auth_client, sample_client, monkeypatch):

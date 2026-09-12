@@ -150,3 +150,86 @@ def test_archiving_client_hides_its_planned_events(app, auth_client, sample_clie
 
     response = auth_client.get("/calendar/?view=month&date=2026-09-01")
     assert '<span class="calendar-count">1</span>'.encode() not in response.data
+
+
+def test_client_groups_toggle_and_are_mutually_exclusive(
+    app, auth_client, sample_client
+):
+    response = auth_client.post(
+        f"/clients/{sample_client}/group",
+        data={"group": "active"},
+        follow_redirects=True,
+    )
+    assert "Убрать из активных".encode() in response.data
+    with app.app_context():
+        assert db.session.get(Client, sample_client).client_group == "active"
+
+    listing = auth_client.get("/clients/")
+    assert "Активные клиенты".encode() in listing.data
+
+    auth_client.post(
+        f"/clients/{sample_client}/group", data={"group": "potential"}
+    )
+    with app.app_context():
+        assert db.session.get(Client, sample_client).client_group == "potential"
+
+    auth_client.post(
+        f"/clients/{sample_client}/group", data={"group": "potential"}
+    )
+    with app.app_context():
+        assert db.session.get(Client, sample_client).client_group == "none"
+
+
+def test_new_interaction_completes_previous_event_and_creates_next(
+    app, auth_client, sample_client
+):
+    auth_client.post(
+        f"/clients/{sample_client}/interactions",
+        data={"text": "Первый следующий шаг 311230"},
+    )
+    auth_client.post(
+        f"/clients/{sample_client}/interactions",
+        data={"text": "Выполнили и назначили следующий шаг 311231!"},
+    )
+
+    with app.app_context():
+        events = db.session.scalars(
+            db.select(CalendarEvent).order_by(CalendarEvent.id)
+        ).all()
+        assert len(events) == 2
+        assert events[0].status == "completed"
+        assert events[0].completed_by_interaction_id == 2
+        assert events[0].completed_at is not None
+        assert events[1].status == "planned"
+        assert events[1].is_important is True
+
+
+def test_interaction_submission_token_prevents_duplicate(
+    app, auth_client, sample_client
+):
+    payload = {
+        "text": "Один следующий шаг 311231",
+        "submission_token": "fixed-interaction-token-123",
+    }
+    auth_client.post(f"/clients/{sample_client}/interactions", data=payload)
+    auth_client.post(f"/clients/{sample_client}/interactions", data=payload)
+
+    with app.app_context():
+        assert len(db.session.scalars(db.select(Interaction)).all()) == 1
+        assert len(db.session.scalars(db.select(CalendarEvent)).all()) == 1
+
+
+def test_search_interactions_is_case_insensitive_and_returns_anchor(
+    auth_client, sample_client
+):
+    auth_client.post(
+        f"/clients/{sample_client}/interactions",
+        data={"text": "Обсудили договор и сроки поставки"},
+    )
+    response = auth_client.get("/clients/search?q=ДОГОВОР")
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert len(payload["results"]) == 1
+    assert payload["results"][0]["client_name"] == "Иван Петров"
+    assert payload["results"][0]["match"] == "договор"
+    assert payload["results"][0]["url"].endswith("#interaction-1")

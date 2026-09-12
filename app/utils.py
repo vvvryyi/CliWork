@@ -10,7 +10,7 @@ from flask import current_app
 from werkzeug.utils import secure_filename
 
 from .extensions import db
-from .models import AppSetting, Attachment
+from .models import AppSetting, Attachment, CalendarEvent, utcnow
 
 
 CHANNEL_LABELS = {
@@ -23,6 +23,7 @@ CHANNEL_LABELS = {
 
 STATUS_LABELS = {
     "planned": "Запланирован",
+    "overdue": "Просрочен",
     "completed": "Выполнен",
     "rescheduled": "Перенесён",
     "cancelled": "Отменён",
@@ -38,25 +39,36 @@ EVENT_TYPE_LABELS = {
 
 PLANNING_START_YEAR = 2020
 PLANNING_END_YEAR = 2031
+OPEN_EVENT_STATUSES = ("planned", "overdue")
 PLANNING_SUFFIX = re.compile(
-    r"(?:^|\s)(?P<date>\d{6})(?:\s+(?:в\s*)?(?P<hour>[01]\d|2[0-3]):(?P<minute>[0-5]\d))?\s*$"
+    r"(?:^|\s)(?P<date>\d{6})(?:\s+(?:в\s*)?(?P<hour>[01]\d|2[0-3]):(?P<minute>[0-5]\d))?(?P<important>!)?\s*$"
 )
 
 
-def parse_planning_suffix(text):
-    """Return (local datetime, suffix_found) for a trailing YYMMDD date."""
+def parse_planning_details(text):
+    """Return (local datetime, suffix_found, important) for a trailing date."""
     match = PLANNING_SUFFIX.search(text or "")
     if not match:
-        return None, False
+        return None, False, False
     try:
         planned = datetime.strptime(match.group("date"), "%y%m%d")
     except ValueError:
-        return None, True
+        return None, True, bool(match.group("important"))
     if not PLANNING_START_YEAR <= planned.year <= PLANNING_END_YEAR:
-        return None, True
+        return None, True, bool(match.group("important"))
     hour = int(match.group("hour") or 9)
     minute = int(match.group("minute") or 0)
-    return planned.replace(hour=hour, minute=minute), True
+    return (
+        planned.replace(hour=hour, minute=minute),
+        True,
+        bool(match.group("important")),
+    )
+
+
+def parse_planning_suffix(text):
+    """Backward-compatible parser returning only datetime and suffix presence."""
+    planned, suffix_found, _ = parse_planning_details(text)
+    return planned, suffix_found
 
 
 def get_timezone_name():
@@ -84,6 +96,39 @@ def utc_naive_to_local(value):
         return None
     aware_utc = value.replace(tzinfo=timezone.utc)
     return aware_utc.astimezone(get_timezone())
+
+
+def synchronize_event_statuses(now=None):
+    """Persist the overdue state for events whose scheduled time has passed."""
+    current_time = now or utcnow()
+    result = db.session.execute(
+        db.update(CalendarEvent)
+        .where(
+            CalendarEvent.status == "planned",
+            CalendarEvent.starts_at < current_time,
+        )
+        .values(status="overdue")
+    )
+    if result.rowcount:
+        db.session.commit()
+    return result.rowcount or 0
+
+
+def complete_client_events(client_id, interaction):
+    """Complete open note-generated events when a newer client record appears."""
+    return db.session.execute(
+        db.update(CalendarEvent)
+        .where(
+            CalendarEvent.client_id == client_id,
+            CalendarEvent.origin == "interaction",
+            CalendarEvent.status.in_(OPEN_EVENT_STATUSES),
+        )
+        .values(
+            status="completed",
+            completed_at=interaction.created_at,
+            completed_by_interaction_id=interaction.id,
+        )
+    ).rowcount or 0
 
 
 def save_uploads(files, client_id, interaction_id=None):

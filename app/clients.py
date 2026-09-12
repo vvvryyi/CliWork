@@ -1,10 +1,13 @@
+import re
 from pathlib import Path
+from uuid import uuid4
 
 from flask import (
     Blueprint,
     abort,
     current_app,
     flash,
+    jsonify,
     redirect,
     render_template,
     request,
@@ -18,8 +21,10 @@ from .extensions import db
 from .models import Attachment, CalendarEvent, Client, Interaction, utcnow
 from .utils import (
     CHANNEL_LABELS,
+    OPEN_EVENT_STATUSES,
+    complete_client_events,
     local_to_utc_naive,
-    parse_planning_suffix,
+    parse_planning_details,
     save_uploads,
 )
 
@@ -27,6 +32,7 @@ from .utils import (
 bp = Blueprint("clients", __name__, url_prefix="/clients")
 
 INTERACTION_TYPES = {"call", "meeting", "message", "documents"}
+CLIENT_GROUPS = {"active", "potential"}
 
 
 def get_client_or_404(client_id, include_archived=False):
@@ -76,14 +82,28 @@ def index():
         statement = statement.where(Client.preferred_channel == channel)
     clients = db.session.scalars(statement.order_by(Client.full_name)).all()
     clients.sort(key=lambda item: item.full_name.casefold())
+    active_clients = []
+    potential_clients = []
+    alphabetical_clients = clients
+    if not show_archived:
+        active_clients = [item for item in clients if item.client_group == "active"]
+        potential_clients = [
+            item for item in clients if item.client_group == "potential"
+        ]
+        alphabetical_clients = [
+            item for item in clients if item.client_group not in CLIENT_GROUPS
+        ]
+
     client_groups = {}
-    for client in clients:
+    for client in alphabetical_clients:
         first = client.full_name.strip()[:1].upper()
         letter = first if first.isalpha() else "#"
         client_groups.setdefault(letter, []).append(client)
     return render_template(
         "clients/index.html",
         clients=clients,
+        active_clients=active_clients,
+        potential_clients=potential_clients,
         client_groups=client_groups,
         query_text=query_text,
         selected_channel=channel,
@@ -126,7 +146,75 @@ def detail(client_id):
         "clients/detail.html",
         client=client,
         interactions=interactions,
+        interaction_token=uuid4().hex,
     )
+
+
+@bp.post("/<int:client_id>/group")
+@login_required
+def toggle_group(client_id):
+    client = get_client_or_404(client_id)
+    requested_group = request.form.get("group", "")
+    if requested_group not in CLIENT_GROUPS:
+        abort(400)
+    client.client_group = (
+        "none" if client.client_group == requested_group else requested_group
+    )
+    db.session.commit()
+    labels = {"active": "активных", "potential": "потенциальных"}
+    if client.client_group == requested_group:
+        flash(f"Клиент добавлен в группу {labels[requested_group]} клиентов.", "success")
+    else:
+        flash(f"Клиент удалён из группы {labels[requested_group]} клиентов.", "success")
+    return redirect(request.referrer or url_for("clients.detail", client_id=client.id))
+
+
+def search_excerpt(text, query, context=70):
+    flattened = " ".join((text or "").split())
+    match = re.search(re.escape(query), flattened, flags=re.IGNORECASE)
+    if not match:
+        return None
+    start = max(0, match.start() - context)
+    end = min(len(flattened), match.end() + context)
+    return {
+        "before": ("…" if start else "") + flattened[start:match.start()],
+        "match": flattened[match.start():match.end()],
+        "after": flattened[match.end():end] + ("…" if end < len(flattened) else ""),
+    }
+
+
+@bp.get("/search")
+@login_required
+def search_interactions():
+    query_text = request.args.get("q", "").strip()[:100]
+    if not query_text:
+        return jsonify({"query": "", "results": []})
+
+    rows = db.session.execute(
+        db.select(Interaction, Client)
+        .join(Client, Interaction.client_id == Client.id)
+        .where(Client.archived_at.is_(None))
+        .order_by(Interaction.created_at.desc())
+    ).all()
+    results = []
+    for interaction, client in rows:
+        excerpt = search_excerpt(interaction.text, query_text)
+        if not excerpt:
+            continue
+        results.append(
+            {
+                "client_name": client.full_name,
+                "url": url_for(
+                    "clients.detail",
+                    client_id=client.id,
+                    _anchor=f"interaction-{interaction.id}",
+                ),
+                **excerpt,
+            }
+        )
+        if len(results) >= 50:
+            break
+    return jsonify({"query": query_text, "results": results})
 
 
 @bp.route("/<int:client_id>/edit", methods=["GET", "POST"])
@@ -158,7 +246,7 @@ def archive(client_id):
         db.update(CalendarEvent)
         .where(
             CalendarEvent.client_id == client.id,
-            CalendarEvent.status == "planned",
+            CalendarEvent.status.in_(OPEN_EVENT_STATUSES),
         )
         .values(status="cancelled")
     )
@@ -190,24 +278,37 @@ def create_interaction(client_id):
     interaction_type = request.form.get("interaction_type", "call")
     if interaction_type not in INTERACTION_TYPES:
         interaction_type = "call"
+    submission_token = request.form.get("submission_token", "").strip()
+    if submission_token and db.session.scalar(
+        db.select(Interaction).where(Interaction.submission_token == submission_token)
+    ):
+        flash("Эта запись уже сохранена.", "success")
+        return redirect(url_for("clients.detail", client_id=client.id))
+    if not re.fullmatch(r"[A-Za-z0-9_-]{16,64}", submission_token):
+        submission_token = uuid4().hex
+
     interaction = Interaction(
         client_id=client.id,
         text=text,
         interaction_type=interaction_type,
+        submission_token=submission_token,
     )
     db.session.add(interaction)
     db.session.flush()
-    planned_local, date_suffix_found = parse_planning_suffix(text)
+    complete_client_events(client.id, interaction)
+    planned_local, date_suffix_found, is_important = parse_planning_details(text)
     calendar_event = None
     if planned_local:
+        starts_at = local_to_utc_naive(planned_local.isoformat(timespec="minutes"))
         calendar_event = CalendarEvent(
             client_id=client.id,
             source_interaction_id=interaction.id,
             origin="interaction",
             event_type="task",
-            starts_at=local_to_utc_naive(planned_local.isoformat(timespec="minutes")),
+            starts_at=starts_at,
             comment="",
-            status="planned",
+            status="overdue" if starts_at < utcnow() else "planned",
+            is_important=is_important,
         )
         db.session.add(calendar_event)
     try:
@@ -249,22 +350,28 @@ def edit_interaction(client_id, interaction_id):
             interaction.interaction_type = (
                 interaction_type if interaction_type in INTERACTION_TYPES else "call"
             )
-            planned_local, date_suffix_found = parse_planning_suffix(text)
+            planned_local, date_suffix_found, is_important = parse_planning_details(text)
             calendar_event = interaction.calendar_event
             if planned_local:
+                starts_at = local_to_utc_naive(
+                    planned_local.isoformat(timespec="minutes")
+                )
                 if calendar_event is None:
                     calendar_event = CalendarEvent(
                         client_id=client.id,
                         source_interaction_id=interaction.id,
                         origin="interaction",
                         event_type="task",
+                        status="overdue" if starts_at < utcnow() else "planned",
                     )
                     db.session.add(calendar_event)
-                calendar_event.starts_at = local_to_utc_naive(
-                    planned_local.isoformat(timespec="minutes")
-                )
+                calendar_event.starts_at = starts_at
                 calendar_event.comment = ""
-                calendar_event.status = "planned"
+                calendar_event.is_important = is_important
+                if calendar_event.status != "completed":
+                    calendar_event.status = (
+                        "overdue" if starts_at < utcnow() else "planned"
+                    )
             elif calendar_event is not None:
                 db.session.delete(calendar_event)
             try:
@@ -302,6 +409,16 @@ def delete_interaction(client_id, interaction_id):
     if interaction.client_id != client.id:
         abort(404)
     paths = [Path(item.file_path) for item in interaction.attachments]
+    completed_events = db.session.scalars(
+        db.select(CalendarEvent).where(
+            CalendarEvent.completed_by_interaction_id == interaction.id
+        )
+    ).all()
+    now = utcnow()
+    for event in completed_events:
+        event.status = "overdue" if event.starts_at < now else "planned"
+        event.completed_at = None
+        event.completed_by_interaction_id = None
     if interaction.calendar_event is not None:
         db.session.delete(interaction.calendar_event)
     db.session.delete(interaction)

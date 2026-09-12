@@ -20,7 +20,7 @@
     </a>
     <a class="stat-card stat-card-alert" href="{{ url_for('calendar.index', view='overdue') }}">
         <span class="stat-value">{{ overdue_count }}</span>
-        <span class="stat-label">Просроченных напоминаний</span>
+        <span class="stat-label">Просроченных событий</span>
     </a>
 </div>
 
@@ -35,8 +35,8 @@
     {% if week_events %}
         <div class="item-list">
             {% for event in week_events %}
-                <div class="list-item">
-                    <span class="event-dot event-{{ event.event_type }}"></span>
+                <div class="list-item {% if event.is_important or event.status == 'overdue' %}event-important{% endif %}">
+                    <span class="event-dot event-{{ event.event_type }} {% if event.is_important or event.status == 'overdue' %}event-dot-important{% endif %}"></span>
                     <span>
                         {% if event.client %}
                             <strong><a href="{{ url_for('clients.detail', client_id=event.client.id) }}">{{ event.client.full_name }}</a></strong>

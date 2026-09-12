@@ -3,7 +3,12 @@ from flask_login import login_required
 
 from .extensions import db
 from .models import Client, Interaction
-from .utils import CHANNEL_LABELS, build_channel_url, save_uploads
+from .utils import (
+    CHANNEL_LABELS,
+    build_channel_url,
+    complete_client_events,
+    save_uploads,
+)
 
 
 bp = Blueprint("messaging", __name__, url_prefix="/messages")
@@ -37,6 +42,7 @@ def compose():
             )
             db.session.add(interaction)
             db.session.flush()
+            complete_client_events(client.id, interaction)
             try:
                 save_uploads(
                     request.files.getlist("files"), client.id, interaction.id
@@ -71,4 +77,3 @@ def mark_sent(interaction_id):
     db.session.commit()
     flash("Отправка отмечена в истории клиента.", "success")
     return redirect(url_for("clients.detail", client_id=interaction.client_id))
-

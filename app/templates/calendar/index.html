@@ -53,26 +53,26 @@
 
 {% if view in ("day", "overdue") %}
     <section class="panel">
-        {% if view == "overdue" %}<h2>Просроченные напоминания</h2>{% endif %}
+        {% if view == "overdue" %}<h2>Просроченные события</h2>{% endif %}
         {% if events %}
             <div class="agenda-list">
                 {% for event in events %}
-                    <div class="agenda-item">
+                    <div class="agenda-item {% if event.is_important or event.status == 'overdue' %}event-important{% endif %}">
                         <time>{{ event.starts_at|local_datetime("%H:%M") }}</time>
-                        <span class="event-dot event-{{ event.event_type }}"></span>
+                        <span class="event-dot event-{{ event.event_type }} {% if event.is_important or event.status == 'overdue' %}event-dot-important{% endif %}"></span>
                         <span>
                             {% if event.client %}
                                 <strong><a href="{{ url_for('clients.detail', client_id=event.client.id) }}">{{ event.client.full_name }}</a></strong>
                             {% else %}
                                 <strong><a href="{{ url_for('calendar.edit_event', event_id=event.id) }}">{{ event.title }}</a></strong>
                             {% endif %}
-                            {% if view == "overdue" %}<small>{{ event.starts_at|local_datetime("%d.%m.%Y") }}</small>{% endif %}
+                            {% if view == "overdue" %}<small>{{ event.starts_at|local_datetime("%d.%m.%Y") }} · Просрочено</small>{% endif %}
                         </span>
                     </div>
                 {% endfor %}
             </div>
         {% else %}
-            <div class="empty-state">{{ "Просроченных напоминаний нет." if view == "overdue" else "На этот день событий нет." }}</div>
+            <div class="empty-state">{{ "Просроченных событий нет." if view == "overdue" else "На этот день событий нет." }}</div>
         {% endif %}
     </section>
 {% elif view == "month" %}
@@ -83,11 +83,12 @@
         {% for week in weeks %}
             <div class="calendar-row">
                 {% for day in week %}
-                    <a class="calendar-day {% if day == today %}is-today{% endif %} {% if day.month != first_day.month %}outside{% endif %}"
+                    {% set day_events = events_by_date.get(day, []) %}
+                    <a class="calendar-day {% if day == today %}is-today{% endif %} {% if day.month != first_day.month %}outside{% endif %} {% if day_events|selectattr('is_important')|list or day_events|selectattr('status', 'equalto', 'overdue')|list %}has-important{% endif %}"
                        href="{{ url_for('calendar.index', view='day', date=day.isoformat()) }}"
                        aria-label="{{ day.strftime('%d.%m.%Y') }}, событий: {{ events_by_date.get(day, [])|length }}">
                         <span class="calendar-day-header"><strong>{{ day.day }}</strong></span>
-                        {% set day_count = events_by_date.get(day, [])|length %}
+                        {% set day_count = day_events|length %}
                         {% if day_count %}<span class="calendar-count">{{ day_count }}</span>{% endif %}
                     </a>
                 {% endfor %}
@@ -106,9 +107,9 @@
                     <div class="day-events">
                         {% for event in events_by_date.get(day, []) %}
                             {% if event.client %}
-                                <a class="calendar-event event-bg-{{ event.event_type }}" href="{{ url_for('clients.detail', client_id=event.client.id) }}">{{ event.client.full_name }}</a>
+                                <a class="calendar-event event-bg-{{ event.event_type }} {% if event.is_important or event.status == 'overdue' %}event-important{% endif %}" href="{{ url_for('clients.detail', client_id=event.client.id) }}">{{ event.client.full_name }}</a>
                             {% else %}
-                                <a class="calendar-event event-bg-{{ event.event_type }}" href="{{ url_for('calendar.edit_event', event_id=event.id) }}">{{ event.title }}</a>
+                                <a class="calendar-event event-bg-{{ event.event_type }} {% if event.is_important or event.status == 'overdue' %}event-important{% endif %}" href="{{ url_for('calendar.edit_event', event_id=event.id) }}">{{ event.title }}</a>
                             {% endif %}
                         {% endfor %}
                     </div>
@@ -127,7 +128,8 @@
                 <div class="mini-days">
                     {% for week in month_weeks %}
                         {% for day in week %}
-                            <a class="mini-day {% if day.month != month_first.month %}outside{% endif %} {% if day == today %}is-today{% endif %} {% if events_by_date.get(day) %}has-events{% endif %}"
+                            {% set mini_day_events = events_by_date.get(day, []) %}
+                            <a class="mini-day {% if day.month != month_first.month %}outside{% endif %} {% if day == today %}is-today{% endif %} {% if mini_day_events %}has-events{% endif %} {% if mini_day_events|selectattr('is_important')|list or mini_day_events|selectattr('status', 'equalto', 'overdue')|list %}has-important{% endif %}"
                                href="{{ url_for('calendar.index', view='day', date=day.isoformat()) }}"
                                {% if events_by_date.get(day) %}title="Событий: {{ events_by_date.get(day)|length }}"{% endif %}>{{ day.day }}</a>
                         {% endfor %}

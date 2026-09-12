@@ -10,6 +10,7 @@
         {% if show_archived %}
             <a class="button" href="{{ url_for('clients.index') }}">Активные клиенты</a>
         {% else %}
+            <button class="button" type="button" data-search-open>Поиск по запискам</button>
             <a class="button" href="{{ url_for('clients.index', archived=1) }}">Архив</a>
             <a class="button button-primary" href="{{ url_for('clients.create') }}">+ Новый клиент</a>
         {% endif %}
@@ -37,6 +38,28 @@
     {% endif %}
 </form>
 
+{% if not show_archived %}
+    <div class="client-segments">
+        {% for title, group_key, grouped_clients in [
+            ("Активные клиенты", "active", active_clients),
+            ("Потенциальные клиенты", "potential", potential_clients)
+        ] %}
+            <details class="alphabet-group client-segment" {% if query_text %}open{% endif %}>
+                <summary><span>{{ title }}</span><small>{{ grouped_clients|length }}</small></summary>
+                <div class="alphabet-names">
+                    {% for client in grouped_clients %}
+                        <div class="alphabet-client">
+                            <a href="{{ url_for('clients.detail', client_id=client.id) }}">{{ client.full_name }}</a>
+                        </div>
+                    {% else %}
+                        <p class="muted segment-empty">В этой группе пока нет клиентов.</p>
+                    {% endfor %}
+                </div>
+            </details>
+        {% endfor %}
+    </div>
+{% endif %}
+
 {% if client_groups %}
     <div class="alphabet-list">
         {% for letter, grouped_clients in client_groups.items() %}
@@ -59,9 +82,31 @@
         {% endfor %}
     </div>
 {% else %}
-    <div class="panel empty-state">
+    {% if not active_clients and not potential_clients %}<div class="panel empty-state">
         <h2>Клиенты не найдены</h2>
         <p>{{ "В архиве пока ничего нет." if show_archived else "Добавьте первого клиента или измените параметры поиска." }}</p>
+    </div>{% endif %}
+{% endif %}
+
+{% if not show_archived %}
+<dialog class="search-dialog" data-search-dialog data-search-url="{{ url_for('clients.search_interactions') }}">
+    <div class="search-dialog-header">
+        <div>
+            <h2>Поиск по запискам клиентов</h2>
+            <p class="muted">Поиск выполняется по истории всех незархивированных клиентов.</p>
+        </div>
+        <button class="dialog-close" type="button" aria-label="Закрыть поиск" data-search-close>×</button>
     </div>
+    <form class="search-modal-form" data-search-form>
+        <label class="grow">
+            <span class="sr-only">Текст для поиска</span>
+            <input type="search" name="q" maxlength="100" autocomplete="off" placeholder="Введите слово или фразу" data-search-input>
+        </label>
+        <button class="button button-primary" type="submit">Найти</button>
+    </form>
+    <div class="search-results" data-search-results aria-live="polite">
+        <div class="empty-state">Введите слово, которое нужно найти в записках.</div>
+    </div>
+</dialog>
 {% endif %}
 {% endblock %}
