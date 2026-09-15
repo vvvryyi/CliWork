@@ -47,13 +47,42 @@ def apply_client_form(client):
     client.phone = request.form.get("phone", "").strip()
     client.email = request.form.get("email", "").strip()
     client.additional_contacts = request.form.get("additional_contacts", "").strip()
-    client.notes = request.form.get("notes", "").strip()
     client.preferred_channel = request.form.get("preferred_channel", "").strip()
     client.whatsapp = request.form.get("whatsapp", "").strip()
     client.telegram = request.form.get("telegram", "").strip()
     client.max_contact = request.form.get("max_contact", "").strip()
     client.instagram = request.form.get("instagram", "").strip()
     client.facebook = request.form.get("facebook", "").strip()
+
+
+def add_interaction(client, text, interaction_type="call", submission_token=None):
+    """Create a history record and its optional calendar event."""
+    interaction = Interaction(
+        client_id=client.id,
+        text=text,
+        interaction_type=interaction_type,
+        submission_token=submission_token,
+    )
+    db.session.add(interaction)
+    db.session.flush()
+    complete_client_events(client.id, interaction)
+
+    planned_local, date_suffix_found, is_important = parse_planning_details(text)
+    calendar_event = None
+    if planned_local:
+        starts_at = local_to_utc_naive(planned_local.isoformat(timespec="minutes"))
+        calendar_event = CalendarEvent(
+            client_id=client.id,
+            source_interaction_id=interaction.id,
+            origin="interaction",
+            event_type="task",
+            starts_at=starts_at,
+            comment="",
+            status="overdue" if starts_at < utcnow() else "planned",
+            is_important=is_important,
+        )
+        db.session.add(calendar_event)
+    return interaction, calendar_event, planned_local, date_suffix_found
 
 
 @bp.get("/")
@@ -116,20 +145,44 @@ def index():
 @login_required
 def create():
     client = Client()
+    interaction_text = request.form.get("interaction_text", "").strip()
     if request.method == "POST":
         apply_client_form(client)
         if not client.full_name:
             flash("Укажите ФИО клиента.", "error")
         else:
             db.session.add(client)
+            db.session.flush()
+            planned_local = None
+            date_suffix_found = False
+            if interaction_text:
+                _, _, planned_local, date_suffix_found = add_interaction(
+                    client, interaction_text
+                )
             db.session.commit()
-            flash("Клиент создан.", "success")
+            if planned_local:
+                flash(
+                    f"Клиент и запись созданы, событие добавлено на "
+                    f"{planned_local:%d.%m.%Y %H:%M}.",
+                    "success",
+                )
+            elif date_suffix_found:
+                flash(
+                    "Клиент и запись созданы, но событие не создано: "
+                    "проверьте дату ГГММДД.",
+                    "error",
+                )
+            elif interaction_text:
+                flash("Клиент и запись истории созданы.", "success")
+            else:
+                flash("Клиент создан.", "success")
             return redirect(url_for("clients.detail", client_id=client.id))
     return render_template(
         "clients/form.html",
         client=client,
         title="Новый клиент",
         channels=CHANNEL_LABELS,
+        interaction_text=interaction_text,
     )
 
 
@@ -137,15 +190,16 @@ def create():
 @login_required
 def detail(client_id):
     client = get_client_or_404(client_id)
-    interactions = db.session.scalars(
+    current_interaction = db.session.scalar(
         db.select(Interaction)
         .where(Interaction.client_id == client.id)
         .order_by(Interaction.created_at.desc())
-    ).all()
+        .limit(1)
+    )
     return render_template(
         "clients/detail.html",
         client=client,
-        interactions=interactions,
+        current_interaction=current_interaction,
         interaction_token=uuid4().hex,
     )
 
@@ -287,30 +341,9 @@ def create_interaction(client_id):
     if not re.fullmatch(r"[A-Za-z0-9_-]{16,64}", submission_token):
         submission_token = uuid4().hex
 
-    interaction = Interaction(
-        client_id=client.id,
-        text=text,
-        interaction_type=interaction_type,
-        submission_token=submission_token,
+    interaction, calendar_event, planned_local, date_suffix_found = add_interaction(
+        client, text, interaction_type, submission_token
     )
-    db.session.add(interaction)
-    db.session.flush()
-    complete_client_events(client.id, interaction)
-    planned_local, date_suffix_found, is_important = parse_planning_details(text)
-    calendar_event = None
-    if planned_local:
-        starts_at = local_to_utc_naive(planned_local.isoformat(timespec="minutes"))
-        calendar_event = CalendarEvent(
-            client_id=client.id,
-            source_interaction_id=interaction.id,
-            origin="interaction",
-            event_type="task",
-            starts_at=starts_at,
-            comment="",
-            status="overdue" if starts_at < utcnow() else "planned",
-            is_important=is_important,
-        )
-        db.session.add(calendar_event)
     try:
         save_uploads(files, client.id, interaction.id)
         db.session.commit()

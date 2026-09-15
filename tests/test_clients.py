@@ -5,6 +5,66 @@ from app.models import CalendarEvent, Client, Interaction
 from app.utils import utc_naive_to_local
 
 
+def test_create_client_form_replaces_notes_with_interaction_field(auth_client):
+    response = auth_client.get("/clients/new")
+
+    assert response.status_code == 200
+    assert "Общий комментарий".encode() not in response.data
+    assert b'name="notes"' not in response.data
+    assert "Запись о работе с клиентом".encode() in response.data
+    assert b'name="interaction_text"' in response.data
+    assert "ГГММДД".encode() in response.data
+
+
+def test_create_client_with_interaction_and_next_action(app, auth_client):
+    response = auth_client.post(
+        "/clients/new",
+        data={
+            "full_name": "Анна Смирнова",
+            "interaction_text": "Провели первую консультацию 260920 14:30!",
+        },
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert "Провели первую консультацию 260920 14:30!".encode() in response.data
+    assert "событие добавлено на 20.09.2026 14:30".encode() in response.data
+    with app.app_context():
+        interaction = db.session.scalar(db.select(Interaction))
+        event = db.session.scalar(db.select(CalendarEvent))
+        assert interaction.client.full_name == "Анна Смирнова"
+        assert interaction.text == "Провели первую консультацию 260920 14:30!"
+        assert event.source_interaction_id == interaction.id
+        assert event.is_important is True
+        assert utc_naive_to_local(event.starts_at).strftime("%y%m%d %H:%M") == "260920 14:30"
+
+
+def test_client_card_keeps_note_in_textarea_without_timeline(
+    app, auth_client, sample_client
+):
+    original_text = "Строка один\nСтрока два 260920"
+    auth_client.post(
+        f"/clients/{sample_client}/interactions",
+        data={"text": original_text},
+    )
+
+    detail = auth_client.get(f"/clients/{sample_client}")
+    assert b'class="timeline timeline-spaced"' not in detail.data
+    assert f'<textarea name="text" rows="8"'.encode() in detail.data
+    assert original_text.encode() in detail.data
+    assert f'action="/clients/{sample_client}/interactions/1/edit"'.encode() in detail.data
+
+    updated_text = "Обновлённая запись\nСледующий шаг 260921 11:00"
+    auth_client.post(
+        f"/clients/{sample_client}/interactions/1/edit",
+        data={"text": updated_text},
+    )
+    with app.app_context():
+        interactions = db.session.scalars(db.select(Interaction)).all()
+        assert len(interactions) == 1
+        assert interactions[0].text == updated_text
+
+
 def test_create_search_edit_and_archive_client(app, auth_client, sample_client):
     response = auth_client.get("/clients/?q=Иван")
     assert response.status_code == 200

@@ -49,14 +49,16 @@
         </div>
     </fieldset>
 
-    <label>
-        Общий комментарий
-        <textarea name="notes" rows="5">{{ client.notes or '' }}</textarea>
-    </label>
+    {% if not client.id %}
+        <label>
+            Запись о работе с клиентом
+            <textarea name="interaction_text" rows="5" placeholder="Что сделано и какое следующее действие?">{{ interaction_text or '' }}</textarea>
+            <small>Дату следующего действия укажите в конце записи: ГГММДД, при необходимости время ЧЧ:ММ и ! для важного события.</small>
+        </label>
+    {% endif %}
     <div class="form-actions">
         <button class="button button-primary" type="submit">Сохранить</button>
         <a class="button button-ghost" href="{{ url_for('clients.detail', client_id=client.id) if client.id else url_for('clients.index') }}">Отмена</a>
     </div>
 </form>
 {% endblock %}
-
