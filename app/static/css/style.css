@@ -136,6 +136,31 @@ input, select, textarea {
 }
 textarea { resize: vertical; }
 input:focus, select:focus, textarea:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(36, 107, 254, .12); }
+.dated-interaction-editor {
+    width: 100%;
+    min-height: 176px;
+    padding: .65rem .78rem;
+    overflow-y: auto;
+    border: 1px solid #cbd3da;
+    border-radius: 9px;
+    outline: none;
+    background: white;
+    color: var(--text);
+    font: inherit;
+    font-weight: 400;
+    line-height: 1.35;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+.dated-interaction-editor:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(36, 107, 254, .12);
+}
+.interaction-date {
+    color: var(--primary);
+    font-family: Consolas, monospace;
+    font-weight: 800;
+}
 label small { color: var(--muted); font-weight: 400; }
 fieldset { padding: 20px; border: 1px solid var(--line); border-radius: 12px; }
 legend { padding: 0 8px; font-weight: 750; }

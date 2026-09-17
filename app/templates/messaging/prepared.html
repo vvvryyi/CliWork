@@ -6,7 +6,7 @@
     <p class="eyebrow">Сообщение сохранено</p>
     <h1>{{ client.full_name }} · {{ channel_label }}</h1>
     <p>Запись получила статус «Подготовлено». Откройте канал, вставьте текст при необходимости и после отправки подтвердите действие.</p>
-    <div class="message-preview" id="prepared-message">{{ interaction.text }}</div>
+    <div class="message-preview" id="prepared-message">{{ message }}</div>
     <div class="heading-actions centered">
         <button class="button" type="button" data-copy-target="#prepared-message">Копировать текст</button>
         {% if external_url %}
@@ -29,4 +29,3 @@
     <a class="back-link" href="{{ url_for('clients.detail', client_id=client.id) }}">Оставить подготовленным и вернуться к клиенту</a>
 </section>
 {% endblock %}
-

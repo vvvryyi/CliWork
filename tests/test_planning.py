@@ -4,6 +4,7 @@ from datetime import datetime
 from app.models import CalendarEvent
 from app.utils import (
     local_to_utc_naive,
+    normalize_interaction_text,
     parse_planning_details,
     parse_planning_suffix,
 )
@@ -118,6 +119,25 @@ def test_planning_suffix_marks_important_events():
     assert found is True
     assert important is True
     assert planned == datetime(2031, 12, 31, 15, 30)
+
+
+def test_interaction_text_uses_current_date_only_without_trailing_date(app):
+    fixed_now = datetime(2026, 9, 16, 9)
+    with app.app_context():
+        assert (
+            normalize_interaction_text("Обсудили документы", fixed_now)
+            == "260916 Обсудили документы"
+        )
+        assert (
+            normalize_interaction_text("Обсудили следующий шаг 260920", fixed_now)
+            == "Обсудили следующий шаг 260920"
+        )
+        assert (
+            normalize_interaction_text(
+                "260916 Обсудили следующий шаг 260920", fixed_now
+            )
+            == "Обсудили следующий шаг 260920"
+        )
 
 
 def test_calendar_marks_important_event_red(app, auth_client, sample_client):

@@ -42,6 +42,75 @@ document.querySelectorAll("[data-auto-submit]").forEach((field) => {
     field.addEventListener("change", () => field.form?.submit());
 });
 
+const interactionLeadingDate = /^(\d{6})(?:\s+|$)/;
+const interactionTrailingDate = /(?:^|\s)\d{6}(?:\s+(?:в\s*)?(?:[01]\d|2[0-3]):[0-5]\d)?!?\s*$/;
+
+function normalizeInteractionText(value, currentDate) {
+    const cleaned = value.replace(/\r\n/g, "\n").trim();
+    if (!cleaned) return `${currentDate} `;
+
+    const leadingMatch = cleaned.match(interactionLeadingDate);
+    const body = leadingMatch ? cleaned.slice(leadingMatch[0].length).trimStart() : cleaned;
+    if (body && interactionTrailingDate.test(body)) return body;
+    if (leadingMatch) return cleaned;
+    return `${currentDate} ${cleaned}`;
+}
+
+function renderInteractionEditor(editor, value) {
+    editor.replaceChildren();
+    const leadingMatch = value.match(interactionLeadingDate);
+    if (!leadingMatch) {
+        editor.textContent = value;
+        return;
+    }
+
+    const date = document.createElement("span");
+    date.className = "interaction-date";
+    date.contentEditable = "false";
+    date.textContent = leadingMatch[1];
+    editor.append(date, document.createTextNode(value.slice(6)));
+}
+
+document.querySelectorAll("textarea[data-dated-interaction]").forEach((source) => {
+    const editor = document.createElement("div");
+    editor.className = "dated-interaction-editor";
+    editor.contentEditable = "true";
+    editor.setAttribute("role", "textbox");
+    editor.setAttribute("aria-multiline", "true");
+    editor.setAttribute("aria-label", "Запись о клиенте");
+    editor.style.minHeight = `${source.offsetHeight}px`;
+
+    const syncSource = (normalize = false) => {
+        let value = editor.innerText.replace(/\r\n/g, "\n");
+        if (normalize) {
+            value = normalizeInteractionText(value, source.dataset.currentDate);
+            renderInteractionEditor(editor, value);
+        }
+        source.value = value;
+    };
+
+    const initialValue = normalizeInteractionText(
+        source.value,
+        source.dataset.currentDate,
+    );
+    renderInteractionEditor(editor, initialValue);
+    source.value = initialValue;
+    source.insertAdjacentElement("beforebegin", editor);
+    source.hidden = true;
+
+    editor.addEventListener("input", () => syncSource());
+    editor.addEventListener("blur", () => syncSource(true));
+    editor.addEventListener("paste", (event) => {
+        event.preventDefault();
+        document.execCommand(
+            "insertText",
+            false,
+            event.clipboardData.getData("text/plain"),
+        );
+    });
+    source.form?.addEventListener("submit", () => syncSource(true));
+});
+
 const searchDialog = document.querySelector("[data-search-dialog]");
 const searchInput = searchDialog?.querySelector("[data-search-input]");
 const searchForm = searchDialog?.querySelector("[data-search-form]");

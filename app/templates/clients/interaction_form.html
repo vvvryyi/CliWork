@@ -20,7 +20,7 @@
     </label>
     <label>
         Текст
-        <textarea name="text" rows="7">{{ interaction.text }}</textarea>
+        <textarea name="text" rows="7" data-dated-interaction data-current-date="{{ new_interaction_date|history_date }}">{{ interaction_text }}</textarea>
     </label>
     {% if interaction.attachments %}
         <div>

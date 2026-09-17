@@ -23,7 +23,9 @@ from .utils import (
     CHANNEL_LABELS,
     OPEN_EVENT_STATUSES,
     complete_client_events,
+    interaction_text_body,
     local_to_utc_naive,
+    normalize_interaction_text,
     parse_planning_details,
     save_uploads,
 )
@@ -57,6 +59,9 @@ def apply_client_form(client):
 
 def add_interaction(client, text, interaction_type="call", submission_token=None):
     """Create a history record and its optional calendar event."""
+    text = normalize_interaction_text(text, utcnow())
+    if not interaction_text_body(text):
+        text = ""
     interaction = Interaction(
         client_id=client.id,
         text=text,
@@ -155,7 +160,7 @@ def create():
             db.session.flush()
             planned_local = None
             date_suffix_found = False
-            if interaction_text:
+            if interaction_text_body(interaction_text):
                 _, _, planned_local, date_suffix_found = add_interaction(
                     client, interaction_text
                 )
@@ -172,7 +177,7 @@ def create():
                     "проверьте дату ГГММДД.",
                     "error",
                 )
-            elif interaction_text:
+            elif interaction_text_body(interaction_text):
                 flash("Клиент и запись истории созданы.", "success")
             else:
                 flash("Клиент создан.", "success")
@@ -182,7 +187,8 @@ def create():
         client=client,
         title="Новый клиент",
         channels=CHANNEL_LABELS,
-        interaction_text=interaction_text,
+        interaction_text=normalize_interaction_text(interaction_text, utcnow()),
+        new_interaction_date=utcnow(),
     )
 
 
@@ -200,7 +206,12 @@ def detail(client_id):
         "clients/detail.html",
         client=client,
         current_interaction=current_interaction,
+        interaction_text=normalize_interaction_text(
+            current_interaction.text if current_interaction else "",
+            utcnow(),
+        ),
         interaction_token=uuid4().hex,
+        new_interaction_date=utcnow(),
     )
 
 
@@ -323,9 +334,9 @@ def restore(client_id):
 @login_required
 def create_interaction(client_id):
     client = get_client_or_404(client_id)
-    text = request.form.get("text", "").strip()
+    text = normalize_interaction_text(request.form.get("text", ""), utcnow())
     files = request.files.getlist("files")
-    if not text and not any(item.filename for item in files):
+    if not interaction_text_body(text) and not any(item.filename for item in files):
         flash("Введите текст или приложите файл.", "error")
         return redirect(url_for("clients.detail", client_id=client.id))
 
@@ -374,16 +385,18 @@ def edit_interaction(client_id, interaction_id):
     if interaction.client_id != client.id:
         abort(404)
     if request.method == "POST":
-        text = request.form.get("text", "").strip()
-        if not text and not interaction.attachments:
+        text = normalize_interaction_text(request.form.get("text", ""), utcnow())
+        if not interaction_text_body(text) and not interaction.attachments:
             flash("Запись не может быть пустой.", "error")
         else:
-            interaction.text = text
+            interaction.text = text if interaction_text_body(text) else ""
             interaction_type = request.form.get("interaction_type", "call")
             interaction.interaction_type = (
                 interaction_type if interaction_type in INTERACTION_TYPES else "call"
             )
-            planned_local, date_suffix_found, is_important = parse_planning_details(text)
+            planned_local, date_suffix_found, is_important = parse_planning_details(
+                interaction.text
+            )
             calendar_event = interaction.calendar_event
             if planned_local:
                 starts_at = local_to_utc_naive(
@@ -431,6 +444,8 @@ def edit_interaction(client_id, interaction_id):
         "clients/interaction_form.html",
         client=client,
         interaction=interaction,
+        interaction_text=normalize_interaction_text(interaction.text, utcnow()),
+        new_interaction_date=utcnow(),
     )
 
 

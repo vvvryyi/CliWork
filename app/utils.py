@@ -43,6 +43,7 @@ OPEN_EVENT_STATUSES = ("planned", "overdue")
 PLANNING_SUFFIX = re.compile(
     r"(?:^|\s)(?P<date>\d{6})(?:\s+(?:в\s*)?(?P<hour>[01]\d|2[0-3]):(?P<minute>[0-5]\d))?(?P<important>!)?\s*$"
 )
+INTERACTION_LEADING_DATE = re.compile(r"^(?P<date>\d{6})(?:\s+|$)")
 
 
 def parse_planning_details(text):
@@ -69,6 +70,34 @@ def parse_planning_suffix(text):
     """Backward-compatible parser returning only datetime and suffix presence."""
     planned, suffix_found, _ = parse_planning_details(text)
     return planned, suffix_found
+
+
+def interaction_text_body(text):
+    """Return record text without its automatic leading date."""
+    cleaned = (text or "").strip()
+    match = INTERACTION_LEADING_DATE.match(cleaned)
+    return cleaned[match.end():].lstrip() if match else cleaned
+
+
+def normalize_interaction_text(text, now=None):
+    """Add today's date unless the record already ends with a planning date."""
+    cleaned = (text or "").strip()
+    local_now = utc_naive_to_local(now or utcnow())
+    current_date = local_now.strftime("%y%m%d")
+    if not cleaned:
+        return f"{current_date} "
+
+    leading_match = INTERACTION_LEADING_DATE.match(cleaned)
+    body = (
+        cleaned[leading_match.end():].lstrip()
+        if leading_match
+        else cleaned
+    )
+    if body and PLANNING_SUFFIX.search(body):
+        return body
+    if leading_match:
+        return cleaned
+    return f"{current_date} {cleaned}"
 
 
 def get_timezone_name():

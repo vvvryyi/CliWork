@@ -7,6 +7,7 @@ from .utils import (
     CHANNEL_LABELS,
     build_channel_url,
     complete_client_events,
+    normalize_interaction_text,
     save_uploads,
 )
 
@@ -35,7 +36,7 @@ def compose():
         else:
             interaction = Interaction(
                 client_id=client.id,
-                text=message,
+                text=normalize_interaction_text(message),
                 interaction_type="message",
                 channel=channel,
                 delivery_status="prepared",
@@ -57,6 +58,7 @@ def compose():
                 "messaging/prepared.html",
                 client=client,
                 interaction=interaction,
+                message=message,
                 channel_label=CHANNEL_LABELS[channel],
                 external_url=build_channel_url(client, channel, message),
             )

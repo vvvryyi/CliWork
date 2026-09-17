@@ -1,3 +1,5 @@
+import re
+from datetime import datetime
 from io import BytesIO
 
 from app.extensions import db
@@ -5,7 +7,12 @@ from app.models import CalendarEvent, Client, Interaction
 from app.utils import utc_naive_to_local
 
 
-def test_create_client_form_replaces_notes_with_interaction_field(auth_client):
+def test_create_client_form_replaces_notes_with_interaction_field(
+    auth_client, monkeypatch
+):
+    import app.clients as clients_module
+
+    monkeypatch.setattr(clients_module, "utcnow", lambda: datetime(2026, 9, 16, 9))
     response = auth_client.get("/clients/new")
 
     assert response.status_code == 200
@@ -14,6 +21,11 @@ def test_create_client_form_replaces_notes_with_interaction_field(auth_client):
     assert "Запись о работе с клиентом".encode() in response.data
     assert b'name="interaction_text"' in response.data
     assert "ГГММДД".encode() in response.data
+    assert b"data-dated-interaction" in response.data
+    assert (
+        'data-current-date="260916">260916 </textarea>'.encode()
+        in response.data
+    )
 
 
 def test_create_client_with_interaction_and_next_action(app, auth_client):
@@ -90,7 +102,12 @@ def test_create_search_edit_and_archive_client(app, auth_client, sample_client):
         assert db.session.get(Client, sample_client).is_archived
 
 
-def test_interaction_with_attachment(app, auth_client, sample_client):
+def test_interaction_with_attachment(
+    app, auth_client, sample_client, monkeypatch
+):
+    import app.clients as clients_module
+
+    monkeypatch.setattr(clients_module, "utcnow", lambda: datetime(2026, 9, 16, 9))
     response = auth_client.post(
         f"/clients/{sample_client}/interactions",
         data={
@@ -104,7 +121,7 @@ def test_interaction_with_attachment(app, auth_client, sample_client):
 
     with app.app_context():
         interaction = db.session.scalar(db.select(Interaction))
-        assert interaction.text == "Обсудили документы"
+        assert interaction.text == "260916 Обсудили документы"
         assert len(interaction.attachments) == 1
         attachment_id = interaction.attachments[0].id
 
@@ -121,6 +138,7 @@ def test_history_uses_compact_date(auth_client, sample_client):
     response = auth_client.get(f"/clients/{sample_client}")
     assert response.status_code == 200
     assert "Новая запись".encode() in response.data
+    assert re.search(rb">\d{6} [^<]+</textarea>", response.data)
 
 
 def test_client_list_is_grouped_and_only_shows_names(auth_client, sample_client):
