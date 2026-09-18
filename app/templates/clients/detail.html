@@ -64,16 +64,18 @@
             <input type="hidden" name="workflow_fields_present" value="1">
             {% if not current_interaction %}<input type="hidden" name="submission_token" value="{{ interaction_token }}">{% endif %}
             {% if current_interaction %}<input type="hidden" name="interaction_type" value="{{ current_interaction.interaction_type }}">{% endif %}
-            <label>
-                <span class="sr-only">Запись о клиенте</span>
-                <textarea name="text" rows="8" placeholder="Добавьте запись о работе с клиентом" data-dated-interaction data-current-date="{{ new_interaction_date|history_date }}">{{ interaction_text }}</textarea>
-                <small>Дату следующего действия укажите в конце записи: ГГММДД, при необходимости время ЧЧ:ММ и ! для важного события.</small>
-            </label>
-            <div class="client-workflow">
+            <div class="client-workflow client-workflow-panel">
                 <div>
                     <span class="field-label">Отметки</span>
                     <div class="flag-grid">
-                        {% for field, label in [("flag_f", "Ф"), ("flag_d", "Д"), ("flag_b", "Б"), ("flag_n", "Н"), ("flag_percent", "%"), ("flag_ki", "КИ"), ("flag_ku", "КУ"), ("flag_ks", "КС"), ("flag_kr", "КР")] %}
+                        {% for field, label in [("flag_f", "Ф"), ("flag_d", "Д"), ("flag_b", "Б"), ("flag_n", "Н"), ("flag_ki", "КИ")] %}
+                            <label class="flag-cell"><input name="{{ field }}" type="checkbox" {% if client|attr(field) %}checked{% endif %}><span>{{ label }}</span></label>
+                        {% endfor %}
+                        <label class="percent-cell">
+                            <span>%</span>
+                            <input name="percent_value" type="number" min="0" max="100" step="1" inputmode="numeric" value="{{ client.percent_value if client.percent_value is not none else '' }}" aria-label="Процент">
+                        </label>
+                        {% for field, label in [("flag_ku", "КУ"), ("flag_ks", "КС"), ("flag_kr", "КР")] %}
                             <label class="flag-cell"><input name="{{ field }}" type="checkbox" {% if client|attr(field) %}checked{% endif %}><span>{{ label }}</span></label>
                         {% endfor %}
                     </div>
@@ -83,6 +85,11 @@
                     <input name="quarterly_reminder_mmdd" value="{{ client.quarterly_reminder_mmdd }}" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" placeholder="ММДД">
                 </label>
             </div>
+            <label>
+                <span class="sr-only">Запись о клиенте</span>
+                <textarea name="text" rows="8" placeholder="Добавьте запись о работе с клиентом" data-dated-interaction data-current-date="{{ new_interaction_date|history_date }}">{{ interaction_text }}</textarea>
+                <small>Дату следующего действия укажите в конце записи: ГГММДД, при необходимости время ЧЧ:ММ и ! для важного дела.</small>
+            </label>
             <div class="compact-upload">
                 <label class="button button-small">
                     📎 Выбрать файлы

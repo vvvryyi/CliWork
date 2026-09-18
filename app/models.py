@@ -41,6 +41,7 @@ class Client(TimestampMixin, db.Model):
     flag_ku = db.Column(db.Boolean, nullable=False, default=False)
     flag_ks = db.Column(db.Boolean, nullable=False, default=False)
     flag_kr = db.Column(db.Boolean, nullable=False, default=False)
+    percent_value = db.Column(db.Integer, nullable=True)
     quarterly_reminder_mmdd = db.Column(db.String(4), nullable=False, default="")
     archived_at = db.Column(db.DateTime, nullable=True)
 
@@ -178,6 +179,12 @@ class CalendarEvent(TimestampMixin, db.Model):
         back_populates="completed_events",
         foreign_keys=[completed_by_interaction_id],
     )
+    daily_task = db.relationship(
+        "DailyTask",
+        back_populates="calendar_event",
+        uselist=False,
+        foreign_keys="DailyTask.calendar_event_id",
+    )
 
 
 class AppSetting(db.Model):
@@ -191,9 +198,22 @@ class DailyTask(TimestampMixin, db.Model):
     __tablename__ = "daily_tasks"
 
     id = db.Column(db.Integer, primary_key=True)
+    calendar_event_id = db.Column(
+        db.Integer,
+        db.ForeignKey("calendar_events.id", ondelete="SET NULL"),
+        nullable=True,
+        unique=True,
+        index=True,
+    )
     text = db.Column(db.String(500), nullable=False)
     due_date = db.Column(db.Date, nullable=False, index=True)
     completed_at = db.Column(db.DateTime, nullable=True)
+
+    calendar_event = db.relationship(
+        "CalendarEvent",
+        back_populates="daily_task",
+        foreign_keys=[calendar_event_id],
+    )
 
     @property
     def is_completed(self):

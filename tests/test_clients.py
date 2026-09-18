@@ -39,7 +39,7 @@ def test_create_client_with_interaction_and_next_action(app, auth_client):
     )
 
     assert response.status_code == 200
-    assert "событие добавлено на 20.09.2026 14:30".encode() in response.data
+    assert "дело добавлено на 20.09.2026 14:30".encode() in response.data
     assert response.request.path == "/"
     with app.app_context():
         interaction = db.session.scalar(db.select(Interaction))
@@ -175,7 +175,7 @@ def test_interaction_date_creates_calendar_event_without_copying_text(
         data={"interaction_type": "call", "text": note},
         follow_redirects=True,
     )
-    assert "событие добавлено на 11.09.2026 09:00".encode() in response.data
+    assert "дело добавлено на 11.09.2026 09:00".encode() in response.data
 
     with app.app_context():
         event = db.session.scalar(db.select(CalendarEvent))

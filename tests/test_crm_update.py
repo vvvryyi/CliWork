@@ -55,6 +55,7 @@ def test_client_flags_and_compact_upload_are_saved(app, auth_client, sample_clie
             "flag_f": "on",
             "flag_ks": "on",
             "flag_kr": "on",
+            "percent_value": "35",
         },
     )
     assert response.headers["Location"].endswith("/clients/")
@@ -64,6 +65,7 @@ def test_client_flags_and_compact_upload_are_saved(app, auth_client, sample_clie
         assert client.flag_ks is True
         assert client.flag_kr is True
         assert client.flag_d is False
+        assert client.percent_value == 35
 
     detail = auth_client.get(f"/clients/{sample_client}")
     assert b"data-file-input" in detail.data
@@ -118,13 +120,13 @@ def test_rescheduling_removes_client_from_dashboard_overdue_list(app, auth_clien
         db.session.commit()
 
     before = auth_client.get("/")
-    assert "Просроченные клиенты".encode() in before.data
+    assert b"overdue-client-panel" in before.data
     auth_client.post(
         f"/clients/{sample_client}/interactions/1/edit",
         data={"text": "Новая дата 311231", "workflow_fields_present": "1"},
     )
     after = auth_client.get("/")
-    assert "Просроченные клиенты".encode() not in after.data
+    assert b"overdue-client-panel" not in after.data
 
 
 def test_unfinished_tasks_carry_forward_and_completed_stay_on_original_day(app, auth_client):
@@ -135,6 +137,78 @@ def test_unfinished_tasks_carry_forward_and_completed_stay_on_original_day(app, 
     auth_client.post("/tasks/1/toggle", data={"date": "2026-09-18"})
     assert "Позвонить".encode() not in auth_client.get("/tasks/?date=2026-09-18").data
     assert "Позвонить".encode() in auth_client.get("/tasks/?date=2026-09-17").data
+
+
+def test_task_sheet_autosaves_and_stays_linked_to_calendar(app, auth_client):
+    created = auth_client.post(
+        "/tasks/save",
+        data={"text": "Подготовить документы", "due_date": "2026-09-20"},
+    )
+    assert created.status_code == 200
+    task_id = created.get_json()["task_id"]
+
+    with app.app_context():
+        task = db.session.get(DailyTask, task_id)
+        event_id = task.calendar_event_id
+        assert task.calendar_event.title == "Подготовить документы"
+        assert utc_naive_to_local(task.calendar_event.starts_at).date() == date(2026, 9, 20)
+
+    updated = auth_client.post(
+        "/tasks/save",
+        data={
+            "task_id": task_id,
+            "text": "Документы готовы",
+            "due_date": "2026-09-20",
+            "completed": "1",
+        },
+    )
+    assert updated.get_json()["completed"] is True
+    with app.app_context():
+        event = db.session.get(CalendarEvent, event_id)
+        assert event.title == "Документы готовы"
+        assert event.status == "completed"
+
+    auth_client.post("/tasks/save", data={"task_id": task_id, "delete": "1"})
+    with app.app_context():
+        assert db.session.get(DailyTask, task_id) is None
+        assert db.session.get(CalendarEvent, event_id) is None
+
+
+def test_calendar_deal_creates_daily_task(app, auth_client):
+    response = auth_client.post(
+        "/calendar/events/new",
+        data={
+            "title": "Встреча по договору",
+            "event_type": "meeting",
+            "starts_at": "2026-09-22T14:30",
+            "ends_at": "",
+            "comment": "",
+        },
+    )
+    assert response.status_code == 302
+    with app.app_context():
+        task = db.session.scalar(
+            db.select(DailyTask).where(DailyTask.text == "Встреча по договору")
+        )
+        assert task is not None
+        assert task.due_date == date(2026, 9, 22)
+        assert task.calendar_event.origin == "manual"
+
+
+def test_task_page_and_dashboard_use_new_compact_wording(auth_client):
+    tasks_page = auth_client.get("/tasks/?date=2026-09-18")
+    assert b"data-task-editor" in tasks_page.data
+    assert "⌘/Ctrl + Z".encode() in tasks_page.data
+
+    dashboard = auth_client.get("/")
+    assert "Активные клиенты".encode() in dashboard.data
+    assert "Просроченные клиенты".encode() in dashboard.data
+    assert dashboard.data.index("Дела".encode()) < dashboard.data.index("Новый клиент".encode())
+
+    calendar_form = auth_client.get("/calendar/events/new?date=2026-09-18")
+    assert b"calendar-form-grid" in calendar_form.data
+    assert "Новое дело".encode() in calendar_form.data
+    assert "Название дела".encode() in calendar_form.data
 
 
 class FakeRemoteEvent:

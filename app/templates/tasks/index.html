@@ -12,37 +12,26 @@
     {% if selected_date != today %}<a class="button button-small" href="{{ url_for('tasks.index', date=today.isoformat()) }}">Сегодня</a>{% endif %}
 </div>
 
-<section class="panel task-panel">
-    <form class="task-create" method="post" action="{{ url_for('tasks.create') }}">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <input type="hidden" name="due_date" value="{{ selected_date.isoformat() }}">
-        <label class="grow"><span class="sr-only">Новое дело</span><input name="text" maxlength="500" placeholder="Одна строка — одно дело" required></label>
-        <button class="button button-primary" type="submit">Добавить</button>
-    </form>
-
-    {% if tasks %}
-        <div class="task-list">
-            {% for task in tasks %}
-                <div class="task-row {% if task.is_completed %}is-completed{% endif %}">
-                    <form method="post" action="{{ url_for('tasks.toggle', task_id=task.id) }}">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                        <input type="hidden" name="date" value="{{ selected_date.isoformat() }}">
-                        <label class="task-check">
-                            <input type="checkbox" {% if task.is_completed %}checked{% endif %} onchange="this.form.submit()">
-                            <span>Выполнено</span>
-                        </label>
-                    </form>
-                    <span class="task-text">{{ task.text }}{% if not task.is_completed and task.due_date < selected_date %}<small>с {{ task.due_date.strftime("%d.%m") }}</small>{% endif %}</span>
-                    <form method="post" action="{{ url_for('tasks.delete', task_id=task.id) }}" data-confirm="Удалить дело?">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                        <input type="hidden" name="date" value="{{ selected_date.isoformat() }}">
-                        <button class="link-danger" type="submit">Удалить</button>
-                    </form>
-                </div>
-            {% endfor %}
+<section class="panel task-panel" data-task-editor data-save-url="{{ url_for('tasks.save') }}" data-selected-date="{{ selected_date.isoformat() }}">
+    <input type="hidden" data-task-csrf value="{{ csrf_token() }}">
+    <div class="task-sheet" data-task-list>
+        {% for task in tasks %}
+            <div class="task-line {% if task.is_completed %}is-completed{% endif %}" data-task-row data-task-id="{{ task.id }}" data-due-date="{{ task.due_date.isoformat() }}" data-saved-text="{{ task.text }}" data-saved-completed="{{ '1' if task.is_completed else '0' }}">
+                <input class="task-line-check" type="checkbox" data-task-check aria-label="Выполнено" {% if task.is_completed %}checked{% endif %}>
+                <input class="task-line-text" type="text" data-task-text maxlength="500" value="{{ task.text }}" aria-label="Текст дела">
+                {% if not task.is_completed and task.due_date < selected_date %}<small class="task-origin">с {{ task.due_date.strftime("%d.%m") }}</small>{% endif %}
+                <button class="task-line-remove" type="button" data-task-remove aria-label="Удалить дело">×</button>
+            </div>
+        {% endfor %}
+        <div class="task-line is-new" data-task-row data-task-id="" data-due-date="{{ selected_date.isoformat() }}" data-saved-text="" data-saved-completed="0">
+            <input class="task-line-check" type="checkbox" data-task-check aria-label="Выполнено">
+            <input class="task-line-text" type="text" data-task-text maxlength="500" placeholder="Введите дело и нажмите Enter" aria-label="Новое дело">
+            <button class="task-line-remove" type="button" data-task-remove aria-label="Удалить строку">×</button>
         </div>
-    {% else %}
-        <div class="empty-state">Дел на этот день нет.</div>
-    {% endif %}
+    </div>
+    <div class="task-sheet-footer">
+        <small>Enter — новая строка · ⌘/Ctrl + Z — отменить последнее изменение</small>
+        <small class="task-save-status" data-task-status aria-live="polite">Сохраняется автоматически</small>
+    </div>
 </section>
 {% endblock %}

@@ -44,7 +44,6 @@ CLIENT_FLAG_FIELDS = (
     "flag_d",
     "flag_b",
     "flag_n",
-    "flag_percent",
     "flag_ki",
     "flag_ku",
     "flag_ks",
@@ -75,6 +74,15 @@ def apply_client_form(client):
 def apply_client_workflow_form(client):
     for field in CLIENT_FLAG_FIELDS:
         setattr(client, field, field in request.form)
+    percent_value = request.form.get("percent_value", "").strip()
+    if percent_value:
+        if not percent_value.isdigit() or not 0 <= int(percent_value) <= 100:
+            raise ValueError("Процент должен быть целым числом от 0 до 100.")
+        client.percent_value = int(percent_value)
+        client.flag_percent = True
+    else:
+        client.percent_value = None
+        client.flag_percent = False
     client.quarterly_reminder_mmdd = validate_mmdd(
         request.form.get("quarterly_reminder_mmdd", "")
     )
@@ -190,13 +198,13 @@ def create():
             db.session.commit()
             if planned_local:
                 flash(
-                    f"Клиент и запись созданы, событие добавлено на "
+                    f"Клиент и запись созданы, дело добавлено на "
                     f"{planned_local:%d.%m.%Y %H:%M}.",
                     "success",
                 )
             elif date_suffix_found:
                 flash(
-                    "Клиент и запись созданы, но событие не создано: "
+                    "Клиент и запись созданы, но дело не создано: "
                     "проверьте дату ГГММДД.",
                     "error",
                 )
@@ -400,12 +408,12 @@ def create_interaction(client_id):
         return redirect(url_for("clients.detail", client_id=client.id))
     if calendar_event:
         flash(
-            f"Запись сохранена, событие добавлено на {planned_local:%d.%m.%Y %H:%M}.",
+            f"Запись сохранена, дело добавлено на {planned_local:%d.%m.%Y %H:%M}.",
             "success",
         )
     elif date_suffix_found:
         flash(
-            "Запись сохранена, но событие не создано: проверьте дату ГГММДД.",
+            "Запись сохранена, но дело не создано: проверьте дату ГГММДД.",
             "error",
         )
     else:
@@ -479,12 +487,12 @@ def edit_interaction(client_id, interaction_id):
                 return redirect(request.url)
             if planned_local:
                 flash(
-                    f"Запись обновлена, событие назначено на {planned_local:%d.%m.%Y %H:%M}.",
+                    f"Запись обновлена, дело назначено на {planned_local:%d.%m.%Y %H:%M}.",
                     "success",
                 )
             elif date_suffix_found:
                 flash(
-                    "Запись обновлена, но событие удалено: проверьте дату ГГММДД.",
+                    "Запись обновлена, но дело удалено: проверьте дату ГГММДД.",
                     "error",
                 )
             else:

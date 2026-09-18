@@ -5,6 +5,7 @@ from flask_login import login_required
 
 from .extensions import db
 from .models import CalendarEvent, Client, utcnow
+from .task_service import delete_event_and_task, sync_task_from_event
 from .utils import (
     EVENT_TYPE_LABELS,
     local_to_utc_naive,
@@ -158,16 +159,16 @@ def apply_event_form(event):
 
 def validate_event(event):
     if not event.starts_at:
-        return "Укажите дату события."
+        return "Укажите дату дела."
     if not event.client_id and not event.title:
-        return "Для личного события укажите название."
+        return "Для личного дела укажите название."
     local_start = utc_naive_to_local(event.starts_at)
     if local_start.date() > PLANNING_END:
-        return "События можно планировать не позднее 31.12.2031."
+        return "Дела можно планировать не позднее 31.12.2031."
     if event.ends_at and event.ends_at < event.starts_at:
         return "Окончание не может быть раньше начала."
     if event.ends_at and utc_naive_to_local(event.ends_at).date() > PLANNING_END:
-        return "События можно планировать не позднее 31.12.2031."
+        return "Дела можно планировать не позднее 31.12.2031."
     return None
 
 
@@ -192,15 +193,17 @@ def create_event():
             flash(error, "error")
         else:
             db.session.add(event)
+            db.session.flush()
+            sync_task_from_event(event)
             db.session.commit()
-            flash("Событие создано.", "success")
+            flash("Дело создано.", "success")
             return redirect(url_for("calendar.index"))
     return render_template(
         "calendar/form.html",
         event=event,
         clients=clients,
         event_types=EVENT_TYPE_LABELS,
-        title="Новое событие",
+        title="Новое дело",
         preset_date=preset_date,
         planning_end=PLANNING_END,
     )
@@ -221,15 +224,16 @@ def edit_event(event_id):
         if error:
             flash(error, "error")
         else:
+            sync_task_from_event(event)
             db.session.commit()
-            flash("Событие обновлено.", "success")
+            flash("Дело обновлено.", "success")
             return redirect(url_for("calendar.index"))
     return render_template(
         "calendar/form.html",
         event=event,
         clients=clients,
         event_types=EVENT_TYPE_LABELS,
-        title="Редактирование события",
+        title="Редактирование дела",
         preset_date=None,
         planning_end=PLANNING_END,
     )
@@ -239,10 +243,7 @@ def edit_event(event_id):
 @login_required
 def delete_event(event_id):
     event = db.get_or_404(CalendarEvent, event_id)
-    if event.external_uid:
-        event.status = "cancelled"
-    else:
-        db.session.delete(event)
+    delete_event_and_task(event)
     db.session.commit()
-    flash("Событие удалено.", "success")
+    flash("Дело удалено.", "success")
     return redirect(url_for("calendar.index"))

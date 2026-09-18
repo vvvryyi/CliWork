@@ -1,4 +1,4 @@
-const STATIC_CACHE = "seremka-static-v2";
+const STATIC_CACHE = "seremka-static-v4";
 const STATIC_FILES = [
   "/static/css/style.css",
   "/static/js/app.js",
@@ -24,5 +24,13 @@ self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET" || event.request.mode === "navigate") return;
   const url = new URL(event.request.url);
   if (url.origin !== self.location.origin || !url.pathname.startsWith("/static/")) return;
-  event.respondWith(caches.match(event.request).then((cached) => cached || fetch(event.request)));
+  event.respondWith(
+    fetch(event.request)
+      .then((response) => {
+        const copy = response.clone();
+        caches.open(STATIC_CACHE).then((cache) => cache.put(event.request, copy));
+        return response;
+      })
+      .catch(() => caches.match(event.request))
+  );
 });

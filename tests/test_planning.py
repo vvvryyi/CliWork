@@ -86,7 +86,7 @@ def test_personal_event_requires_title(app, auth_client):
         data={"client_id": "", "title": "", "starts_at": "2026-07-28T12:00"},
         follow_redirects=True,
     )
-    assert "Для личного события укажите название".encode() in response.data
+    assert "Для личного дела укажите название".encode() in response.data
     with app.app_context():
         assert db.session.scalar(db.select(CalendarEvent)) is None
 

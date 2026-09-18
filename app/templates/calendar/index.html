@@ -6,7 +6,7 @@
         <p class="eyebrow">Планирование</p>
         <h1>Календарь</h1>
     </div>
-    <a class="button button-primary" href="{{ url_for('calendar.create_event', date=selected_date.isoformat()) }}">+ Событие</a>
+    <a class="button button-primary" href="{{ url_for('calendar.create_event', date=selected_date.isoformat()) }}">+ Дело</a>
 </div>
 
 <div class="calendar-toolbar">
@@ -53,7 +53,7 @@
 
 {% if view in ("day", "overdue") %}
     <section class="panel">
-        {% if view == "overdue" %}<h2>Просроченные события</h2>{% endif %}
+        {% if view == "overdue" %}<h2>Просроченные дела</h2>{% endif %}
         {% if events %}
             <div class="agenda-list">
                 {% for event in events %}
@@ -72,7 +72,7 @@
                 {% endfor %}
             </div>
         {% else %}
-            <div class="empty-state">{{ "Просроченных событий нет." if view == "overdue" else "На этот день событий нет." }}</div>
+            <div class="empty-state">{{ "Просроченных дел нет." if view == "overdue" else "На этот день дел нет." }}</div>
         {% endif %}
     </section>
 {% elif view == "month" %}
@@ -86,7 +86,7 @@
                     {% set day_events = events_by_date.get(day, []) %}
                     <a class="calendar-day {% if day == today %}is-today{% endif %} {% if day.month != first_day.month %}outside{% endif %} {% if day_events|selectattr('is_important')|list or day_events|selectattr('status', 'equalto', 'overdue')|list %}has-important{% endif %}"
                        href="{{ url_for('calendar.index', view='day', date=day.isoformat()) }}"
-                       aria-label="{{ day.strftime('%d.%m.%Y') }}, событий: {{ events_by_date.get(day, [])|length }}">
+                       aria-label="{{ day.strftime('%d.%m.%Y') }}, дел: {{ events_by_date.get(day, [])|length }}">
                         <span class="calendar-day-header"><strong>{{ day.day }}</strong></span>
                         {% set day_count = day_events|length %}
                         {% if day_count %}<span class="calendar-count">{{ day_count }}</span>{% endif %}
@@ -131,7 +131,7 @@
                             {% set mini_day_events = events_by_date.get(day, []) %}
                             <a class="mini-day {% if day.month != month_first.month %}outside{% endif %} {% if day == today %}is-today{% endif %} {% if mini_day_events %}has-events{% endif %} {% if mini_day_events|selectattr('is_important')|list or mini_day_events|selectattr('status', 'equalto', 'overdue')|list %}has-important{% endif %}"
                                href="{{ url_for('calendar.index', view='day', date=day.isoformat()) }}"
-                               {% if events_by_date.get(day) %}title="Событий: {{ events_by_date.get(day)|length }}"{% endif %}>{{ day.day }}</a>
+                               {% if events_by_date.get(day) %}title="Дел: {{ events_by_date.get(day)|length }}"{% endif %}>{{ day.day }}</a>
                         {% endfor %}
                     {% endfor %}
                 </div>

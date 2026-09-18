@@ -8,9 +8,9 @@
         <p class="muted">Клиенты и ближайшие дела в одном месте.</p>
     </div>
     <div class="heading-actions">
+        <a class="button" href="{{ url_for('tasks.index') }}">Дела</a>
         <a class="button button-primary" href="{{ url_for('clients.create') }}">+ Новый клиент</a>
-        <a class="button" href="{{ url_for('calendar.create_event') }}">+ Событие</a>
-        <a class="button" href="{{ url_for('tasks.index') }}">+ Дело</a>
+        <a class="button" href="{{ url_for('calendar.create_event') }}">+ Дело в календарь</a>
     </div>
 </div>
 
@@ -21,17 +21,17 @@
     </a>
     <a class="stat-card" href="{{ url_for('clients.index') }}">
         <span class="stat-value">{{ client_count }}</span>
-        <span class="stat-label">Активных клиентов</span>
+        <span class="stat-label">Активные клиенты</span>
     </a>
     <a class="stat-card stat-card-alert" href="{{ url_for('calendar.index', view='overdue') }}">
         <span class="stat-value">{{ overdue_count }}</span>
-        <span class="stat-label">Просроченных клиентов</span>
+        <span class="stat-label">Просроченные клиенты</span>
     </a>
 </div>
 
 {% if overdue_clients %}
 <section class="panel overdue-client-panel">
-    <div class="panel-heading"><h2>Просроченные клиенты</h2><a href="{{ url_for('calendar.index', view='overdue') }}">Все события</a></div>
+    <div class="panel-heading"><h2>Просроченные клиенты</h2><a href="{{ url_for('calendar.index', view='overdue') }}">Все дела</a></div>
     <div class="item-list">
         {% for event in overdue_clients %}
             <a class="list-item event-important" href="{{ url_for('clients.detail', client_id=event.client.id) }}">
@@ -46,7 +46,7 @@
 <section class="panel">
     <div class="panel-heading">
         <div>
-            <h2>События текущей недели</h2>
+            <h2>Дела текущей недели</h2>
             <span class="muted">{{ week_start.strftime("%d.%m") }} — {{ week_end.strftime("%d.%m.%Y") }}</span>
         </div>
         <a href="{{ url_for('calendar.index') }}">Календарь</a>
@@ -68,7 +68,7 @@
             {% endfor %}
         </div>
     {% else %}
-        <div class="empty-state">На этой неделе событий нет.</div>
+        <div class="empty-state">На этой неделе дел нет.</div>
     {% endif %}
 </section>
 {% endblock %}

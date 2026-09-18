@@ -6,6 +6,7 @@ from flask import current_app
 
 from .extensions import db
 from .models import AppSetting, CalendarEvent, utcnow
+from .task_service import delete_event_and_task, sync_task_from_event
 from .utils import get_timezone, local_to_utc_naive
 
 
@@ -75,7 +76,7 @@ def _event_ical(event):
     component = Event()
     component.add("uid", event.external_uid)
     component.add("dtstamp", datetime.now(timezone.utc))
-    component.add("summary", event.title or (event.client.full_name if event.client else "Событие CRM"))
+    component.add("summary", event.title or (event.client.full_name if event.client else "Дело CRM"))
     component.add("dtstart", event.starts_at.replace(tzinfo=timezone.utc))
     if event.ends_at:
         component.add("dtend", event.ends_at.replace(tzinfo=timezone.utc))
@@ -138,6 +139,7 @@ def sync_icloud_calendar():
                 )
                 if _apply_remote_event(local_event, remote, synced_at):
                     db.session.add(local_event)
+                    sync_task_from_event(local_event)
                     pulled += 1
                 continue
 
@@ -149,6 +151,7 @@ def sync_icloud_calendar():
             if remote_changed and not locally_changed:
                 if _apply_remote_event(local_event, remote, synced_at):
                     pulled += 1
+            sync_task_from_event(local_event)
 
         db.session.flush()
         syncable = db.session.scalars(
@@ -162,7 +165,7 @@ def sync_icloud_calendar():
                 and local_event.external_hash == fingerprint
             ):
                 if local_event.origin == "icloud":
-                    db.session.delete(local_event)
+                    delete_event_and_task(local_event)
                 else:
                     local_event.status = "cancelled"
                     local_event.external_uid = None
