@@ -1,6 +1,6 @@
 import calendar
 import re
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from urllib.parse import quote
 from uuid import uuid4
@@ -80,7 +80,7 @@ def interaction_text_body(text):
 
 
 def normalize_interaction_text(text, now=None):
-    """Add today's date unless the record already ends with a planning date."""
+    """Show today's date at the start without persisting it until submit."""
     cleaned = (text or "").strip()
     local_now = utc_naive_to_local(now or utcnow())
     current_date = local_now.strftime("%y%m%d")
@@ -88,16 +88,85 @@ def normalize_interaction_text(text, now=None):
         return f"{current_date} "
 
     leading_match = INTERACTION_LEADING_DATE.match(cleaned)
-    body = (
-        cleaned[leading_match.end():].lstrip()
-        if leading_match
-        else cleaned
-    )
-    if body and PLANNING_SUFFIX.search(body):
-        return body
-    if leading_match:
-        return cleaned
-    return f"{current_date} {cleaned}"
+    body = cleaned[leading_match.end():].lstrip() if leading_match else cleaned
+    return f"{current_date} {body}" if body else f"{current_date} "
+
+
+def validate_mmdd(value):
+    """Normalize an MMDD reminder value or raise a user-facing error."""
+    cleaned = (value or "").strip()
+    if not cleaned:
+        return ""
+    if not re.fullmatch(r"\d{4}", cleaned):
+        raise ValueError("Дату квартального напоминания укажите в формате ММДД.")
+    try:
+        date(2000, int(cleaned[:2]), int(cleaned[2:]))
+    except ValueError as error:
+        raise ValueError("Укажите существующую дату в формате ММДД.") from error
+    return cleaned
+
+
+def add_months(day, months, preferred_day=None):
+    month_index = day.year * 12 + day.month - 1 + months
+    year, zero_based_month = divmod(month_index, 12)
+    month = zero_based_month + 1
+    target_day = preferred_day or day.day
+    return date(year, month, min(target_day, calendar.monthrange(year, month)[1]))
+
+
+def regenerate_quarterly_events(client, after_date=None):
+    """Rebuild open quarterly reminders from the anchor through 2031."""
+    existing = db.session.scalars(
+        db.select(CalendarEvent).where(
+            CalendarEvent.client_id == client.id,
+            CalendarEvent.origin == "quarterly",
+            CalendarEvent.status.in_(OPEN_EVENT_STATUSES),
+        )
+    ).all()
+    for event in existing:
+        db.session.delete(event)
+
+    if client.is_archived or client.client_group != "active" or not client.quarterly_reminder_mmdd:
+        return 0
+
+    local_today = utc_naive_to_local(utcnow()).date()
+    cutoff = after_date if after_date is not None else local_today - timedelta(days=1)
+    month = int(client.quarterly_reminder_mmdd[:2])
+    day = int(client.quarterly_reminder_mmdd[2:])
+    first = date(local_today.year, month, min(day, calendar.monthrange(local_today.year, month)[1]))
+    while first <= cutoff:
+        first = add_months(first, 3, day)
+
+    created = 0
+    reminder_day = first
+    while reminder_day <= date(PLANNING_END_YEAR, 12, 31):
+        db.session.add(
+            CalendarEvent(
+                client_id=client.id,
+                title="Квартальный контакт",
+                origin="quarterly",
+                event_type="task",
+                starts_at=local_to_utc_naive(f"{reminder_day.isoformat()}T09:00"),
+                status="planned",
+            )
+        )
+        created += 1
+        reminder_day = add_months(reminder_day, 3, day)
+    return created
+
+
+def complete_due_quarterly_events(client_id, now=None):
+    current_time = now or utcnow()
+    return db.session.execute(
+        db.update(CalendarEvent)
+        .where(
+            CalendarEvent.client_id == client_id,
+            CalendarEvent.origin == "quarterly",
+            CalendarEvent.status.in_(OPEN_EVENT_STATUSES),
+            CalendarEvent.starts_at <= current_time,
+        )
+        .values(status="completed", completed_at=current_time)
+    ).rowcount or 0
 
 
 def get_timezone_name():

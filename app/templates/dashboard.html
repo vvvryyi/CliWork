@@ -10,19 +10,38 @@
     <div class="heading-actions">
         <a class="button button-primary" href="{{ url_for('clients.create') }}">+ Новый клиент</a>
         <a class="button" href="{{ url_for('calendar.create_event') }}">+ Событие</a>
+        <a class="button" href="{{ url_for('tasks.index') }}">+ Дело</a>
     </div>
 </div>
 
 <div class="stat-grid">
+    <a class="stat-card stat-card-compact" href="{{ url_for('tasks.index') }}">
+        <span class="stat-value">{{ task_count }}</span>
+        <span class="stat-label">Дела</span>
+    </a>
     <a class="stat-card" href="{{ url_for('clients.index') }}">
         <span class="stat-value">{{ client_count }}</span>
         <span class="stat-label">Активных клиентов</span>
     </a>
     <a class="stat-card stat-card-alert" href="{{ url_for('calendar.index', view='overdue') }}">
         <span class="stat-value">{{ overdue_count }}</span>
-        <span class="stat-label">Просроченных событий</span>
+        <span class="stat-label">Просроченных клиентов</span>
     </a>
 </div>
+
+{% if overdue_clients %}
+<section class="panel overdue-client-panel">
+    <div class="panel-heading"><h2>Просроченные клиенты</h2><a href="{{ url_for('calendar.index', view='overdue') }}">Все события</a></div>
+    <div class="item-list">
+        {% for event in overdue_clients %}
+            <a class="list-item event-important" href="{{ url_for('clients.detail', client_id=event.client.id) }}">
+                <span class="event-dot event-dot-important"></span>
+                <span><strong>{{ event.client.full_name }}</strong><small>{{ event.starts_at|local_datetime("%d.%m.%Y") }}</small></span>
+            </a>
+        {% endfor %}
+    </div>
+</section>
+{% endif %}
 
 <section class="panel">
     <div class="panel-heading">

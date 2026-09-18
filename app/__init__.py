@@ -45,6 +45,7 @@ def create_app(test_config=None):
     from .main import bp as main_bp
     from .messaging import bp as messaging_bp
     from .settings import bp as settings_bp
+    from .tasks import bp as tasks_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(main_bp)
@@ -52,6 +53,7 @@ def create_app(test_config=None):
     app.register_blueprint(messaging_bp)
     app.register_blueprint(calendar_bp)
     app.register_blueprint(settings_bp)
+    app.register_blueprint(tasks_bp)
 
     from .utils import (
         CHANNEL_LABELS,
@@ -84,6 +86,16 @@ def create_app(test_config=None):
     def init_db():
         db.create_all()
         print("База данных создана.")
+
+    @app.cli.command("sync-icloud-calendar")
+    def sync_icloud_calendar_command():
+        from .calendar_sync import sync_icloud_calendar
+
+        result = sync_icloud_calendar()
+        print(
+            f"iCloud sync complete: pulled={result['pulled']}, "
+            f"pushed={result['pushed']}, deleted={result['deleted']}"
+        )
 
     @app.get("/healthz")
     def healthz():

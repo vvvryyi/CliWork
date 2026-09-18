@@ -51,9 +51,7 @@ function normalizeInteractionText(value, currentDate) {
 
     const leadingMatch = cleaned.match(interactionLeadingDate);
     const body = leadingMatch ? cleaned.slice(leadingMatch[0].length).trimStart() : cleaned;
-    if (body && interactionTrailingDate.test(body)) return body;
-    if (leadingMatch) return cleaned;
-    return `${currentDate} ${cleaned}`;
+    return body ? `${currentDate} ${body}` : `${currentDate} `;
 }
 
 function renderInteractionEditor(editor, value) {
@@ -209,6 +207,15 @@ document.querySelectorAll("form[data-disable-on-submit]").forEach((form) => {
         form.querySelectorAll("button[type='submit']").forEach((button) => {
             button.disabled = true;
         });
+    });
+});
+
+document.querySelectorAll("[data-file-input]").forEach((input) => {
+    input.addEventListener("change", () => {
+        const status = input.closest(".compact-upload")?.querySelector("[data-file-status]");
+        if (!status) return;
+        const count = input.files?.length || 0;
+        status.textContent = count ? `Выбрано: ${count} · До 20 МБ` : "До 20 МБ";
     });
 });
 

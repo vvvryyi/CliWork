@@ -53,4 +53,21 @@
         <div><a class="button button-primary" href="{{ url_for('settings.setup_2fa') }}">Настроить 2FA</a></div>
     {% endif %}
 </section>
+
+<section class="panel form-stack settings-form settings-section">
+    <div>
+        <h2>Календарь iPhone</h2>
+        {% if icloud_configured %}
+            <p><span class="status status-success">Настроен</span></p>
+            <p class="muted">Двусторонний обмен с календарём «{{ icloud_calendar_name }}». {% if icloud_last_sync %}Последняя синхронизация: {{ icloud_last_sync }}.{% endif %}</p>
+        {% else %}
+            <p><span class="status status-neutral">Не настроен</span></p>
+            <p class="muted">Добавьте ICLOUD_USERNAME, ICLOUD_APP_PASSWORD и ICLOUD_CALENDAR_NAME в <code>.env</code>. Используйте отдельный пароль приложения Apple.</p>
+        {% endif %}
+    </div>
+    <form method="post" action="{{ url_for('settings.sync_icloud') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button class="button button-primary" type="submit" {% if not icloud_configured %}disabled{% endif %}>Синхронизировать сейчас</button>
+    </form>
+</section>
 {% endblock %}

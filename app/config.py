@@ -48,4 +48,8 @@ class Config:
         "webp",
         "zip",
     }
+    ICLOUD_CALDAV_URL = os.getenv("ICLOUD_CALDAV_URL", "https://caldav.icloud.com/")
+    ICLOUD_USERNAME = os.getenv("ICLOUD_USERNAME", "")
+    ICLOUD_APP_PASSWORD = os.getenv("ICLOUD_APP_PASSWORD", "")
+    ICLOUD_CALENDAR_NAME = os.getenv("ICLOUD_CALENDAR_NAME", "")
     WTF_CSRF_TIME_LIMIT = None

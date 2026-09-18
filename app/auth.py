@@ -16,6 +16,14 @@ class LocalUser(UserMixin):
     id = "local-user"
 
 
+def secure_text_compare(value, expected):
+    """Compare Unicode credentials in constant time using UTF-8 bytes."""
+    return hmac.compare_digest(
+        (value or "").encode("utf-8"),
+        (expected or "").encode("utf-8"),
+    )
+
+
 @login_manager.user_loader
 def load_user(user_id):
     return LocalUser() if user_id == LocalUser.id else None
@@ -45,8 +53,8 @@ def login():
         valid = (
             bool(expected_username)
             and bool(expected_password)
-            and hmac.compare_digest(username, expected_username)
-            and hmac.compare_digest(password, expected_password)
+            and secure_text_compare(username, expected_username)
+            and secure_text_compare(password, expected_password)
         )
         if valid:
             next_url = _safe_next_url(request.args.get("next", ""))

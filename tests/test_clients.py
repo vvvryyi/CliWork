@@ -39,13 +39,14 @@ def test_create_client_with_interaction_and_next_action(app, auth_client):
     )
 
     assert response.status_code == 200
-    assert "Провели первую консультацию 260920 14:30!".encode() in response.data
     assert "событие добавлено на 20.09.2026 14:30".encode() in response.data
+    assert response.request.path == "/"
     with app.app_context():
         interaction = db.session.scalar(db.select(Interaction))
         event = db.session.scalar(db.select(CalendarEvent))
         assert interaction.client.full_name == "Анна Смирнова"
-        assert interaction.text == "Провели первую консультацию 260920 14:30!"
+        assert interaction.text.endswith("Провели первую консультацию 260920 14:30!")
+        assert re.match(r"\d{6} ", interaction.text)
         assert event.source_interaction_id == interaction.id
         assert event.is_important is True
         assert utc_naive_to_local(event.starts_at).strftime("%y%m%d %H:%M") == "260920 14:30"
@@ -74,7 +75,8 @@ def test_client_card_keeps_note_in_textarea_without_timeline(
     with app.app_context():
         interactions = db.session.scalars(db.select(Interaction)).all()
         assert len(interactions) == 1
-        assert interactions[0].text == updated_text
+        assert interactions[0].text.endswith(updated_text)
+        assert re.match(r"\d{6} ", interactions[0].text)
 
 
 def test_create_search_edit_and_archive_client(app, auth_client, sample_client):

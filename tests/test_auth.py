@@ -19,6 +19,30 @@ def test_login_rejects_invalid_credentials(client):
     assert "Неверный логин или пароль".encode() in response.data
 
 
+def test_login_supports_non_ascii_credentials(tmp_path):
+    from app import create_app
+
+    application = create_app(
+        {
+            "TESTING": True,
+            "WTF_CSRF_ENABLED": False,
+            "SQLALCHEMY_DATABASE_URI": "sqlite://",
+            "UPLOAD_FOLDER": str(tmp_path / "uploads"),
+            "CRM_USERNAME": "Артём",
+            "CRM_PASSWORD": "пароль-для-CRM",
+            "SECRET_KEY": "test-secret",
+        }
+    )
+    with application.app_context():
+        db.create_all()
+    response = application.test_client().post(
+        "/auth/login",
+        data={"username": "Артём", "password": "пароль-для-CRM"},
+    )
+    assert response.status_code == 302
+    assert response.headers["Location"].endswith("/")
+
+
 def test_login_opens_dashboard(auth_client):
     response = auth_client.get("/")
     assert response.status_code == 200

@@ -4,6 +4,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from flask import Blueprint, current_app, flash, redirect, render_template, request, url_for
 from flask_login import login_required
 
+from .calendar_sync import is_configured, sync_icloud_calendar
 from .extensions import db
 from .models import AppSetting
 from .totp import generate_secret, provisioning_uri, verify_code
@@ -32,11 +33,34 @@ def index():
             flash("Настройки сохранены.", "success")
             return redirect(url_for("settings.index"))
     totp_secret = db.session.get(AppSetting, "totp_secret")
+    last_sync = db.session.get(AppSetting, "icloud_last_sync")
     return render_template(
         "settings/index.html",
         timezone_name=get_timezone_name(),
         two_factor_enabled=bool(totp_secret),
+        icloud_configured=is_configured(),
+        icloud_calendar_name=current_app.config.get("ICLOUD_CALENDAR_NAME", ""),
+        icloud_last_sync=last_sync.value if last_sync else "",
     )
+
+
+@bp.post("/icloud/sync")
+@login_required
+def sync_icloud():
+    try:
+        result = sync_icloud_calendar()
+    except Exception as error:
+        current_app.logger.exception("iCloud calendar sync failed")
+        message = str(error) if isinstance(error, RuntimeError) else "не удалось подключиться к iCloud."
+        flash(f"Синхронизация не выполнена: {message}", "error")
+    else:
+        flash(
+            f"Календарь синхронизирован: "
+            f"из iPhone — {result['pulled']}, в iPhone — {result['pushed']}, "
+            f"удалено — {result['deleted']}.",
+            "success",
+        )
+    return redirect(url_for("settings.index"))
 
 
 @bp.route("/2fa/setup", methods=["GET", "POST"])

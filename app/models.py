@@ -32,6 +32,16 @@ class Client(TimestampMixin, db.Model):
     client_group = db.Column(
         db.String(20), nullable=False, default="none", index=True
     )
+    flag_f = db.Column(db.Boolean, nullable=False, default=False)
+    flag_d = db.Column(db.Boolean, nullable=False, default=False)
+    flag_b = db.Column(db.Boolean, nullable=False, default=False)
+    flag_n = db.Column(db.Boolean, nullable=False, default=False)
+    flag_percent = db.Column(db.Boolean, nullable=False, default=False)
+    flag_ki = db.Column(db.Boolean, nullable=False, default=False)
+    flag_ku = db.Column(db.Boolean, nullable=False, default=False)
+    flag_ks = db.Column(db.Boolean, nullable=False, default=False)
+    flag_kr = db.Column(db.Boolean, nullable=False, default=False)
+    quarterly_reminder_mmdd = db.Column(db.String(4), nullable=False, default="")
     archived_at = db.Column(db.DateTime, nullable=True)
 
     interactions = db.relationship(
@@ -151,6 +161,11 @@ class CalendarEvent(TimestampMixin, db.Model):
     completed_at = db.Column(db.DateTime, nullable=True)
     meeting_format = db.Column(db.String(20), nullable=False, default="")
     location_or_url = db.Column(db.String(500), nullable=False, default="")
+    external_uid = db.Column(db.String(255), nullable=True, unique=True, index=True)
+    external_href = db.Column(db.String(1000), nullable=False, default="")
+    external_etag = db.Column(db.String(255), nullable=False, default="")
+    external_hash = db.Column(db.String(64), nullable=False, default="")
+    last_synced_at = db.Column(db.DateTime, nullable=True)
 
     client = db.relationship("Client", back_populates="events")
     source_interaction = db.relationship(
@@ -170,3 +185,16 @@ class AppSetting(db.Model):
 
     key = db.Column(db.String(100), primary_key=True)
     value = db.Column(db.String(500), nullable=False)
+
+
+class DailyTask(TimestampMixin, db.Model):
+    __tablename__ = "daily_tasks"
+
+    id = db.Column(db.Integer, primary_key=True)
+    text = db.Column(db.String(500), nullable=False)
+    due_date = db.Column(db.Date, nullable=False, index=True)
+    completed_at = db.Column(db.DateTime, nullable=True)
+
+    @property
+    def is_completed(self):
+        return self.completed_at is not None

@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Дела — Персональная CRM{% endblock %}
+{% block content %}
+<div class="page-heading">
+    <div><p class="eyebrow">План дня</p><h1>Дела</h1></div>
+</div>
+
+<div class="task-toolbar">
+    <a class="icon-button" href="{{ url_for('tasks.index', date=previous_date.isoformat()) }}" aria-label="Предыдущий день">←</a>
+    <strong>{{ selected_date.strftime("%d.%m.%Y") }}</strong>
+    <a class="icon-button" href="{{ url_for('tasks.index', date=next_date.isoformat()) }}" aria-label="Следующий день">→</a>
+    {% if selected_date != today %}<a class="button button-small" href="{{ url_for('tasks.index', date=today.isoformat()) }}">Сегодня</a>{% endif %}
+</div>
+
+<section class="panel task-panel">
+    <form class="task-create" method="post" action="{{ url_for('tasks.create') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="due_date" value="{{ selected_date.isoformat() }}">
+        <label class="grow"><span class="sr-only">Новое дело</span><input name="text" maxlength="500" placeholder="Одна строка — одно дело" required></label>
+        <button class="button button-primary" type="submit">Добавить</button>
+    </form>
+
+    {% if tasks %}
+        <div class="task-list">
+            {% for task in tasks %}
+                <div class="task-row {% if task.is_completed %}is-completed{% endif %}">
+                    <form method="post" action="{{ url_for('tasks.toggle', task_id=task.id) }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <input type="hidden" name="date" value="{{ selected_date.isoformat() }}">
+                        <label class="task-check">
+                            <input type="checkbox" {% if task.is_completed %}checked{% endif %} onchange="this.form.submit()">
+                            <span>Выполнено</span>
+                        </label>
+                    </form>
+                    <span class="task-text">{{ task.text }}{% if not task.is_completed and task.due_date < selected_date %}<small>с {{ task.due_date.strftime("%d.%m") }}</small>{% endif %}</span>
+                    <form method="post" action="{{ url_for('tasks.delete', task_id=task.id) }}" data-confirm="Удалить дело?">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <input type="hidden" name="date" value="{{ selected_date.isoformat() }}">
+                        <button class="link-danger" type="submit">Удалить</button>
+                    </form>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="empty-state">Дел на этот день нет.</div>
+    {% endif %}
+</section>
+{% endblock %}

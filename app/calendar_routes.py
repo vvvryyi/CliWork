@@ -239,7 +239,10 @@ def edit_event(event_id):
 @login_required
 def delete_event(event_id):
     event = db.get_or_404(CalendarEvent, event_id)
-    db.session.delete(event)
+    if event.external_uid:
+        event.status = "cancelled"
+    else:
+        db.session.delete(event)
     db.session.commit()
     flash("Событие удалено.", "success")
     return redirect(url_for("calendar.index"))

@@ -121,7 +121,7 @@ def test_planning_suffix_marks_important_events():
     assert planned == datetime(2031, 12, 31, 15, 30)
 
 
-def test_interaction_text_uses_current_date_only_without_trailing_date(app):
+def test_interaction_text_always_uses_current_date(app):
     fixed_now = datetime(2026, 9, 16, 9)
     with app.app_context():
         assert (
@@ -130,13 +130,13 @@ def test_interaction_text_uses_current_date_only_without_trailing_date(app):
         )
         assert (
             normalize_interaction_text("Обсудили следующий шаг 260920", fixed_now)
-            == "Обсудили следующий шаг 260920"
+            == "260916 Обсудили следующий шаг 260920"
         )
         assert (
             normalize_interaction_text(
                 "260916 Обсудили следующий шаг 260920", fixed_now
             )
-            == "Обсудили следующий шаг 260920"
+            == "260916 Обсудили следующий шаг 260920"
         )
 
 
@@ -203,7 +203,7 @@ def test_dashboard_uses_monday_to_sunday(app, auth_client, sample_client, monkey
         db.session.commit()
 
     response = auth_client.get("/")
-    assert response.data.count("Иван Петров".encode()) == 2
+    assert response.data.count("Иван Петров".encode()) == 3
     assert "07.09 — 13.09.2026".encode() in response.data
 
 

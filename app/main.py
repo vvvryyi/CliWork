@@ -5,7 +5,7 @@ from flask_login import login_required
 from sqlalchemy import func
 
 from .extensions import db
-from .models import CalendarEvent, Client, utcnow
+from .models import CalendarEvent, Client, DailyTask, utcnow
 from .utils import (
     local_to_utc_naive,
     synchronize_event_statuses,
@@ -32,9 +32,27 @@ def dashboard():
             Client.client_group == "active",
         )
     )
-    overdue_count = db.session.scalar(
-        db.select(func.count(CalendarEvent.id)).where(
+    overdue_events = db.session.scalars(
+        db.select(CalendarEvent)
+        .join(Client, CalendarEvent.client_id == Client.id)
+        .where(
             CalendarEvent.status == "overdue",
+            Client.archived_at.is_(None),
+        )
+        .order_by(CalendarEvent.starts_at)
+    ).all()
+    overdue_clients = []
+    seen_client_ids = set()
+    for event in overdue_events:
+        if event.client_id in seen_client_ids:
+            continue
+        seen_client_ids.add(event.client_id)
+        overdue_clients.append(event)
+    overdue_count = len(overdue_clients)
+    task_count = db.session.scalar(
+        db.select(func.count(DailyTask.id)).where(
+            DailyTask.completed_at.is_(None),
+            DailyTask.due_date <= local_today,
         )
     )
     week_events = db.session.scalars(
@@ -50,6 +68,8 @@ def dashboard():
         "dashboard.html",
         client_count=client_count or 0,
         overdue_count=overdue_count or 0,
+        overdue_clients=overdue_clients,
+        task_count=task_count or 0,
         week_events=week_events,
         week_start=week_start,
         week_end=week_end - timedelta(days=1),

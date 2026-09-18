@@ -22,12 +22,16 @@ from .models import Attachment, CalendarEvent, Client, Interaction, utcnow
 from .utils import (
     CHANNEL_LABELS,
     OPEN_EVENT_STATUSES,
+    complete_due_quarterly_events,
     complete_client_events,
     interaction_text_body,
     local_to_utc_naive,
     normalize_interaction_text,
     parse_planning_details,
+    regenerate_quarterly_events,
     save_uploads,
+    utc_naive_to_local,
+    validate_mmdd,
 )
 
 
@@ -35,6 +39,17 @@ bp = Blueprint("clients", __name__, url_prefix="/clients")
 
 INTERACTION_TYPES = {"call", "meeting", "message", "documents"}
 CLIENT_GROUPS = {"active", "potential"}
+CLIENT_FLAG_FIELDS = (
+    "flag_f",
+    "flag_d",
+    "flag_b",
+    "flag_n",
+    "flag_percent",
+    "flag_ki",
+    "flag_ku",
+    "flag_ks",
+    "flag_kr",
+)
 
 
 def get_client_or_404(client_id, include_archived=False):
@@ -55,6 +70,14 @@ def apply_client_form(client):
     client.max_contact = request.form.get("max_contact", "").strip()
     client.instagram = request.form.get("instagram", "").strip()
     client.facebook = request.form.get("facebook", "").strip()
+
+
+def apply_client_workflow_form(client):
+    for field in CLIENT_FLAG_FIELDS:
+        setattr(client, field, field in request.form)
+    client.quarterly_reminder_mmdd = validate_mmdd(
+        request.form.get("quarterly_reminder_mmdd", "")
+    )
 
 
 def add_interaction(client, text, interaction_type="call", submission_token=None):
@@ -181,7 +204,7 @@ def create():
                 flash("Клиент и запись истории созданы.", "success")
             else:
                 flash("Клиент создан.", "success")
-            return redirect(url_for("clients.detail", client_id=client.id))
+            return redirect(url_for("main.dashboard"))
     return render_template(
         "clients/form.html",
         client=client,
@@ -225,6 +248,7 @@ def toggle_group(client_id):
     client.client_group = (
         "none" if client.client_group == requested_group else requested_group
     )
+    regenerate_quarterly_events(client)
     db.session.commit()
     labels = {"active": "активных", "potential": "потенциальных"}
     if client.client_group == requested_group:
@@ -293,7 +317,7 @@ def edit(client_id):
         else:
             db.session.commit()
             flash("Данные клиента обновлены.", "success")
-            return redirect(url_for("clients.detail", client_id=client.id))
+            return redirect(url_for("main.dashboard"))
     return render_template(
         "clients/form.html",
         client=client,
@@ -325,6 +349,7 @@ def archive(client_id):
 def restore(client_id):
     client = get_client_or_404(client_id, include_archived=True)
     client.archived_at = None
+    regenerate_quarterly_events(client)
     db.session.commit()
     flash("Клиент восстановлен из архива.", "success")
     return redirect(url_for("clients.detail", client_id=client.id))
@@ -336,9 +361,16 @@ def create_interaction(client_id):
     client = get_client_or_404(client_id)
     text = normalize_interaction_text(request.form.get("text", ""), utcnow())
     files = request.files.getlist("files")
-    if not interaction_text_body(text) and not any(item.filename for item in files):
-        flash("Введите текст или приложите файл.", "error")
+    try:
+        apply_client_workflow_form(client)
+    except ValueError as error:
+        flash(str(error), "error")
         return redirect(url_for("clients.detail", client_id=client.id))
+    if not interaction_text_body(text) and not any(item.filename for item in files):
+        regenerate_quarterly_events(client)
+        db.session.commit()
+        flash("Карточка клиента сохранена.", "success")
+        return redirect(url_for("clients.index"))
 
     interaction_type = request.form.get("interaction_type", "call")
     if interaction_type not in INTERACTION_TYPES:
@@ -348,12 +380,16 @@ def create_interaction(client_id):
         db.select(Interaction).where(Interaction.submission_token == submission_token)
     ):
         flash("Эта запись уже сохранена.", "success")
-        return redirect(url_for("clients.detail", client_id=client.id))
+        return redirect(url_for("clients.index"))
     if not re.fullmatch(r"[A-Za-z0-9_-]{16,64}", submission_token):
         submission_token = uuid4().hex
 
     interaction, calendar_event, planned_local, date_suffix_found = add_interaction(
         client, text, interaction_type, submission_token
+    )
+    complete_due_quarterly_events(client.id)
+    regenerate_quarterly_events(
+        client, after_date=utc_naive_to_local(utcnow()).date()
     )
     try:
         save_uploads(files, client.id, interaction.id)
@@ -374,7 +410,7 @@ def create_interaction(client_id):
         )
     else:
         flash("Запись добавлена в историю.", "success")
-    return redirect(url_for("clients.detail", client_id=client.id))
+    return redirect(url_for("clients.index"))
 
 
 @bp.route("/<int:client_id>/interactions/<int:interaction_id>/edit", methods=["GET", "POST"])
@@ -385,6 +421,12 @@ def edit_interaction(client_id, interaction_id):
     if interaction.client_id != client.id:
         abort(404)
     if request.method == "POST":
+        if request.form.get("workflow_fields_present"):
+            try:
+                apply_client_workflow_form(client)
+            except ValueError as error:
+                flash(str(error), "error")
+                return redirect(request.url)
         text = normalize_interaction_text(request.form.get("text", ""), utcnow())
         if not interaction_text_body(text) and not interaction.attachments:
             flash("Запись не может быть пустой.", "error")
@@ -419,7 +461,15 @@ def edit_interaction(client_id, interaction_id):
                         "overdue" if starts_at < utcnow() else "planned"
                     )
             elif calendar_event is not None:
-                db.session.delete(calendar_event)
+                if calendar_event.external_uid:
+                    calendar_event.status = "cancelled"
+                else:
+                    db.session.delete(calendar_event)
+            if request.form.get("workflow_fields_present"):
+                complete_due_quarterly_events(client.id)
+                regenerate_quarterly_events(
+                    client, after_date=utc_naive_to_local(utcnow()).date()
+                )
             try:
                 save_uploads(request.files.getlist("files"), client.id, interaction.id)
                 db.session.commit()
@@ -439,7 +489,7 @@ def edit_interaction(client_id, interaction_id):
                 )
             else:
                 flash("Запись истории обновлена.", "success")
-            return redirect(url_for("clients.detail", client_id=client.id))
+            return redirect(url_for("clients.index"))
     return render_template(
         "clients/interaction_form.html",
         client=client,
@@ -468,7 +518,11 @@ def delete_interaction(client_id, interaction_id):
         event.completed_at = None
         event.completed_by_interaction_id = None
     if interaction.calendar_event is not None:
-        db.session.delete(interaction.calendar_event)
+        if interaction.calendar_event.external_uid:
+            interaction.calendar_event.source_interaction_id = None
+            interaction.calendar_event.status = "cancelled"
+        else:
+            db.session.delete(interaction.calendar_event)
     db.session.delete(interaction)
     db.session.commit()
     for path in paths:
