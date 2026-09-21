@@ -104,6 +104,16 @@ def index():
     for event in events:
         local_date = utc_naive_to_local(event.starts_at).date()
         events_by_date.setdefault(local_date, []).append(event)
+    today = utc_naive_to_local(utcnow()).date()
+    highlighted_event_ids = {
+        event.id
+        for event in events
+        if event.status == "overdue"
+        or (
+            event.is_important
+            and utc_naive_to_local(event.starts_at).date() == today
+        )
+    }
 
     if view == "overdue":
         previous_date = selected_date
@@ -139,7 +149,8 @@ def index():
         events_by_date=events_by_date,
         previous_date=previous_date,
         next_date=next_date,
-        today=utc_naive_to_local(utcnow()).date(),
+        today=today,
+        highlighted_event_ids=highlighted_event_ids,
         year_months=year_months,
         calendar_years=range(CALENDAR_START_YEAR, PLANNING_END.year + 1),
         planning_end=PLANNING_END,

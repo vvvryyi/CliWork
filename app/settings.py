@@ -34,6 +34,11 @@ def index():
             return redirect(url_for("settings.index"))
     totp_secret = db.session.get(AppSetting, "totp_secret")
     last_sync = db.session.get(AppSetting, "icloud_last_sync")
+    icloud_fields = {
+        "ICLOUD_USERNAME": "Apple ID",
+        "ICLOUD_APP_PASSWORD": "пароль приложения",
+        "ICLOUD_CALENDAR_NAME": "название календаря",
+    }
     return render_template(
         "settings/index.html",
         timezone_name=get_timezone_name(),
@@ -41,6 +46,11 @@ def index():
         icloud_configured=is_configured(),
         icloud_calendar_name=current_app.config.get("ICLOUD_CALENDAR_NAME", ""),
         icloud_last_sync=last_sync.value if last_sync else "",
+        icloud_missing=[
+            label
+            for key, label in icloud_fields.items()
+            if not current_app.config.get(key)
+        ],
     )
 
 

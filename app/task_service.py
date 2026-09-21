@@ -5,7 +5,7 @@ from .models import CalendarEvent, DailyTask, utcnow
 from .utils import local_to_utc_naive, utc_naive_to_local
 
 
-TASK_EVENT_ORIGINS = {"daily_task", "manual", "icloud"}
+TASK_EVENT_ORIGINS = {"daily_task", "manual"}
 
 
 def _event_title(event):
@@ -66,7 +66,17 @@ def sync_event_from_task(task):
 
 
 def sync_task_from_event(event):
-    if event.origin not in TASK_EVENT_ORIGINS or not event.starts_at:
+    # The daily list is intentionally personal: client and imported iCloud
+    # events stay in the calendar and never become daily tasks.
+    if (
+        event.origin not in TASK_EVENT_ORIGINS
+        or event.client_id is not None
+        or not event.starts_at
+    ):
+        if event.daily_task is not None:
+            task = event.daily_task
+            task.calendar_event = None
+            db.session.delete(task)
         return None
 
     text = _event_title(event)

@@ -60,6 +60,7 @@ def create_app(test_config=None):
         EVENT_TYPE_LABELS,
         STATUS_LABELS,
         get_timezone_name,
+        interaction_text_body,
         utc_naive_to_local,
     )
 
@@ -72,6 +73,10 @@ def create_app(test_config=None):
     def history_date(value):
         local = utc_naive_to_local(value)
         return local.strftime("%y%m%d") if local else ""
+
+    @app.template_filter("interaction_body")
+    def interaction_body(value):
+        return interaction_text_body(value)
 
     @app.context_processor
     def template_globals():

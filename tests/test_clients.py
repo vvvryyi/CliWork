@@ -52,7 +52,7 @@ def test_create_client_with_interaction_and_next_action(app, auth_client):
         assert utc_naive_to_local(event.starts_at).strftime("%y%m%d %H:%M") == "260920 14:30"
 
 
-def test_client_card_keeps_note_in_textarea_without_timeline(
+def test_client_card_shows_history_and_opens_a_new_note_below_it(
     app, auth_client, sample_client
 ):
     original_text = "Строка один\nСтрока два 260920"
@@ -62,21 +62,24 @@ def test_client_card_keeps_note_in_textarea_without_timeline(
     )
 
     detail = auth_client.get(f"/clients/{sample_client}")
-    assert b'class="timeline timeline-spaced"' not in detail.data
-    assert f'<textarea name="text" rows="8"'.encode() in detail.data
+    assert b'class="timeline client-history"' in detail.data
+    assert f'<textarea name="text" rows="5"'.encode() in detail.data
     assert original_text.encode() in detail.data
-    assert f'action="/clients/{sample_client}/interactions/1/edit"'.encode() in detail.data
+    assert f'action="/clients/{sample_client}/interactions"'.encode() in detail.data
+    assert detail.data.index(original_text.encode()) < detail.data.index(b'<textarea name="text"')
 
-    updated_text = "Обновлённая запись\nСледующий шаг 260921 11:00"
+    updated_text = "Новая запись\nСледующий шаг 260921 11:00"
     auth_client.post(
-        f"/clients/{sample_client}/interactions/1/edit",
+        f"/clients/{sample_client}/interactions",
         data={"text": updated_text},
     )
     with app.app_context():
-        interactions = db.session.scalars(db.select(Interaction)).all()
-        assert len(interactions) == 1
-        assert interactions[0].text.endswith(updated_text)
-        assert re.match(r"\d{6} ", interactions[0].text)
+        interactions = db.session.scalars(
+            db.select(Interaction).order_by(Interaction.id)
+        ).all()
+        assert len(interactions) == 2
+        assert interactions[0].text.endswith(original_text)
+        assert interactions[1].text.endswith(updated_text)
 
 
 def test_create_search_edit_and_archive_client(app, auth_client, sample_client):
@@ -140,7 +143,8 @@ def test_history_uses_compact_date(auth_client, sample_client):
     response = auth_client.get(f"/clients/{sample_client}")
     assert response.status_code == 200
     assert "Новая запись".encode() in response.data
-    assert re.search(rb">\d{6} [^<]+</textarea>", response.data)
+    assert re.search(rb'class="timeline-date">\d{6}</time>', response.data)
+    assert re.search(rb'<textarea[^>]+>\d{6} </textarea>', response.data)
 
 
 def test_client_list_is_grouped_and_only_shows_names(auth_client, sample_client):
@@ -232,32 +236,27 @@ def test_archiving_client_hides_its_planned_events(app, auth_client, sample_clie
     assert '<span class="calendar-count">1</span>'.encode() not in response.data
 
 
-def test_client_groups_toggle_and_are_mutually_exclusive(
+def test_client_categories_are_in_one_row_and_mutually_exclusive(
     app, auth_client, sample_client
 ):
     response = auth_client.post(
         f"/clients/{sample_client}/group",
-        data={"group": "active"},
+        data={"group": "a"},
         follow_redirects=True,
     )
-    assert "Убрать из активных".encode() in response.data
+    assert "Группа А".encode() in response.data
     with app.app_context():
-        assert db.session.get(Client, sample_client).client_group == "active"
+        assert db.session.get(Client, sample_client).client_group == "a"
 
     listing = auth_client.get("/clients/")
-    assert "Активные клиенты".encode() in listing.data
+    for label in ("А", "В", "Д", "К", "КН", "М", "П", "Р"):
+        assert f"<span>{label}</span>".encode() in listing.data
 
     auth_client.post(
-        f"/clients/{sample_client}/group", data={"group": "potential"}
+        f"/clients/{sample_client}/group", data={"group": "p"}
     )
     with app.app_context():
-        assert db.session.get(Client, sample_client).client_group == "potential"
-
-    auth_client.post(
-        f"/clients/{sample_client}/group", data={"group": "potential"}
-    )
-    with app.app_context():
-        assert db.session.get(Client, sample_client).client_group == "none"
+        assert db.session.get(Client, sample_client).client_group == "p"
 
 
 def test_new_interaction_completes_previous_event_and_creates_next(

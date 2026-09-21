@@ -1,4 +1,4 @@
-const STATIC_CACHE = "seremka-static-v4";
+const STATIC_CACHE = "seremka-static-v5";
 const STATIC_FILES = [
   "/static/css/style.css",
   "/static/js/app.js",

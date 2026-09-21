@@ -40,10 +40,8 @@
 
 {% if not show_archived %}
     <div class="client-segments">
-        {% for title, group_key, grouped_clients in [
-            ("Активные клиенты", "active", active_clients),
-            ("Потенциальные клиенты", "potential", potential_clients)
-        ] %}
+        {% for group_key, title in client_categories.items() %}
+            {% set grouped_clients = clients_by_category[group_key] %}
             <details class="alphabet-group client-segment" {% if query_text %}open{% endif %}>
                 <summary><span>{{ title }}</span><small>{{ grouped_clients|length }}</small></summary>
                 <div class="alphabet-names">
@@ -82,7 +80,7 @@
         {% endfor %}
     </div>
 {% else %}
-    {% if not active_clients and not potential_clients %}<div class="panel empty-state">
+    {% if not clients %}<div class="panel empty-state">
         <h2>Клиенты не найдены</h2>
         <p>{{ "В архиве пока ничего нет." if show_archived else "Добавьте первого клиента или измените параметры поиска." }}</p>
     </div>{% endif %}

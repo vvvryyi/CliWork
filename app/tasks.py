@@ -2,8 +2,6 @@ from datetime import date, timedelta
 
 from flask import Blueprint, flash, jsonify, redirect, render_template, request, url_for
 from flask_login import login_required
-from sqlalchemy import or_
-
 from .extensions import db
 from .models import DailyTask, utcnow
 from .task_service import create_daily_task, delete_task_and_event, sync_event_from_task
@@ -26,13 +24,8 @@ def index():
     selected_date = parse_date(request.args.get("date"))
     tasks = db.session.scalars(
         db.select(DailyTask)
-        .where(
-            or_(
-                DailyTask.completed_at.is_(None) & (DailyTask.due_date <= selected_date),
-                DailyTask.completed_at.is_not(None) & (DailyTask.due_date == selected_date),
-            )
-        )
-        .order_by(DailyTask.completed_at.is_not(None), DailyTask.due_date, DailyTask.id)
+        .where(DailyTask.due_date == selected_date)
+        .order_by(DailyTask.completed_at.is_not(None), DailyTask.id)
     ).all()
     return render_template(
         "tasks/index.html",

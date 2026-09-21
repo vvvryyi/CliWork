@@ -19,7 +19,6 @@
             <div class="task-line {% if task.is_completed %}is-completed{% endif %}" data-task-row data-task-id="{{ task.id }}" data-due-date="{{ task.due_date.isoformat() }}" data-saved-text="{{ task.text }}" data-saved-completed="{{ '1' if task.is_completed else '0' }}">
                 <input class="task-line-check" type="checkbox" data-task-check aria-label="Выполнено" {% if task.is_completed %}checked{% endif %}>
                 <input class="task-line-text" type="text" data-task-text maxlength="500" value="{{ task.text }}" aria-label="Текст дела">
-                {% if not task.is_completed and task.due_date < selected_date %}<small class="task-origin">с {{ task.due_date.strftime("%d.%m") }}</small>{% endif %}
                 <button class="task-line-remove" type="button" data-task-remove aria-label="Удалить дело">×</button>
             </div>
         {% endfor %}

@@ -38,7 +38,17 @@ from .utils import (
 bp = Blueprint("clients", __name__, url_prefix="/clients")
 
 INTERACTION_TYPES = {"call", "meeting", "message", "documents"}
-CLIENT_GROUPS = {"active", "potential"}
+CLIENT_GROUP_LABELS = {
+    "a": "А",
+    "v": "В",
+    "d": "Д",
+    "k": "К",
+    "kn": "КН",
+    "m": "М",
+    "p": "П",
+    "r": "Р",
+}
+CLIENT_GROUPS = set(CLIENT_GROUP_LABELS)
 CLIENT_FLAG_FIELDS = (
     "flag_f",
     "flag_d",
@@ -147,14 +157,12 @@ def index():
         statement = statement.where(Client.preferred_channel == channel)
     clients = db.session.scalars(statement.order_by(Client.full_name)).all()
     clients.sort(key=lambda item: item.full_name.casefold())
-    active_clients = []
-    potential_clients = []
+    grouped_by_category = {key: [] for key in CLIENT_GROUP_LABELS}
     alphabetical_clients = clients
     if not show_archived:
-        active_clients = [item for item in clients if item.client_group == "active"]
-        potential_clients = [
-            item for item in clients if item.client_group == "potential"
-        ]
+        for item in clients:
+            if item.client_group in grouped_by_category:
+                grouped_by_category[item.client_group].append(item)
         alphabetical_clients = [
             item for item in clients if item.client_group not in CLIENT_GROUPS
         ]
@@ -167,8 +175,8 @@ def index():
     return render_template(
         "clients/index.html",
         clients=clients,
-        active_clients=active_clients,
-        potential_clients=potential_clients,
+        client_categories=CLIENT_GROUP_LABELS,
+        clients_by_category=grouped_by_category,
         client_groups=client_groups,
         query_text=query_text,
         selected_channel=channel,
@@ -227,22 +235,19 @@ def create():
 @login_required
 def detail(client_id):
     client = get_client_or_404(client_id)
-    current_interaction = db.session.scalar(
+    interactions = db.session.scalars(
         db.select(Interaction)
         .where(Interaction.client_id == client.id)
-        .order_by(Interaction.created_at.desc())
-        .limit(1)
-    )
+        .order_by(Interaction.created_at)
+    ).all()
     return render_template(
         "clients/detail.html",
         client=client,
-        current_interaction=current_interaction,
-        interaction_text=normalize_interaction_text(
-            current_interaction.text if current_interaction else "",
-            utcnow(),
-        ),
+        interactions=interactions,
+        interaction_text=normalize_interaction_text("", utcnow()),
         interaction_token=uuid4().hex,
         new_interaction_date=utcnow(),
+        client_categories=CLIENT_GROUP_LABELS,
     )
 
 
@@ -253,16 +258,10 @@ def toggle_group(client_id):
     requested_group = request.form.get("group", "")
     if requested_group not in CLIENT_GROUPS:
         abort(400)
-    client.client_group = (
-        "none" if client.client_group == requested_group else requested_group
-    )
+    client.client_group = requested_group
     regenerate_quarterly_events(client)
     db.session.commit()
-    labels = {"active": "активных", "potential": "потенциальных"}
-    if client.client_group == requested_group:
-        flash(f"Клиент добавлен в группу {labels[requested_group]} клиентов.", "success")
-    else:
-        flash(f"Клиент удалён из группы {labels[requested_group]} клиентов.", "success")
+    flash(f"Клиент добавлен в группу {CLIENT_GROUP_LABELS[requested_group]}.", "success")
     return redirect(request.referrer or url_for("clients.detail", client_id=client.id))
 
 
@@ -502,8 +501,8 @@ def edit_interaction(client_id, interaction_id):
         "clients/interaction_form.html",
         client=client,
         interaction=interaction,
-        interaction_text=normalize_interaction_text(interaction.text, utcnow()),
-        new_interaction_date=utcnow(),
+        interaction_text=interaction.text,
+        new_interaction_date=interaction.created_at,
     )
 
 

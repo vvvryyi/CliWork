@@ -140,13 +140,18 @@ def test_interaction_text_always_uses_current_date(app):
         )
 
 
-def test_calendar_marks_important_event_red(app, auth_client, sample_client):
+def test_calendar_marks_important_event_red_only_on_its_day(app, auth_client, sample_client, monkeypatch):
     auth_client.post(
         f"/clients/{sample_client}/interactions",
         data={"text": "Важная задача 311231!"},
     )
     response = auth_client.get("/calendar/?view=month&date=2031-12-01")
     assert response.status_code == 200
+    assert "has-important".encode() not in response.data
+
+    import app.calendar_routes as calendar_module
+    monkeypatch.setattr(calendar_module, "utcnow", lambda: datetime(2031, 12, 31, 8))
+    response = auth_client.get("/calendar/?view=month&date=2031-12-01")
     assert "has-important".encode() in response.data
 
     with app.app_context():
@@ -172,30 +177,21 @@ def test_past_planned_event_becomes_overdue(app, auth_client, sample_client):
         assert db.session.scalar(db.select(CalendarEvent)).status == "overdue"
 
 
-def test_dashboard_uses_monday_to_sunday(app, auth_client, sample_client, monkeypatch):
+def test_dashboard_shows_only_todays_daily_tasks(app, auth_client, sample_client, monkeypatch):
     import app.main as main_module
 
     fixed_now = datetime(2026, 9, 9, 12, 0)
     monkeypatch.setattr(main_module, "utcnow", lambda: fixed_now)
     with app.app_context():
+        from app.models import DailyTask
         db.session.add_all(
             [
+                DailyTask(text="Сегодня", due_date=datetime(2026, 9, 9).date()),
+                DailyTask(text="Вчера", due_date=datetime(2026, 9, 8).date()),
                 CalendarEvent(
                     client_id=sample_client,
-                    starts_at=local_to_utc_naive("2026-09-07T08:00"),
-                    title="",
-                    status="planned",
-                ),
-                CalendarEvent(
-                    client_id=sample_client,
-                    starts_at=local_to_utc_naive("2026-09-13T18:00"),
-                    title="",
-                    status="planned",
-                ),
-                CalendarEvent(
-                    client_id=sample_client,
-                    starts_at=local_to_utc_naive("2026-09-14T08:00"),
-                    title="",
+                    starts_at=local_to_utc_naive("2026-09-09T18:00"),
+                    title="Клиентское событие",
                     status="planned",
                 ),
             ]
@@ -203,8 +199,10 @@ def test_dashboard_uses_monday_to_sunday(app, auth_client, sample_client, monkey
         db.session.commit()
 
     response = auth_client.get("/")
-    assert response.data.count("Иван Петров".encode()) == 3
-    assert "07.09 — 13.09.2026".encode() in response.data
+    assert "Сегодня".encode() in response.data
+    assert "Вчера".encode() not in response.data
+    assert "Клиентское событие".encode() not in response.data
+    assert "Дела на сегодня".encode() in response.data
 
 
 def test_prepare_and_confirm_message(app, auth_client, sample_client):

@@ -62,7 +62,8 @@
             <p class="muted">Двусторонний обмен с календарём «{{ icloud_calendar_name }}». {% if icloud_last_sync %}Последняя синхронизация: {{ icloud_last_sync }}.{% endif %}</p>
         {% else %}
             <p><span class="status status-neutral">Не настроен</span></p>
-            <p class="muted">Добавьте ICLOUD_USERNAME, ICLOUD_APP_PASSWORD и ICLOUD_CALENDAR_NAME в <code>.env</code>. Используйте отдельный пароль приложения Apple.</p>
+            <p class="muted">Не заполнено: {{ icloud_missing|join(", ") }}. Добавьте ICLOUD_USERNAME, ICLOUD_APP_PASSWORD и ICLOUD_CALENDAR_NAME в <code>.env</code>, затем перезапустите приложение.</p>
+            <p class="muted">Используйте отдельный пароль приложения Apple и создавайте встречи на iPhone именно в указанном календаре. Обычный пароль Apple ID не подходит.</p>
         {% endif %}
     </div>
     <form method="post" action="{{ url_for('settings.sync_icloud') }}">

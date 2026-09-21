@@ -21,7 +21,7 @@ def test_client_and_note_redirects(app, auth_client, sample_client):
     assert note_save.headers["Location"].endswith("/clients/")
 
 
-def test_opening_card_replaces_date_only_after_save(app, auth_client, sample_client, monkeypatch):
+def test_opening_card_adds_a_fresh_dated_row_below_history(app, auth_client, sample_client, monkeypatch):
     import app.clients as clients_module
 
     fixed_now = datetime(2026, 9, 18, 9)
@@ -31,19 +31,22 @@ def test_opening_card_replaces_date_only_after_save(app, auth_client, sample_cli
         db.session.commit()
 
     page = auth_client.get(f"/clients/{sample_client}")
-    assert "260918 Старый текст 261201".encode() in page.data
+    assert "Старый текст 261201".encode() in page.data
+    assert b">260918 </textarea>" in page.data
+    assert page.data.index("Старый текст 261201".encode()) < page.data.index(b">260918 </textarea>")
     with app.app_context():
         assert db.session.get(Interaction, 1).text.startswith("250101")
 
     auth_client.post(
-        f"/clients/{sample_client}/interactions/1/edit",
+        f"/clients/{sample_client}/interactions",
         data={
-            "text": "260918 Старый текст 261201",
+            "text": "260918 Новая запись 261201",
             "workflow_fields_present": "1",
         },
     )
     with app.app_context():
-        assert db.session.get(Interaction, 1).text.startswith("260918")
+        assert db.session.get(Interaction, 1).text.startswith("250101")
+        assert db.session.get(Interaction, 2).text.startswith("260918")
 
 
 def test_client_flags_and_compact_upload_are_saved(app, auth_client, sample_client):
@@ -77,7 +80,7 @@ def test_quarterly_reminders_fill_calendar_for_active_client(app, auth_client, s
     import app.utils as utils_module
 
     monkeypatch.setattr(utils_module, "utcnow", lambda: datetime(2026, 9, 18, 9))
-    auth_client.post(f"/clients/{sample_client}/group", data={"group": "active"})
+    auth_client.post(f"/clients/{sample_client}/group", data={"group": "a"})
     auth_client.post(
         f"/clients/{sample_client}/interactions",
         data={
@@ -122,20 +125,19 @@ def test_rescheduling_removes_client_from_dashboard_overdue_list(app, auth_clien
     before = auth_client.get("/")
     assert b"overdue-client-panel" in before.data
     auth_client.post(
-        f"/clients/{sample_client}/interactions/1/edit",
-        data={"text": "Новая дата 311231", "workflow_fields_present": "1"},
+        f"/clients/{sample_client}/interactions",
+        data={"text": "Новая запись и дата 311231", "workflow_fields_present": "1"},
     )
     after = auth_client.get("/")
     assert b"overdue-client-panel" not in after.data
 
 
-def test_unfinished_tasks_carry_forward_and_completed_stay_on_original_day(app, auth_client):
+def test_every_day_has_its_own_tasks(app, auth_client):
     auth_client.post("/tasks/new", data={"text": "Позвонить", "due_date": "2026-09-17"})
-    carried = auth_client.get("/tasks/?date=2026-09-18")
-    assert "Позвонить".encode() in carried.data
-
-    auth_client.post("/tasks/1/toggle", data={"date": "2026-09-18"})
     assert "Позвонить".encode() not in auth_client.get("/tasks/?date=2026-09-18").data
+    assert "Позвонить".encode() in auth_client.get("/tasks/?date=2026-09-17").data
+
+    auth_client.post("/tasks/1/toggle", data={"date": "2026-09-17"})
     assert "Позвонить".encode() in auth_client.get("/tasks/?date=2026-09-17").data
 
 
@@ -193,6 +195,24 @@ def test_calendar_deal_creates_daily_task(app, auth_client):
         assert task is not None
         assert task.due_date == date(2026, 9, 22)
         assert task.calendar_event.origin == "manual"
+
+
+def test_client_and_iphone_calendar_events_do_not_create_daily_tasks(
+    app, auth_client, sample_client
+):
+    auth_client.post(
+        "/calendar/events/new",
+        data={
+            "client_id": sample_client,
+            "title": "Контакт с клиентом",
+            "event_type": "meeting",
+            "starts_at": "2026-09-22T14:30",
+        },
+    )
+    with app.app_context():
+        event = db.session.scalar(db.select(CalendarEvent))
+        assert event.client_id == sample_client
+        assert event.daily_task is None
 
 
 def test_task_page_and_dashboard_use_new_compact_wording(auth_client):
@@ -291,6 +311,7 @@ def test_icloud_sync_pulls_and_pushes_events(app, monkeypatch):
             db.select(CalendarEvent).where(CalendarEvent.external_uid == "iphone-meeting")
         )
         assert imported.title == "Встреча из iPhone"
+        assert imported.daily_task is None
         assert result["pulled"] == 1
         assert result["pushed"] == 1
         assert len(fake_calendar.added) == 1

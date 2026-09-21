@@ -7,10 +7,10 @@
         <h1>Добро пожаловать</h1>
         <p class="muted">Клиенты и ближайшие дела в одном месте.</p>
     </div>
-    <div class="heading-actions">
+    <div class="heading-actions dashboard-actions">
         <a class="button" href="{{ url_for('tasks.index') }}">Дела</a>
         <a class="button button-primary" href="{{ url_for('clients.create') }}">+ Новый клиент</a>
-        <a class="button" href="{{ url_for('calendar.create_event') }}">+ Дело в календарь</a>
+        <a class="button" href="{{ url_for('calendar.create_event') }}">+ Новое дело</a>
     </div>
 </div>
 
@@ -46,29 +46,24 @@
 <section class="panel">
     <div class="panel-heading">
         <div>
-            <h2>Дела текущей недели</h2>
-            <span class="muted">{{ week_start.strftime("%d.%m") }} — {{ week_end.strftime("%d.%m.%Y") }}</span>
+            <h2>Дела на сегодня</h2>
+            <span class="muted">{{ today.strftime("%d.%m.%Y") }}</span>
         </div>
-        <a href="{{ url_for('calendar.index') }}">Календарь</a>
+        <a href="{{ url_for('tasks.index', date=today.isoformat()) }}">Открыть дела</a>
     </div>
-    {% if week_events %}
+    {% if today_tasks %}
         <div class="item-list">
-            {% for event in week_events %}
-                <div class="list-item {% if event.is_important or event.status == 'overdue' %}event-important{% endif %}">
-                    <span class="event-dot event-{{ event.event_type }} {% if event.is_important or event.status == 'overdue' %}event-dot-important{% endif %}"></span>
+            {% for task in today_tasks %}
+                <a class="list-item task-dashboard-item {% if task.is_completed %}is-completed{% endif %}" href="{{ url_for('tasks.index', date=today.isoformat()) }}">
+                    <span class="task-dashboard-check" aria-hidden="true">{{ "✓" if task.is_completed else "" }}</span>
                     <span>
-                        {% if event.client %}
-                            <strong><a href="{{ url_for('clients.detail', client_id=event.client.id) }}">{{ event.client.full_name }}</a></strong>
-                        {% else %}
-                            <strong><a href="{{ url_for('calendar.edit_event', event_id=event.id) }}">{{ event.title }}</a></strong>
-                        {% endif %}
-                        <small>{{ event.starts_at|local_datetime }}</small>
+                        <strong>{{ task.text }}</strong>
                     </span>
-                </div>
+                </a>
             {% endfor %}
         </div>
     {% else %}
-        <div class="empty-state">На этой неделе дел нет.</div>
+        <div class="empty-state">На сегодня дел нет.</div>
     {% endif %}
 </section>
 {% endblock %}

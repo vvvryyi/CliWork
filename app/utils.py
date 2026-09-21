@@ -32,7 +32,7 @@ STATUS_LABELS = {
 EVENT_TYPE_LABELS = {
     "call": "Звонок",
     "meeting": "Встреча",
-    "task": "Задача",
+    "task": "Дело",
     "documents": "Документы",
     "other": "Другое",
 }
@@ -126,7 +126,11 @@ def regenerate_quarterly_events(client, after_date=None):
     for event in existing:
         db.session.delete(event)
 
-    if client.is_archived or client.client_group != "active" or not client.quarterly_reminder_mmdd:
+    if (
+        client.is_archived
+        or client.client_group != "a"
+        or not client.quarterly_reminder_mmdd
+    ):
         return 0
 
     local_today = utc_naive_to_local(utcnow()).date()
