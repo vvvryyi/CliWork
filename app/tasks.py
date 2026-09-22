@@ -4,7 +4,12 @@ from flask import Blueprint, flash, jsonify, redirect, render_template, request,
 from flask_login import login_required
 from .extensions import db
 from .models import DailyTask, utcnow
-from .task_service import create_daily_task, delete_task_and_event, sync_event_from_task
+from .task_service import (
+    create_daily_task,
+    daily_task_sort_key,
+    delete_task_and_event,
+    sync_event_from_task,
+)
 from .utils import utc_naive_to_local
 
 
@@ -25,8 +30,9 @@ def index():
     tasks = db.session.scalars(
         db.select(DailyTask)
         .where(DailyTask.due_date == selected_date)
-        .order_by(DailyTask.completed_at.is_not(None), DailyTask.id)
+        .order_by(DailyTask.id)
     ).all()
+    tasks.sort(key=daily_task_sort_key)
     return render_template(
         "tasks/index.html",
         tasks=tasks,

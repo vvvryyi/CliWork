@@ -4,6 +4,7 @@ from sqlalchemy import func
 
 from .extensions import db
 from .models import CalendarEvent, Client, DailyTask, utcnow
+from .task_service import daily_task_sort_key
 from .utils import (
     synchronize_event_statuses,
     utc_naive_to_local,
@@ -45,8 +46,9 @@ def dashboard():
     today_tasks = db.session.scalars(
         db.select(DailyTask)
         .where(DailyTask.due_date == local_today)
-        .order_by(DailyTask.completed_at.is_not(None), DailyTask.id)
+        .order_by(DailyTask.id)
     ).all()
+    today_tasks.sort(key=daily_task_sort_key)
     return render_template(
         "dashboard.html",
         overdue_count=overdue_count or 0,

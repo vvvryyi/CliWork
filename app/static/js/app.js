@@ -323,6 +323,22 @@ if (taskEditor) {
         return blank;
     };
 
+    const sortTaskRows = () => {
+        const blank = ensureBlankTaskRow();
+        const rows = [...taskList.querySelectorAll("[data-task-row]:not(.is-new)")];
+        rows.sort((left, right) => {
+            const completionOrder = Number(left.dataset.savedCompleted === "1")
+                - Number(right.dataset.savedCompleted === "1");
+            if (completionOrder) return completionOrder;
+            const leftText = left.dataset.savedText.toLocaleLowerCase("ru").replaceAll("ё", "е");
+            const rightText = right.dataset.savedText.toLocaleLowerCase("ru").replaceAll("ё", "е");
+            if (leftText < rightText) return -1;
+            if (leftText > rightText) return 1;
+            return Number(left.dataset.taskId) - Number(right.dataset.taskId);
+        });
+        rows.forEach((row) => taskList.insertBefore(row, blank));
+    };
+
     const rememberTaskChange = (before, after, index) => {
         undoStack.push({ before, after, index });
         if (undoStack.length > 100) undoStack.shift();
@@ -375,7 +391,7 @@ if (taskEditor) {
             if (result.completed && row.dataset.dueDate !== selectedTaskDate) {
                 row.remove();
             }
-            ensureBlankTaskRow();
+            sortTaskRows();
             setTaskStatus("Сохранено");
             return after;
         } catch (error) {
@@ -441,7 +457,7 @@ if (taskEditor) {
                     row.classList.toggle("is-completed", restored.completed);
                 }
             }
-            ensureBlankTaskRow();
+            sortTaskRows();
             setTaskStatus("Изменение отменено");
         } catch (error) {
             undoStack.push(action);

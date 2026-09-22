@@ -141,6 +141,24 @@ def test_every_day_has_its_own_tasks(app, auth_client):
     assert "Позвонить".encode() in auth_client.get("/tasks/?date=2026-09-17").data
 
 
+def test_tasks_are_alphabetical_with_completed_tasks_at_the_bottom(auth_client):
+    due_date = "2026-09-19"
+    for text, completed in (
+        ("Якорь", "0"),
+        ("ёж", "1"),
+        ("Арбуз", "0"),
+        ("Бета", "1"),
+    ):
+        auth_client.post(
+            "/tasks/save",
+            data={"text": text, "due_date": due_date, "completed": completed},
+        )
+
+    page = auth_client.get(f"/tasks/?date={due_date}").data
+    positions = [page.index(text.encode()) for text in ("Арбуз", "Якорь", "Бета", "ёж")]
+    assert positions == sorted(positions)
+
+
 def test_task_sheet_autosaves_and_stays_linked_to_calendar(app, auth_client):
     created = auth_client.post(
         "/tasks/save",

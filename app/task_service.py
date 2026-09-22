@@ -8,6 +8,12 @@ from .utils import local_to_utc_naive, utc_naive_to_local
 TASK_EVENT_ORIGINS = {"daily_task", "manual"}
 
 
+def daily_task_sort_key(task):
+    """Sort incomplete and completed task groups alphabetically."""
+    normalized_text = task.text.casefold().replace("ё", "е")
+    return (task.is_completed, normalized_text, task.id or 0)
+
+
 def _event_title(event):
     if event.title:
         return event.title.strip()[:500]
