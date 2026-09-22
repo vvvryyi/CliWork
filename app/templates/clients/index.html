@@ -42,9 +42,18 @@
     <div class="client-segments">
         {% for group_key, title in client_categories.items() %}
             {% set grouped_clients = clients_by_category[group_key] %}
-            <details class="alphabet-group client-segment" {% if query_text %}open{% endif %}>
-                <summary><span>{{ title }}</span><small>{{ grouped_clients|length }}</small></summary>
-                <div class="alphabet-names">
+            <button class="alphabet-group client-segment" type="button" data-client-segment-open="client-segment-{{ group_key }}" aria-haspopup="dialog" aria-controls="client-segment-{{ group_key }}">
+                <span>{{ title }}</span><small>{{ grouped_clients|length }}</small>
+            </button>
+            <dialog class="client-segment-dialog" id="client-segment-{{ group_key }}" data-client-segment-dialog>
+                <div class="client-segment-dialog-header">
+                    <div>
+                        <h2>Группа {{ title }}</h2>
+                        <p class="muted">Клиентов: {{ grouped_clients|length }}</p>
+                    </div>
+                    <button class="dialog-close" type="button" aria-label="Закрыть группу {{ title }}" data-client-segment-close>×</button>
+                </div>
+                <div class="client-segment-dialog-list">
                     {% for client in grouped_clients %}
                         <div class="alphabet-client">
                             <a href="{{ url_for('clients.detail', client_id=client.id) }}">{{ client.full_name }}</a>
@@ -53,7 +62,7 @@
                         <p class="muted segment-empty">В этой группе пока нет клиентов.</p>
                     {% endfor %}
                 </div>
-            </details>
+            </dialog>
         {% endfor %}
     </div>
 {% endif %}

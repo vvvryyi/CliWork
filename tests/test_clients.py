@@ -251,6 +251,10 @@ def test_client_categories_are_in_one_row_and_mutually_exclusive(
     listing = auth_client.get("/clients/")
     for label in ("А", "В", "Д", "К", "КН", "М", "П", "Р"):
         assert f"<span>{label}</span>".encode() in listing.data
+    assert b'data-client-segment-open="client-segment-a"' in listing.data
+    assert b'id="client-segment-a" data-client-segment-dialog' in listing.data
+    assert f'href="/clients/{sample_client}"'.encode() in listing.data
+    assert "Иван Петров".encode() in listing.data
 
     auth_client.post(
         f"/clients/{sample_client}/group", data={"group": "p"}

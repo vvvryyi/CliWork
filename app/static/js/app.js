@@ -42,6 +42,27 @@ document.querySelectorAll("[data-auto-submit]").forEach((field) => {
     field.addEventListener("change", () => field.form?.submit());
 });
 
+document.querySelectorAll("[data-client-segment-open]").forEach((button) => {
+    button.addEventListener("click", () => {
+        const dialog = document.getElementById(button.dataset.clientSegmentOpen);
+        if (!dialog) return;
+        if (typeof dialog.showModal === "function") dialog.showModal();
+        else dialog.setAttribute("open", "");
+    });
+});
+
+document.querySelectorAll("[data-client-segment-dialog]").forEach((dialog) => {
+    dialog.querySelector("[data-client-segment-close]")?.addEventListener("click", () => {
+        if (typeof dialog.close === "function") dialog.close();
+        else dialog.removeAttribute("open");
+    });
+    dialog.addEventListener("click", (event) => {
+        if (event.target !== dialog) return;
+        if (typeof dialog.close === "function") dialog.close();
+        else dialog.removeAttribute("open");
+    });
+});
+
 const interactionLeadingDate = /^(\d{6})(?:\s+|$)/;
 const interactionTrailingDate = /(?:^|\s)\d{6}(?:\s+(?:в\s*)?(?:[01]\d|2[0-3]):[0-5]\d)?!?\s*$/;
 

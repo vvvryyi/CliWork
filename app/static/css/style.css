@@ -248,19 +248,25 @@ legend { padding: 0 8px; font-weight: 750; }
 .client-quick-actions a { padding: 2px 0; color: var(--primary); font-size: .78rem; font-weight: 700; }
 .alphabet-list { display: grid; gap: 12px; }
 .client-segments { display: grid; grid-template-columns: repeat(8, minmax(70px, 1fr)); align-items: start; gap: 8px; margin-bottom: 18px; }
-.client-segment { position: relative; overflow: visible; }
-.client-segment summary { color: var(--text); }
+.client-segment { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 10px 12px; color: var(--text); text-align: left; font-size: 1.1rem; font-weight: 800; }
+.client-segment small { color: var(--muted); font-size: .78rem; }
 .client-group-form select { width: 82px; min-height: 42px; font-weight: 800; }
 .segment-empty { margin: 10px 0 8px; }
 .alphabet-group { overflow: hidden; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); box-shadow: var(--shadow); }
 .alphabet-group summary { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; cursor: pointer; color: var(--primary); font-size: 1.1rem; font-weight: 800; }
-.client-segment summary { padding: 10px 12px; }
-.client-segment[open] .alphabet-names { position: absolute; z-index: 12; top: calc(100% + 6px); left: 0; width: max(190px, 100%); padding: 8px 14px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); box-shadow: var(--shadow); }
 .alphabet-group summary small { color: var(--muted); font-size: .78rem; }
 .alphabet-names { display: grid; padding: 0 18px 10px; }
 .alphabet-client { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 11px 0; border-top: 1px solid var(--line); }
 .alphabet-client > a { color: var(--text); font-weight: 700; }
 .alphabet-client form { margin: 0; }
+.client-segment-dialog { width: min(720px, calc(100% - 24px)); height: 90vh; height: 90dvh; max-height: 90vh; max-height: 90dvh; padding: 0; overflow: hidden; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); color: var(--text); box-shadow: 0 24px 80px rgba(23, 33, 43, .25); }
+.client-segment-dialog[open] { display: grid; grid-template-rows: auto minmax(0, 1fr); }
+.client-segment-dialog::backdrop { background: rgba(23, 33, 43, .45); backdrop-filter: blur(2px); }
+.client-segment-dialog-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; padding: 22px 24px 16px; border-bottom: 1px solid var(--line); }
+.client-segment-dialog-header h2 { margin-bottom: .25rem; }
+.client-segment-dialog-header p { margin-bottom: 0; }
+.client-segment-dialog-list { min-height: 0; padding: 0 24px 18px; overflow-y: auto; }
+.client-segment-dialog-list .alphabet-client:first-child { border-top: 0; }
 .tag { display: inline-flex; width: fit-content; padding: .24rem .52rem; border-radius: 999px; background: #edf3ff; color: #2258c9; font-size: .75rem; font-weight: 750; }
 .tag-success { background: var(--success-soft); color: var(--success); }
 .tag-warning { background: var(--warning-soft); color: var(--warning); }
