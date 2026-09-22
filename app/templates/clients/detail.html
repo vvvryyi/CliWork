@@ -93,7 +93,13 @@
                                         {% endfor %}
                                     </div>
                                 {% endif %}
-                                <div class="inline-actions"><a href="{{ url_for('clients.edit_interaction', client_id=client.id, interaction_id=interaction.id) }}">Редактировать</a></div>
+                                <div class="inline-actions">
+                                    <a href="{{ url_for('clients.edit_interaction', client_id=client.id, interaction_id=interaction.id) }}">Редактировать</a>
+                                    <form action="{{ url_for('clients.delete_interaction', client_id=client.id, interaction_id=interaction.id) }}" method="post" data-confirm="Удалить эту запись из истории клиента?">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <button class="link-danger" type="submit">Удалить</button>
+                                    </form>
+                                </div>
                             </div>
                         </article>
                     {% endfor %}

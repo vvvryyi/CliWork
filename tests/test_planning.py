@@ -148,6 +148,12 @@ def test_calendar_marks_important_event_red_only_on_its_day(app, auth_client, sa
     response = auth_client.get("/calendar/?view=month&date=2031-12-01")
     assert response.status_code == 200
     assert "has-important".encode() not in response.data
+    future_day = auth_client.get("/calendar/?view=day&date=2031-12-31")
+    assert b"agenda-item event-important" not in future_day.data
+    future_week = auth_client.get("/calendar/?view=week&date=2031-12-31")
+    assert b"event-bg-task event-important" not in future_week.data
+    future_year = auth_client.get("/calendar/?view=year&date=2031-01-01")
+    assert "has-important".encode() not in future_year.data
 
     import app.calendar_routes as calendar_module
     monkeypatch.setattr(calendar_module, "utcnow", lambda: datetime(2031, 12, 31, 8))

@@ -259,6 +259,7 @@ legend { padding: 0 8px; font-weight: 750; }
 .alphabet-client { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 11px 0; border-top: 1px solid var(--line); }
 .alphabet-client > a { color: var(--text); font-weight: 700; }
 .alphabet-client form { margin: 0; }
+.archive-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 7px; }
 .client-segment-dialog { width: min(720px, calc(100% - 24px)); height: 90vh; height: 90dvh; max-height: 90vh; max-height: 90dvh; padding: 0; overflow: hidden; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); color: var(--text); box-shadow: 0 24px 80px rgba(23, 33, 43, .25); }
 .client-segment-dialog[open] { display: grid; grid-template-rows: auto minmax(0, 1fr); }
 .client-segment-dialog::backdrop { background: rgba(23, 33, 43, .45); backdrop-filter: blur(2px); }

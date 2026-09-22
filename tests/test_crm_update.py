@@ -107,18 +107,25 @@ def test_quarterly_dates_keep_original_day_after_short_month():
 
 def test_rescheduling_removes_client_from_dashboard_overdue_list(app, auth_client, sample_client):
     with app.app_context():
-        interaction = Interaction(client_id=sample_client, text="250101 Позвонить 250101")
-        db.session.add(interaction)
-        db.session.flush()
-        db.session.add(
-            CalendarEvent(
-                client_id=sample_client,
-                source_interaction_id=interaction.id,
-                origin="interaction",
-                event_type="task",
-                starts_at=local_to_utc_naive("2025-01-01T09:00"),
-                status="overdue",
-            )
+        db.session.add_all(
+            [
+                CalendarEvent(
+                    client_id=sample_client,
+                    title="Просроченное ручное дело",
+                    origin="manual",
+                    event_type="task",
+                    starts_at=local_to_utc_naive("2025-01-01T09:00"),
+                    status="overdue",
+                ),
+                CalendarEvent(
+                    client_id=sample_client,
+                    title="Будущее ручное дело",
+                    origin="manual",
+                    event_type="task",
+                    starts_at=local_to_utc_naive("2031-12-30T09:00"),
+                    status="planned",
+                ),
+            ]
         )
         db.session.commit()
 
@@ -130,6 +137,11 @@ def test_rescheduling_removes_client_from_dashboard_overdue_list(app, auth_clien
     )
     after = auth_client.get("/")
     assert b"overdue-client-panel" not in after.data
+    with app.app_context():
+        old_event = db.session.get(CalendarEvent, 1)
+        assert old_event.status == "completed"
+        assert old_event.completed_by_interaction_id is not None
+        assert db.session.get(CalendarEvent, 2).status == "planned"
 
 
 def test_every_day_has_its_own_tasks(app, auth_client):
@@ -237,6 +249,7 @@ def test_task_page_and_dashboard_use_new_compact_wording(auth_client):
     tasks_page = auth_client.get("/tasks/?date=2026-09-18")
     assert b"data-task-editor" in tasks_page.data
     assert "⌘/Ctrl + Z".encode() in tasks_page.data
+    assert "⇧⌘Z/Ctrl + Y".encode() in tasks_page.data
 
     dashboard = auth_client.get("/")
     assert "Активные клиенты".encode() not in dashboard.data

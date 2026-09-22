@@ -247,6 +247,8 @@ if (taskEditor) {
     const taskCsrf = taskEditor.querySelector("[data-task-csrf]").value;
     const selectedTaskDate = taskEditor.dataset.selectedDate;
     const undoStack = [];
+    const redoStack = [];
+    let taskHistoryBusy = false;
 
     const setTaskStatus = (message, isError = false) => {
         taskStatus.textContent = message;
@@ -339,8 +341,9 @@ if (taskEditor) {
         rows.forEach((row) => taskList.insertBefore(row, blank));
     };
 
-    const rememberTaskChange = (before, after, index) => {
-        undoStack.push({ before, after, index });
+    const rememberTaskChange = (before, after) => {
+        undoStack.push({ before, after });
+        redoStack.length = 0;
         if (undoStack.length > 100) undoStack.shift();
     };
 
@@ -350,8 +353,6 @@ if (taskEditor) {
         const checkbox = row.querySelector("[data-task-check]");
         const before = row.dataset.taskId ? taskSnapshot(row) : null;
         const text = input.value.trim();
-        const index = [...taskList.children].indexOf(row);
-
         if (!text && !row.dataset.taskId) {
             checkbox.checked = false;
             if (!row.classList.contains("is-new")) row.remove();
@@ -365,7 +366,7 @@ if (taskEditor) {
             if (remove || !text) {
                 await postTask({ task_id: row.dataset.taskId, delete: "1" });
                 row.remove();
-                if (remember && before) rememberTaskChange(before, null, index);
+                if (remember && before) rememberTaskChange(before, null);
                 ensureBlankTaskRow();
                 setTaskStatus("Сохранено");
                 return null;
@@ -386,7 +387,7 @@ if (taskEditor) {
             input.placeholder = "";
             const after = taskSnapshot(row);
             if (remember && JSON.stringify(before) !== JSON.stringify(after)) {
-                rememberTaskChange(before, after, index);
+                rememberTaskChange(before, after);
             }
             if (result.completed && row.dataset.dueDate !== selectedTaskDate) {
                 row.remove();
@@ -402,66 +403,82 @@ if (taskEditor) {
         }
     };
 
-    const replaceUndoTaskId = (oldId, newId) => {
-        undoStack.forEach((action) => {
+    const replaceTaskHistoryId = (oldId, newId, currentAction) => {
+        [currentAction, ...undoStack, ...redoStack].forEach((action) => {
             [action.before, action.after].forEach((snapshot) => {
                 if (snapshot?.id === oldId) snapshot.id = newId;
             });
         });
     };
 
-    const applyTaskUndo = async () => {
-        const action = undoStack.pop();
-        if (!action) return;
-        setTaskStatus("Отменяем…");
-        try {
-            if (!action.before && action.after) {
-                await postTask({ task_id: action.after.id, delete: "1" });
-                taskList.querySelector(`[data-task-id="${action.after.id}"]`)?.remove();
-            } else if (action.before && !action.after) {
-                const restored = await postTask({
-                    text: action.before.text,
-                    due_date: action.before.dueDate,
-                    completed: action.before.completed ? "1" : "0",
-                });
-                const restoredRow = buildTaskRow({
-                    id: String(restored.task_id),
-                    text: restored.text,
-                    dueDate: restored.due_date,
-                    completed: restored.completed,
-                });
-                const blank = ensureBlankTaskRow();
-                taskList.insertBefore(restoredRow, taskList.children[action.index] || blank);
-                replaceUndoTaskId(action.before.id, String(restored.task_id));
-            } else if (action.before && action.after) {
-                const restored = await postTask({
-                    task_id: action.after.id,
-                    text: action.before.text,
-                    due_date: action.before.dueDate,
-                    completed: action.before.completed ? "1" : "0",
-                });
-                let row = taskList.querySelector(`[data-task-id="${action.after.id}"]`);
-                if (!row) {
-                    row = buildTaskRow({
-                        id: String(restored.task_id),
-                        text: restored.text,
-                        dueDate: restored.due_date,
-                        completed: restored.completed,
-                    });
-                    taskList.insertBefore(row, ensureBlankTaskRow());
-                } else {
-                    row.dataset.savedText = restored.text;
-                    row.dataset.savedCompleted = restored.completed ? "1" : "0";
-                    row.querySelector("[data-task-text]").value = restored.text;
-                    row.querySelector("[data-task-check]").checked = restored.completed;
-                    row.classList.toggle("is-completed", restored.completed);
-                }
-            }
+    const applyTaskHistoryState = async (action, direction) => {
+        const target = direction === "undo" ? action.before : action.after;
+        const source = direction === "undo" ? action.after : action.before;
+
+        if (!target && source) {
+            await postTask({ task_id: source.id, delete: "1" });
+            taskList.querySelector(`[data-task-id="${source.id}"]`)?.remove();
             sortTaskRows();
-            setTaskStatus("Изменение отменено");
+            return;
+        }
+
+        const payload = {
+            text: target.text,
+            due_date: target.dueDate,
+            completed: target.completed ? "1" : "0",
+        };
+        if (source) payload.task_id = source.id;
+        const result = await postTask(payload);
+        const resultId = String(result.task_id);
+        const previousId = source?.id || target.id;
+        if (previousId && previousId !== resultId) {
+            replaceTaskHistoryId(previousId, resultId, action);
+        }
+
+        let row = previousId
+            ? taskList.querySelector(`[data-task-id="${previousId}"]`)
+            : null;
+        row ||= taskList.querySelector(`[data-task-id="${resultId}"]`);
+        if (!row) {
+            row = buildTaskRow({
+                id: resultId,
+                text: result.text,
+                dueDate: result.due_date,
+                completed: result.completed,
+            });
+            taskList.insertBefore(row, ensureBlankTaskRow());
+        } else {
+            row.dataset.taskId = resultId;
+            row.dataset.dueDate = result.due_date;
+            row.dataset.savedText = result.text;
+            row.dataset.savedCompleted = result.completed ? "1" : "0";
+            row.querySelector("[data-task-text]").value = result.text;
+            row.querySelector("[data-task-check]").checked = result.completed;
+            row.classList.toggle("is-completed", result.completed);
+        }
+        sortTaskRows();
+    };
+
+    const applyTaskHistory = async (direction) => {
+        if (taskHistoryBusy) return;
+        const sourceStack = direction === "undo" ? undoStack : redoStack;
+        const destinationStack = direction === "undo" ? redoStack : undoStack;
+        const action = sourceStack.pop();
+        if (!action) return;
+        taskHistoryBusy = true;
+        setTaskStatus(direction === "undo" ? "Отменяем…" : "Повторяем…");
+        try {
+            await applyTaskHistoryState(action, direction);
+            destinationStack.push(action);
+            if (destinationStack.length > 100) destinationStack.shift();
+            setTaskStatus(
+                direction === "undo" ? "Изменение отменено" : "Изменение повторено",
+            );
         } catch (error) {
-            undoStack.push(action);
+            sourceStack.push(action);
             setTaskStatus(error.message, true);
+        } finally {
+            taskHistoryBusy = false;
         }
     };
 
@@ -512,12 +529,18 @@ if (taskEditor) {
     });
 
     taskEditor.addEventListener("keydown", (event) => {
-        if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== "z" || event.shiftKey) return;
+        const key = event.key.toLowerCase();
+        const modifier = event.metaKey || event.ctrlKey;
+        const undoRequested = modifier && key === "z" && !event.shiftKey;
+        const redoRequested = modifier && (
+            (key === "z" && event.shiftKey) || key === "y"
+        );
+        if (!undoRequested && !redoRequested) return;
         const activeInput = document.activeElement?.closest?.("[data-task-text]");
         const activeRow = activeInput?.closest("[data-task-row]");
         if (activeInput && activeInput.value.trim() !== activeRow.dataset.savedText) return;
         event.preventDefault();
-        applyTaskUndo();
+        applyTaskHistory(redoRequested ? "redo" : "undo");
     });
 }
 

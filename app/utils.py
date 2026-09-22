@@ -7,6 +7,7 @@ from uuid import uuid4
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from flask import current_app
+from sqlalchemy import or_
 from werkzeug.utils import secure_filename
 
 from .extensions import db
@@ -217,13 +218,16 @@ def synchronize_event_statuses(now=None):
 
 
 def complete_client_events(client_id, interaction):
-    """Complete open note-generated events when a newer client record appears."""
+    """Complete all due client events when a newer client record appears."""
     return db.session.execute(
         db.update(CalendarEvent)
         .where(
             CalendarEvent.client_id == client_id,
-            CalendarEvent.origin == "interaction",
             CalendarEvent.status.in_(OPEN_EVENT_STATUSES),
+            or_(
+                CalendarEvent.origin == "interaction",
+                CalendarEvent.starts_at <= interaction.created_at,
+            ),
         )
         .values(
             status="completed",

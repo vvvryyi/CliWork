@@ -1,6 +1,7 @@
 import re
 from datetime import datetime
 from io import BytesIO
+from pathlib import Path
 
 from app.extensions import db
 from app.models import CalendarEvent, Client, Interaction
@@ -66,6 +67,7 @@ def test_client_card_shows_history_and_opens_a_new_note_below_it(
     assert f'<textarea name="text" rows="5"'.encode() in detail.data
     assert original_text.encode() in detail.data
     assert f'action="/clients/{sample_client}/interactions"'.encode() in detail.data
+    assert f'action="/clients/{sample_client}/interactions/1/delete"'.encode() in detail.data
     assert detail.data.index(original_text.encode()) < detail.data.index(b'<textarea name="text"')
 
     updated_text = "Новая запись\nСледующий шаг 260921 11:00"
@@ -105,6 +107,41 @@ def test_create_search_edit_and_archive_client(app, auth_client, sample_client):
     assert response.status_code == 302
     with app.app_context():
         assert db.session.get(Client, sample_client).is_archived
+
+
+def test_archived_client_can_be_deleted_permanently_with_files(
+    app, auth_client, sample_client
+):
+    auth_client.post(
+        f"/clients/{sample_client}/interactions",
+        data={
+            "text": "Старая запись 311231",
+            "files": (BytesIO(b"old file"), "old.txt"),
+        },
+        content_type="multipart/form-data",
+    )
+    with app.app_context():
+        interaction = db.session.scalar(db.select(Interaction))
+        attachment_path = Path(interaction.attachments[0].file_path)
+        assert attachment_path.exists()
+
+    assert (
+        auth_client.post(f"/clients/{sample_client}/delete-permanently").status_code
+        == 400
+    )
+    auth_client.post(f"/clients/{sample_client}/archive")
+    archive_page = auth_client.get("/clients/?archived=1")
+    assert f'action="/clients/{sample_client}/delete-permanently"'.encode() in archive_page.data
+
+    response = auth_client.post(
+        f"/clients/{sample_client}/delete-permanently", follow_redirects=True
+    )
+    assert "удалён навсегда".encode() in response.data
+    with app.app_context():
+        assert db.session.get(Client, sample_client) is None
+        assert db.session.scalar(db.select(Interaction)) is None
+        assert db.session.scalar(db.select(CalendarEvent)) is None
+    assert not attachment_path.exists()
 
 
 def test_interaction_with_attachment(
@@ -220,6 +257,26 @@ def test_deleting_interaction_deletes_generated_event(app, auth_client, sample_c
     auth_client.post(f"/clients/{sample_client}/interactions/1/delete")
     with app.app_context():
         assert db.session.scalar(db.select(CalendarEvent)) is None
+
+
+def test_cleaning_newer_history_keeps_previous_event_completed(
+    app, auth_client, sample_client
+):
+    auth_client.post(
+        f"/clients/{sample_client}/interactions",
+        data={"text": "Первое дело 250101"},
+    )
+    auth_client.post(
+        f"/clients/{sample_client}/interactions",
+        data={"text": "Выполнено"},
+    )
+    auth_client.post(f"/clients/{sample_client}/interactions/2/delete")
+
+    with app.app_context():
+        event = db.session.scalar(db.select(CalendarEvent))
+        assert event.status == "completed"
+        assert event.completed_at is not None
+        assert event.completed_by_interaction_id is None
 
 
 def test_archiving_client_hides_its_planned_events(app, auth_client, sample_client):

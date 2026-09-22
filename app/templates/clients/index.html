@@ -77,10 +77,16 @@
                         <div class="alphabet-client">
                             <a href="{{ url_for('clients.detail', client_id=client.id) }}">{{ client.full_name }}</a>
                             {% if show_archived %}
-                                <form action="{{ url_for('clients.restore', client_id=client.id) }}" method="post">
-                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                    <button class="button button-small" type="submit">Восстановить</button>
-                                </form>
+                                <div class="archive-actions">
+                                    <form action="{{ url_for('clients.restore', client_id=client.id) }}" method="post">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <button class="button button-small" type="submit">Восстановить</button>
+                                    </form>
+                                    <form action="{{ url_for('clients.delete_permanently', client_id=client.id) }}" method="post" data-confirm="Удалить клиента «{{ client.full_name }}» навсегда? Это действие нельзя отменить.">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <button class="button button-small button-danger-ghost" type="submit">Удалить навсегда</button>
+                                    </form>
+                                </div>
                             {% endif %}
                         </div>
                     {% endfor %}

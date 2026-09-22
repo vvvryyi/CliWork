@@ -362,6 +362,35 @@ def restore(client_id):
     return redirect(url_for("clients.detail", client_id=client.id))
 
 
+@bp.post("/<int:client_id>/delete-permanently")
+@login_required
+def delete_permanently(client_id):
+    client = get_client_or_404(client_id, include_archived=True)
+    if not client.is_archived:
+        abort(400)
+
+    paths = [Path(item.file_path) for item in client.attachments.all()]
+    for event in client.events.all():
+        if event.daily_task is not None:
+            task = event.daily_task
+            task.calendar_event = None
+            db.session.delete(task)
+        db.session.delete(event)
+    client_name = client.full_name
+    db.session.delete(client)
+    db.session.commit()
+
+    for path in paths:
+        try:
+            path.unlink(missing_ok=True)
+        except OSError:
+            current_app.logger.warning(
+                "Could not remove attachment after deleting client: %s", path
+            )
+    flash(f"Клиент «{client_name}» удалён навсегда.", "success")
+    return redirect(url_for("clients.index", archived=1))
+
+
 @bp.post("/<int:client_id>/interactions")
 @login_required
 def create_interaction(client_id):
@@ -519,10 +548,7 @@ def delete_interaction(client_id, interaction_id):
             CalendarEvent.completed_by_interaction_id == interaction.id
         )
     ).all()
-    now = utcnow()
     for event in completed_events:
-        event.status = "overdue" if event.starts_at < now else "planned"
-        event.completed_at = None
         event.completed_by_interaction_id = None
     if interaction.calendar_event is not None:
         if interaction.calendar_event.external_uid:
