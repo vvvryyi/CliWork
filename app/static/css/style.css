@@ -191,7 +191,7 @@ legend { padding: 0 8px; font-weight: 750; }
 .flash-success { border-color: #aadcc8; background: var(--success-soft); color: #0b6548; }
 .flash-error { border-color: #f3b8b2; background: var(--danger-soft); color: var(--danger); }
 
-.stat-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 220px)); gap: 12px; margin-bottom: 24px; }
+.stat-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 220px)); gap: 12px; margin-bottom: 24px; }
 .stat-card { display: grid; gap: 2px; padding: 12px 15px; border: 1px solid var(--line); border-radius: 11px; background: var(--surface); color: var(--text); box-shadow: var(--shadow); }
 .stat-card:hover { color: var(--text); border-color: #b9c7d3; }
 .stat-card-alert .stat-value { color: var(--danger); }

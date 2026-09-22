@@ -19,12 +19,6 @@ def dashboard():
     now = utcnow()
     synchronize_event_statuses(now)
     local_today = utc_naive_to_local(now).date()
-    client_count = db.session.scalar(
-        db.select(func.count(Client.id)).where(
-            Client.archived_at.is_(None),
-            Client.client_group == "a",
-        )
-    )
     overdue_events = db.session.scalars(
         db.select(CalendarEvent)
         .join(Client, CalendarEvent.client_id == Client.id)
@@ -55,7 +49,6 @@ def dashboard():
     ).all()
     return render_template(
         "dashboard.html",
-        client_count=client_count or 0,
         overdue_count=overdue_count or 0,
         overdue_clients=overdue_clients,
         task_count=task_count or 0,

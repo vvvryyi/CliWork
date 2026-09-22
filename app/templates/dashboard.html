@@ -19,10 +19,6 @@
         <span class="stat-value">{{ task_count }}</span>
         <span class="stat-label">Дела</span>
     </a>
-    <a class="stat-card" href="{{ url_for('clients.index') }}">
-        <span class="stat-value">{{ client_count }}</span>
-        <span class="stat-label">Активные клиенты</span>
-    </a>
     <a class="stat-card stat-card-alert" href="{{ url_for('calendar.index', view='overdue') }}">
         <span class="stat-value">{{ overdue_count }}</span>
         <span class="stat-label">Просроченные клиенты</span>

@@ -221,7 +221,7 @@ def test_task_page_and_dashboard_use_new_compact_wording(auth_client):
     assert "⌘/Ctrl + Z".encode() in tasks_page.data
 
     dashboard = auth_client.get("/")
-    assert "Активные клиенты".encode() in dashboard.data
+    assert "Активные клиенты".encode() not in dashboard.data
     assert "Просроченные клиенты".encode() in dashboard.data
     assert dashboard.data.index("Дела".encode()) < dashboard.data.index("Новый клиент".encode())
 
