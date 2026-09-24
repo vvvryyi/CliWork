@@ -15,6 +15,8 @@ from .utils import utc_naive_to_local
 
 bp = Blueprint("tasks", __name__, url_prefix="/tasks")
 
+WEEKDAY_ABBREVIATIONS = ("пн.", "вт.", "ср.", "чт.", "пт.", "сб.", "вс.")
+
 
 def parse_date(value):
     try:
@@ -37,6 +39,7 @@ def index():
         "tasks/index.html",
         tasks=tasks,
         selected_date=selected_date,
+        weekday_abbreviation=WEEKDAY_ABBREVIATIONS[selected_date.weekday()],
         previous_date=selected_date - timedelta(days=1),
         next_date=selected_date + timedelta(days=1),
         today=utc_naive_to_local(utcnow()).date(),

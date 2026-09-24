@@ -7,7 +7,10 @@
 
 <div class="task-toolbar">
     <a class="icon-button" href="{{ url_for('tasks.index', date=previous_date.isoformat()) }}" aria-label="Предыдущий день">←</a>
-    <strong>{{ selected_date.strftime("%d.%m.%Y") }}</strong>
+    <div class="task-toolbar-date">
+        <span class="task-toolbar-weekday">{{ weekday_abbreviation }}</span>
+        <strong>{{ selected_date.strftime("%d.%m.%Y") }}</strong>
+    </div>
     <a class="icon-button" href="{{ url_for('tasks.index', date=next_date.isoformat()) }}" aria-label="Следующий день">→</a>
     {% if selected_date != today %}<a class="button button-small" href="{{ url_for('tasks.index', date=today.isoformat()) }}">Сегодня</a>{% endif %}
 </div>

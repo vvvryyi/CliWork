@@ -216,6 +216,8 @@ legend { padding: 0 8px; font-weight: 750; }
 .task-dashboard-item.is-completed strong { color: var(--muted); text-decoration: line-through; }
 .task-dashboard-check { display: grid; flex: 0 0 17px; width: 17px; height: 17px; place-items: center; border: 1px solid #aeb8c1; border-radius: 4px; color: var(--primary); font-size: .72rem; font-weight: 900; }
 .task-toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+.task-toolbar-date { display: flex; min-width: 92px; flex-direction: column; align-items: center; line-height: 1.2; }
+.task-toolbar-weekday { margin-bottom: 2px; color: var(--muted); font-size: .78rem; font-weight: 700; }
 .task-panel { max-width: 900px; }
 .task-sheet { overflow: hidden; border: 1px solid var(--line); border-radius: 10px; background: white; }
 .task-line { display: grid; grid-template-columns: 30px minmax(0, 1fr) 28px; align-items: center; min-height: 43px; border-bottom: 1px solid var(--line); }

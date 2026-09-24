@@ -153,6 +153,13 @@ def test_every_day_has_its_own_tasks(app, auth_client):
     assert "Позвонить".encode() in auth_client.get("/tasks/?date=2026-09-17").data
 
 
+def test_tasks_toolbar_shows_abbreviated_weekday_above_date(auth_client):
+    page = auth_client.get("/tasks/?date=2026-09-24").data.decode()
+
+    assert '<span class="task-toolbar-weekday">чт.</span>' in page
+    assert page.index("чт.</span>") < page.index("24.09.2026</strong>")
+
+
 def test_tasks_are_alphabetical_with_completed_tasks_at_the_bottom(auth_client):
     due_date = "2026-09-19"
     for text, completed in (
