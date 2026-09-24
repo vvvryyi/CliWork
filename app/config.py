@@ -46,6 +46,8 @@ class Config:
         "jpeg",
         "png",
         "webp",
+        "heic",
+        "heif",
         "zip",
     }
     ICLOUD_CALDAV_URL = os.getenv("ICLOUD_CALDAV_URL", "https://caldav.icloud.com/")

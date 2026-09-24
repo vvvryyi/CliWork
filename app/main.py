@@ -6,6 +6,7 @@ from .extensions import db
 from .models import CalendarEvent, Client, DailyTask, utcnow
 from .task_service import daily_task_sort_key
 from .utils import (
+    OPEN_EVENT_STATUSES,
     synchronize_event_statuses,
     utc_naive_to_local,
 )
@@ -20,23 +21,33 @@ def dashboard():
     now = utcnow()
     synchronize_event_statuses(now)
     local_today = utc_naive_to_local(now).date()
-    overdue_events = db.session.scalars(
+    contact_events = db.session.scalars(
         db.select(CalendarEvent)
         .join(Client, CalendarEvent.client_id == Client.id)
         .where(
-            CalendarEvent.status == "overdue",
+            CalendarEvent.status.in_(OPEN_EVENT_STATUSES),
             Client.archived_at.is_(None),
         )
         .order_by(CalendarEvent.starts_at)
     ).all()
-    overdue_clients = []
+    contact_events = [
+        event
+        for event in contact_events
+        if utc_naive_to_local(event.starts_at).date() <= local_today
+    ]
+    contact_clients = []
     seen_client_ids = set()
-    for event in overdue_events:
+    for event in contact_events:
         if event.client_id in seen_client_ids:
             continue
         seen_client_ids.add(event.client_id)
-        overdue_clients.append(event)
-    overdue_count = len(overdue_clients)
+        contact_clients.append(event)
+    overdue_contact_ids = {
+        event.id
+        for event in contact_clients
+        if utc_naive_to_local(event.starts_at).date() < local_today
+    }
+    contact_count = len(contact_clients)
     task_count = db.session.scalar(
         db.select(func.count(DailyTask.id)).where(
             DailyTask.completed_at.is_(None),
@@ -51,8 +62,9 @@ def dashboard():
     today_tasks.sort(key=daily_task_sort_key)
     return render_template(
         "dashboard.html",
-        overdue_count=overdue_count or 0,
-        overdue_clients=overdue_clients,
+        contact_count=contact_count,
+        contact_clients=contact_clients,
+        overdue_contact_ids=overdue_contact_ids,
         task_count=task_count or 0,
         today_tasks=today_tasks,
         today=local_today,

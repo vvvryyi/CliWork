@@ -108,11 +108,7 @@ def index():
     highlighted_event_ids = {
         event.id
         for event in events
-        if event.status == "overdue"
-        or (
-            event.is_important
-            and utc_naive_to_local(event.starts_at).date() == today
-        )
+        if event.is_important
     }
 
     if view == "overdue":

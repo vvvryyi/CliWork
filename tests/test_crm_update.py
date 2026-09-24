@@ -136,7 +136,7 @@ def test_rescheduling_removes_client_from_dashboard_overdue_list(app, auth_clien
         data={"text": "Новая запись и дата 311231", "workflow_fields_present": "1"},
     )
     after = auth_client.get("/")
-    assert b"overdue-client-panel" not in after.data
+    assert "Иван Петров".encode() not in after.data
     with app.app_context():
         old_event = db.session.get(CalendarEvent, 1)
         assert old_event.status == "completed"
@@ -178,10 +178,40 @@ def test_tasks_are_alphabetical_with_completed_tasks_at_the_bottom(auth_client):
     assert positions == sorted(positions)
 
 
+def test_all_tasks_has_no_date_toolbar_and_shows_calendar_arrow_for_open_tasks(
+    auth_client,
+):
+    open_task = auth_client.post(
+        "/tasks/save",
+        data={"text": "Перенести меня", "due_date": "2026-09-20"},
+    ).get_json()
+    completed_task = auth_client.post(
+        "/tasks/save",
+        data={
+            "text": "Уже выполнено",
+            "due_date": "2026-09-19",
+            "completed": "1",
+        },
+    ).get_json()
+
+    page = auth_client.get("/tasks/all").data.decode()
+    assert 'data-show-all="1"' in page
+    assert '<div class="task-toolbar">' not in page
+    assert open_task["calendar_url"] in page
+    open_row = page.split('data-saved-text="Перенести меня"', 1)[1][:1500]
+    completed_row = page.split('data-saved-text="Уже выполнено"', 1)[1][:1500]
+    assert 'task-calendar-link is-hidden' not in open_row
+    assert 'task-calendar-link is-hidden' in completed_row
+
+
 def test_task_sheet_autosaves_and_stays_linked_to_calendar(app, auth_client):
     created = auth_client.post(
         "/tasks/save",
-        data={"text": "Подготовить документы", "due_date": "2026-09-20"},
+        data={
+            "text": "Подготовить документы",
+            "due_date": "2026-09-20",
+            "important": "1",
+        },
     )
     assert created.status_code == 200
     task_id = created.get_json()["task_id"]
@@ -190,6 +220,8 @@ def test_task_sheet_autosaves_and_stays_linked_to_calendar(app, auth_client):
         task = db.session.get(DailyTask, task_id)
         event_id = task.calendar_event_id
         assert task.calendar_event.title == "Подготовить документы"
+        assert task.is_important is True
+        assert task.calendar_event.is_important is True
         assert utc_naive_to_local(task.calendar_event.starts_at).date() == date(2026, 9, 20)
 
     updated = auth_client.post(
@@ -255,18 +287,83 @@ def test_client_and_iphone_calendar_events_do_not_create_daily_tasks(
 def test_task_page_and_dashboard_use_new_compact_wording(auth_client):
     tasks_page = auth_client.get("/tasks/?date=2026-09-18")
     assert b"data-task-editor" in tasks_page.data
+    assert b'<textarea class="task-line-text"' in tasks_page.data
     assert "⌘/Ctrl + Z".encode() in tasks_page.data
     assert "⇧⌘Z/Ctrl + Y".encode() in tasks_page.data
 
     dashboard = auth_client.get("/")
     assert "Активные клиенты".encode() not in dashboard.data
-    assert "Просроченные клиенты".encode() in dashboard.data
-    assert dashboard.data.index("Дела".encode()) < dashboard.data.index("Новый клиент".encode())
+    assert "Связаться сегодня".encode() in dashboard.data
+    assert "+ Новый клиент".encode() not in dashboard.data
+    assert "+ Новое дело".encode() not in dashboard.data
+    assert "Все дела".encode() in dashboard.data
 
     calendar_form = auth_client.get("/calendar/events/new?date=2026-09-18")
     assert b"calendar-form-grid" in calendar_form.data
     assert "Новое дело".encode() in calendar_form.data
     assert "Название дела".encode() in calendar_form.data
+
+
+def test_dashboard_open_task_has_calendar_arrow_but_completed_task_does_not(
+    app, auth_client, monkeypatch
+):
+    import app.main as main_module
+
+    monkeypatch.setattr(main_module, "utcnow", lambda: datetime(2026, 9, 24, 9))
+    open_task = auth_client.post(
+        "/tasks/save",
+        data={"text": "Открытое дело", "due_date": "2026-09-24"},
+    ).get_json()
+    completed_task = auth_client.post(
+        "/tasks/save",
+        data={
+            "text": "Готовое дело",
+            "due_date": "2026-09-24",
+            "completed": "1",
+        },
+    ).get_json()
+
+    page = auth_client.get("/").data.decode()
+    open_row = page.split("Открытое дело", 1)[1][:500]
+    completed_row = page.split("Готовое дело", 1)[1][:500]
+    assert open_task["calendar_url"] in open_row
+    assert completed_task["calendar_url"] not in completed_row
+    assert '<details class="panel dashboard-collapsible" open' not in page
+
+
+def test_dashboard_contacts_due_today_turn_red_only_the_next_day(
+    app, auth_client, sample_client, monkeypatch
+):
+    import app.main as main_module
+
+    monkeypatch.setattr(main_module, "utcnow", lambda: datetime(2026, 9, 24, 9))
+    with app.app_context():
+        yesterday_client = Client(full_name="Вчерашний клиент")
+        db.session.add(yesterday_client)
+        db.session.flush()
+        db.session.add_all(
+            [
+                CalendarEvent(
+                    client_id=sample_client,
+                    title="Связаться сегодня",
+                    starts_at=local_to_utc_naive("2026-09-24T09:00"),
+                    status="planned",
+                ),
+                CalendarEvent(
+                    client_id=yesterday_client.id,
+                    title="Просроченный контакт",
+                    starts_at=local_to_utc_naive("2026-09-23T09:00"),
+                    status="overdue",
+                ),
+            ]
+        )
+        db.session.commit()
+
+    page = auth_client.get("/").data.decode()
+    today_row = page.split("Иван Петров", 1)[0].rsplit('<a class="list-item ', 1)[1]
+    overdue_row = page.split("Вчерашний клиент", 1)[0].rsplit('<a class="list-item ', 1)[1]
+    assert "event-important" not in today_row
+    assert "event-important" in overdue_row
 
 
 class FakeRemoteEvent:

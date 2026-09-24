@@ -67,7 +67,8 @@ def test_client_card_shows_history_and_opens_a_new_note_below_it(
     assert f'<textarea name="text" rows="5"'.encode() in detail.data
     assert original_text.encode() in detail.data
     assert f'action="/clients/{sample_client}/interactions"'.encode() in detail.data
-    assert f'action="/clients/{sample_client}/interactions/1/delete"'.encode() in detail.data
+    assert f'formaction="/clients/{sample_client}/interactions/1/delete"'.encode() in detail.data
+    assert detail.data.count(b"<form") == detail.data.count(b"</form>")
     assert detail.data.index(original_text.encode()) < detail.data.index(b'<textarea name="text"')
 
     updated_text = "Новая запись\nСледующий шаг 260921 11:00"
@@ -170,6 +171,22 @@ def test_interaction_with_attachment(
     response = auth_client.get(f"/clients/attachments/{attachment_id}")
     assert response.status_code == 200
     assert response.data == b"test document"
+
+
+def test_heic_attachment_is_allowed(app, auth_client, sample_client):
+    response = auth_client.post(
+        f"/clients/{sample_client}/interactions",
+        data={
+            "text": "Фото документа",
+            "files": (BytesIO(b"heic image"), "document.HEIC"),
+        },
+        content_type="multipart/form-data",
+    )
+
+    assert response.status_code == 302
+    with app.app_context():
+        interaction = db.session.scalar(db.select(Interaction))
+        assert interaction.attachments[0].stored_name.endswith(".heic")
 
 
 def test_history_uses_compact_date(auth_client, sample_client):
@@ -306,8 +323,12 @@ def test_client_categories_are_in_one_row_and_mutually_exclusive(
         assert db.session.get(Client, sample_client).client_group == "a"
 
     listing = auth_client.get("/clients/")
-    for label in ("А", "В", "Д", "К", "КН", "М", "П", "Р"):
+    labels = ("Д", "Б", "Р", "М", "П", "А", "Н")
+    for label in labels:
         assert f"<span>{label}</span>".encode() in listing.data
+    positions = [listing.data.index(f"<span>{label}</span>".encode()) for label in labels]
+    assert positions == sorted(positions)
+    assert "<span>Х</span>".encode() not in listing.data
     assert b'data-client-segment-open="client-segment-a"' in listing.data
     assert b'id="client-segment-a" data-client-segment-dialog' in listing.data
     assert f'href="/clients/{sample_client}"'.encode() in listing.data
@@ -318,6 +339,12 @@ def test_client_categories_are_in_one_row_and_mutually_exclusive(
     )
     with app.app_context():
         assert db.session.get(Client, sample_client).client_group == "p"
+
+    auth_client.post(
+        f"/clients/{sample_client}/group", data={"group": "none"}
+    )
+    with app.app_context():
+        assert db.session.get(Client, sample_client).client_group == "none"
 
 
 def test_new_interaction_completes_previous_event_and_creates_next(

@@ -28,10 +28,11 @@ def _event_status(starts_at, completed_at=None):
     return "overdue" if starts_at < utcnow() else "planned"
 
 
-def create_daily_task(text, due_date, completed=False):
+def create_daily_task(text, due_date, completed=False, important=False):
     task = DailyTask(
         text=text.strip()[:500],
         due_date=due_date,
+        is_important=important,
         completed_at=utcnow() if completed else None,
     )
     db.session.add(task)
@@ -66,6 +67,7 @@ def sync_event_from_task(task):
         )
 
     event.title = task.text[:250]
+    event.is_important = task.is_important
     event.completed_at = task.completed_at
     event.status = _event_status(event.starts_at, task.completed_at)
     return event
@@ -98,12 +100,14 @@ def sync_task_from_event(event):
             calendar_event=event,
             text=text,
             due_date=due_date,
+            is_important=event.is_important,
             completed_at=completed_at,
         )
         db.session.add(task)
     else:
         task.text = text
         task.due_date = due_date
+        task.is_important = event.is_important
         task.completed_at = completed_at
     return task
 

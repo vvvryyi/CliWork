@@ -1,10 +1,11 @@
 {% extends "base.html" %}
-{% block title %}Дела — Персональная CRM{% endblock %}
+{% block title %}{{ "Все дела" if show_all else "Дела" }} — Персональная CRM{% endblock %}
 {% block content %}
 <div class="page-heading">
-    <div><p class="eyebrow">План дня</p><h1>Дела</h1></div>
+    <div><p class="eyebrow">{{ "Общий список" if show_all else "План дня" }}</p><h1>{{ "Все дела" if show_all else "Дела" }}</h1></div>
 </div>
 
+{% if not show_all %}
 <div class="task-toolbar">
     <a class="icon-button" href="{{ url_for('tasks.index', date=previous_date.isoformat()) }}" aria-label="Предыдущий день">←</a>
     <div class="task-toolbar-date">
@@ -14,20 +15,37 @@
     <a class="icon-button" href="{{ url_for('tasks.index', date=next_date.isoformat()) }}" aria-label="Следующий день">→</a>
     {% if selected_date != today %}<a class="button button-small" href="{{ url_for('tasks.index', date=today.isoformat()) }}">Сегодня</a>{% endif %}
 </div>
+{% endif %}
 
-<section class="panel task-panel" data-task-editor data-save-url="{{ url_for('tasks.save') }}" data-selected-date="{{ selected_date.isoformat() }}">
+<section class="panel task-panel" data-task-editor data-save-url="{{ url_for('tasks.save') }}" data-selected-date="{{ selected_date.isoformat() }}" data-show-all="{{ '1' if show_all else '0' }}">
     <input type="hidden" data-task-csrf value="{{ csrf_token() }}">
     <div class="task-sheet" data-task-list>
         {% for task in tasks %}
-            <div class="task-line {% if task.is_completed %}is-completed{% endif %}" data-task-row data-task-id="{{ task.id }}" data-due-date="{{ task.due_date.isoformat() }}" data-saved-text="{{ task.text }}" data-saved-completed="{{ '1' if task.is_completed else '0' }}">
+            <div class="task-line {% if task.is_completed %}is-completed{% endif %}" data-task-row data-task-id="{{ task.id }}" data-due-date="{{ task.due_date.isoformat() }}" data-saved-text="{{ task.text }}" data-saved-completed="{{ '1' if task.is_completed else '0' }}" data-saved-important="{{ '1' if task.is_important else '0' }}" data-calendar-url="{{ url_for('calendar.edit_event', event_id=task.calendar_event_id) if task.calendar_event_id else '' }}">
                 <input class="task-line-check" type="checkbox" data-task-check aria-label="Выполнено" {% if task.is_completed %}checked{% endif %}>
-                <input class="task-line-text" type="text" data-task-text maxlength="500" value="{{ task.text }}" aria-label="Текст дела">
+                <label class="task-line-important" title="Важно">
+                    <input type="checkbox" data-task-important aria-label="Важно" {% if task.is_important %}checked{% endif %}>
+                    <span aria-hidden="true">★</span>
+                </label>
+                <div class="task-line-content">
+                    <textarea class="task-line-text" data-task-text maxlength="500" rows="1" aria-label="Текст дела">{{ task.text }}</textarea>
+                    {% if show_all %}<small>{{ task.due_date.strftime("%d.%m.%Y") }}</small>{% endif %}
+                </div>
+                <a class="task-calendar-link {% if task.is_completed or not task.calendar_event_id %}is-hidden{% endif %}" data-task-calendar href="{{ url_for('calendar.edit_event', event_id=task.calendar_event_id) if task.calendar_event_id else '#' }}" aria-label="Перенести дело в календаре" title="Перенести в календаре">→</a>
                 <button class="task-line-remove" type="button" data-task-remove aria-label="Удалить дело">×</button>
             </div>
         {% endfor %}
-        <div class="task-line is-new" data-task-row data-task-id="" data-due-date="{{ selected_date.isoformat() }}" data-saved-text="" data-saved-completed="0">
+        <div class="task-line is-new" data-task-row data-task-id="" data-due-date="{{ selected_date.isoformat() }}" data-saved-text="" data-saved-completed="0" data-saved-important="0" data-calendar-url="">
             <input class="task-line-check" type="checkbox" data-task-check aria-label="Выполнено">
-            <input class="task-line-text" type="text" data-task-text maxlength="500" placeholder="Введите дело и нажмите Enter" aria-label="Новое дело">
+            <label class="task-line-important" title="Важно">
+                <input type="checkbox" data-task-important aria-label="Важно">
+                <span aria-hidden="true">★</span>
+            </label>
+            <div class="task-line-content">
+                <textarea class="task-line-text" data-task-text maxlength="500" rows="1" placeholder="Введите дело и нажмите Enter" aria-label="Новое дело"></textarea>
+                {% if show_all %}<small>{{ selected_date.strftime("%d.%m.%Y") }}</small>{% endif %}
+            </div>
+            <a class="task-calendar-link is-hidden" data-task-calendar href="#" aria-label="Перенести дело в календаре" title="Перенести в календаре">→</a>
             <button class="task-line-remove" type="button" data-task-remove aria-label="Удалить строку">×</button>
         </div>
     </div>

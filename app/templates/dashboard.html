@@ -9,8 +9,7 @@
     </div>
     <div class="heading-actions dashboard-actions">
         <a class="button" href="{{ url_for('tasks.index') }}">Дела</a>
-        <a class="button button-primary" href="{{ url_for('clients.create') }}">+ Новый клиент</a>
-        <a class="button" href="{{ url_for('calendar.create_event') }}">+ Новое дело</a>
+        <a class="button" href="{{ url_for('tasks.all_tasks') }}">Все дела</a>
     </div>
 </div>
 
@@ -19,47 +18,50 @@
         <span class="stat-value">{{ task_count }}</span>
         <span class="stat-label">Дела</span>
     </a>
-    <a class="stat-card stat-card-alert" href="{{ url_for('calendar.index', view='overdue') }}">
-        <span class="stat-value">{{ overdue_count }}</span>
-        <span class="stat-label">Просроченные клиенты</span>
+    <a class="stat-card {% if overdue_contact_ids %}stat-card-alert{% endif %}" href="#contacts-today">
+        <span class="stat-value">{{ contact_count }}</span>
+        <span class="stat-label">Связаться сегодня</span>
     </a>
 </div>
 
-{% if overdue_clients %}
-<section class="panel overdue-client-panel">
-    <div class="panel-heading"><h2>Просроченные клиенты</h2><a href="{{ url_for('calendar.index', view='overdue') }}">Все дела</a></div>
+<details class="panel dashboard-collapsible overdue-client-panel" id="contacts-today">
+    <summary class="panel-heading"><h2>Связаться сегодня</h2><span class="muted">{{ contact_count }}</span></summary>
+    {% if contact_clients %}
     <div class="item-list">
-        {% for event in overdue_clients %}
-            <a class="list-item event-important" href="{{ url_for('clients.detail', client_id=event.client.id) }}">
-                <span class="event-dot event-dot-important"></span>
+        {% for event in contact_clients %}
+            <a class="list-item {% if event.id in overdue_contact_ids %}event-important{% endif %}" href="{{ url_for('clients.detail', client_id=event.client.id) }}">
+                <span class="event-dot {% if event.id in overdue_contact_ids %}event-dot-important{% endif %}"></span>
                 <span><strong>{{ event.client.full_name }}</strong><small>{{ event.starts_at|local_datetime("%d.%m.%Y") }}</small></span>
             </a>
         {% endfor %}
     </div>
-</section>
-{% endif %}
+    {% else %}
+        <div class="empty-state">На сегодня клиентов для связи нет.</div>
+    {% endif %}
+</details>
 
-<section class="panel">
-    <div class="panel-heading">
+<details class="panel dashboard-collapsible">
+    <summary class="panel-heading">
         <div>
             <h2>Дела на сегодня</h2>
             <span class="muted">{{ today.strftime("%d.%m.%Y") }}</span>
         </div>
-        <a href="{{ url_for('tasks.index', date=today.isoformat()) }}">Открыть дела</a>
-    </div>
+        <span class="muted">{{ task_count }}</span>
+    </summary>
     {% if today_tasks %}
         <div class="item-list">
             {% for task in today_tasks %}
-                <a class="list-item task-dashboard-item {% if task.is_completed %}is-completed{% endif %}" href="{{ url_for('tasks.index', date=today.isoformat()) }}">
+                <div class="list-item task-dashboard-item {% if task.is_completed %}is-completed{% endif %}">
                     <span class="task-dashboard-check" aria-hidden="true">{{ "✓" if task.is_completed else "" }}</span>
-                    <span>
-                        <strong>{{ task.text }}</strong>
-                    </span>
-                </a>
+                    <a class="task-dashboard-text" href="{{ url_for('tasks.index', date=today.isoformat()) }}"><strong>{{ task.text }}</strong></a>
+                    {% if not task.is_completed and task.calendar_event_id %}
+                        <a class="task-calendar-link" href="{{ url_for('calendar.edit_event', event_id=task.calendar_event_id) }}" aria-label="Перенести дело {{ task.text }} в календаре" title="Перенести в календаре">→</a>
+                    {% endif %}
+                </div>
             {% endfor %}
         </div>
     {% else %}
         <div class="empty-state">На сегодня дел нет.</div>
     {% endif %}
-</section>
+</details>
 {% endblock %}

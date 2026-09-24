@@ -2,6 +2,28 @@ document.querySelector("[data-nav-toggle]")?.addEventListener("click", () => {
     document.querySelector("[data-main-nav]")?.classList.toggle("is-open");
 });
 
+document.addEventListener("click", (event) => {
+    const link = event.target.closest("a[href]");
+    if (!link || event.defaultPrevented || event.button !== 0
+        || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey
+        || link.target === "_blank") return;
+    const target = new URL(link.href, window.location.href);
+    if (target.origin !== window.location.origin
+        || (target.pathname === window.location.pathname
+            && target.search === window.location.search
+            && target.hash)) return;
+    link.classList.add("is-pending");
+});
+
+document.querySelectorAll('a[href^="#"]').forEach((link) => {
+    link.addEventListener("click", () => {
+        const selector = link.getAttribute("href");
+        if (selector.length < 2) return;
+        const target = document.querySelector(selector);
+        if (target?.tagName === "DETAILS") target.open = true;
+    });
+});
+
 document.querySelectorAll("form[data-confirm]").forEach((form) => {
     form.addEventListener("submit", (event) => {
         if (!window.confirm(form.dataset.confirm)) {
@@ -246,6 +268,7 @@ if (taskEditor) {
     const taskStatus = taskEditor.querySelector("[data-task-status]");
     const taskCsrf = taskEditor.querySelector("[data-task-csrf]").value;
     const selectedTaskDate = taskEditor.dataset.selectedDate;
+    const showAllTasks = taskEditor.dataset.showAll === "1";
     const undoStack = [];
     const redoStack = [];
     let taskHistoryBusy = false;
@@ -277,8 +300,14 @@ if (taskEditor) {
         id: row.dataset.taskId || null,
         text: row.dataset.savedText || "",
         completed: row.dataset.savedCompleted === "1",
+        important: row.dataset.savedImportant === "1",
         dueDate: row.dataset.dueDate,
     });
+
+    const resizeTaskInput = (input, expand = false) => {
+        input.style.height = "";
+        if (expand) input.style.height = `${Math.max(42, input.scrollHeight)}px`;
+    };
 
     const buildTaskRow = (task) => {
         const row = document.createElement("div");
@@ -288,6 +317,8 @@ if (taskEditor) {
         row.dataset.dueDate = task.dueDate || selectedTaskDate;
         row.dataset.savedText = task.text || "";
         row.dataset.savedCompleted = task.completed ? "1" : "0";
+        row.dataset.savedImportant = task.important ? "1" : "0";
+        row.dataset.calendarUrl = task.calendarUrl || "";
         if (!task.id) row.classList.add("is-new");
 
         const checkbox = document.createElement("input");
@@ -297,14 +328,44 @@ if (taskEditor) {
         checkbox.dataset.taskCheck = "";
         checkbox.setAttribute("aria-label", "Выполнено");
 
-        const input = document.createElement("input");
+        const importantLabel = document.createElement("label");
+        importantLabel.className = "task-line-important";
+        importantLabel.title = "Важно";
+        const important = document.createElement("input");
+        important.type = "checkbox";
+        important.checked = Boolean(task.important);
+        important.dataset.taskImportant = "";
+        important.setAttribute("aria-label", "Важно");
+        const importantStar = document.createElement("span");
+        importantStar.setAttribute("aria-hidden", "true");
+        importantStar.textContent = "★";
+        importantLabel.append(important, importantStar);
+
+        const content = document.createElement("div");
+        content.className = "task-line-content";
+        const input = document.createElement("textarea");
         input.className = "task-line-text";
-        input.type = "text";
         input.maxLength = 500;
+        input.rows = 1;
         input.value = task.text || "";
         input.dataset.taskText = "";
         input.placeholder = task.id ? "" : "Введите дело и нажмите Enter";
         input.setAttribute("aria-label", task.id ? "Текст дела" : "Новое дело");
+        content.append(input);
+        if (showAllTasks) {
+            const date = document.createElement("small");
+            date.textContent = new Date(`${row.dataset.dueDate}T00:00:00`)
+                .toLocaleDateString("ru-RU");
+            content.append(date);
+        }
+
+        const calendarLink = document.createElement("a");
+        calendarLink.className = `task-calendar-link${task.completed || !task.calendarUrl ? " is-hidden" : ""}`;
+        calendarLink.dataset.taskCalendar = "";
+        calendarLink.href = task.calendarUrl || "#";
+        calendarLink.setAttribute("aria-label", "Перенести дело в календаре");
+        calendarLink.title = "Перенести в календаре";
+        calendarLink.textContent = "→";
 
         const remove = document.createElement("button");
         remove.className = "task-line-remove";
@@ -312,7 +373,7 @@ if (taskEditor) {
         remove.dataset.taskRemove = "";
         remove.setAttribute("aria-label", task.id ? "Удалить дело" : "Удалить строку");
         remove.textContent = "×";
-        row.append(checkbox, input, remove);
+        row.append(checkbox, importantLabel, content, calendarLink, remove);
         return row;
     };
 
@@ -332,6 +393,10 @@ if (taskEditor) {
             const completionOrder = Number(left.dataset.savedCompleted === "1")
                 - Number(right.dataset.savedCompleted === "1");
             if (completionOrder) return completionOrder;
+            if (showAllTasks) {
+                const dateOrder = left.dataset.dueDate.localeCompare(right.dataset.dueDate);
+                if (dateOrder) return dateOrder;
+            }
             const leftText = left.dataset.savedText.toLocaleLowerCase("ru").replaceAll("ё", "е");
             const rightText = right.dataset.savedText.toLocaleLowerCase("ru").replaceAll("ё", "е");
             if (leftText < rightText) return -1;
@@ -351,10 +416,12 @@ if (taskEditor) {
         if (row.dataset.saving === "1") return null;
         const input = row.querySelector("[data-task-text]");
         const checkbox = row.querySelector("[data-task-check]");
+        const important = row.querySelector("[data-task-important]");
         const before = row.dataset.taskId ? taskSnapshot(row) : null;
         const text = input.value.trim();
         if (!text && !row.dataset.taskId) {
             checkbox.checked = false;
+            important.checked = false;
             if (!row.classList.contains("is-new")) row.remove();
             ensureBlankTaskRow();
             return null;
@@ -377,19 +444,25 @@ if (taskEditor) {
                 text,
                 due_date: row.dataset.dueDate,
                 completed: checkbox.checked ? "1" : "0",
+                important: important.checked ? "1" : "0",
             });
             row.dataset.taskId = String(result.task_id);
             row.dataset.savedText = result.text;
             row.dataset.savedCompleted = result.completed ? "1" : "0";
+            row.dataset.savedImportant = result.important ? "1" : "0";
+            row.dataset.calendarUrl = result.calendar_url;
             row.classList.remove("is-new");
             row.classList.toggle("is-completed", result.completed);
             input.value = result.text;
             input.placeholder = "";
+            const calendarLink = row.querySelector("[data-task-calendar]");
+            calendarLink.href = result.calendar_url;
+            calendarLink.classList.toggle("is-hidden", result.completed);
             const after = taskSnapshot(row);
             if (remember && JSON.stringify(before) !== JSON.stringify(after)) {
                 rememberTaskChange(before, after);
             }
-            if (result.completed && row.dataset.dueDate !== selectedTaskDate) {
+            if (!showAllTasks && result.completed && row.dataset.dueDate !== selectedTaskDate) {
                 row.remove();
             }
             sortTaskRows();
@@ -426,6 +499,7 @@ if (taskEditor) {
             text: target.text,
             due_date: target.dueDate,
             completed: target.completed ? "1" : "0",
+            important: target.important ? "1" : "0",
         };
         if (source) payload.task_id = source.id;
         const result = await postTask(payload);
@@ -445,6 +519,8 @@ if (taskEditor) {
                 text: result.text,
                 dueDate: result.due_date,
                 completed: result.completed,
+                important: result.important,
+                calendarUrl: result.calendar_url,
             });
             taskList.insertBefore(row, ensureBlankTaskRow());
         } else {
@@ -452,8 +528,14 @@ if (taskEditor) {
             row.dataset.dueDate = result.due_date;
             row.dataset.savedText = result.text;
             row.dataset.savedCompleted = result.completed ? "1" : "0";
+            row.dataset.savedImportant = result.important ? "1" : "0";
+            row.dataset.calendarUrl = result.calendar_url;
             row.querySelector("[data-task-text]").value = result.text;
             row.querySelector("[data-task-check]").checked = result.completed;
+            row.querySelector("[data-task-important]").checked = result.important;
+            const calendarLink = row.querySelector("[data-task-calendar]");
+            calendarLink.href = result.calendar_url;
+            calendarLink.classList.toggle("is-hidden", result.completed);
             row.classList.toggle("is-completed", result.completed);
         }
         sortTaskRows();
@@ -484,7 +566,7 @@ if (taskEditor) {
 
     taskList.addEventListener("keydown", async (event) => {
         const input = event.target.closest("[data-task-text]");
-        if (!input || event.key !== "Enter") return;
+        if (!input || event.key !== "Enter" || event.shiftKey) return;
         event.preventDefault();
         const row = input.closest("[data-task-row]");
         try {
@@ -504,14 +586,25 @@ if (taskEditor) {
         if (input.value.trim() !== row.dataset.savedText) {
             saveTaskRow(row).catch(() => {});
         }
+        resizeTaskInput(input, false);
+    });
+
+    taskList.addEventListener("focusin", (event) => {
+        const input = event.target.closest("[data-task-text]");
+        if (input) resizeTaskInput(input, true);
+    });
+
+    taskList.addEventListener("input", (event) => {
+        const input = event.target.closest("[data-task-text]");
+        if (input) resizeTaskInput(input, true);
     });
 
     taskList.addEventListener("change", (event) => {
-        const checkbox = event.target.closest("[data-task-check]");
-        if (!checkbox) return;
-        const row = checkbox.closest("[data-task-row]");
+        const control = event.target.closest("[data-task-check], [data-task-important]");
+        if (!control) return;
+        const row = control.closest("[data-task-row]");
         if (!row.querySelector("[data-task-text]").value.trim()) {
-            checkbox.checked = false;
+            control.checked = false;
             return;
         }
         saveTaskRow(row).catch(() => {});

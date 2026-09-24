@@ -43,6 +43,31 @@ def index():
         previous_date=selected_date - timedelta(days=1),
         next_date=selected_date + timedelta(days=1),
         today=utc_naive_to_local(utcnow()).date(),
+        show_all=False,
+    )
+
+
+@bp.get("/all")
+@login_required
+def all_tasks():
+    today = utc_naive_to_local(utcnow()).date()
+    tasks = db.session.scalars(
+        db.select(DailyTask).order_by(DailyTask.due_date, DailyTask.id)
+    ).all()
+    tasks.sort(
+        key=lambda task: (
+            task.is_completed,
+            task.due_date,
+            task.text.casefold().replace("ё", "е"),
+            task.id,
+        )
+    )
+    return render_template(
+        "tasks/index.html",
+        tasks=tasks,
+        selected_date=today,
+        today=today,
+        show_all=True,
     )
 
 
@@ -90,6 +115,7 @@ def save():
     due_date = parse_date(request.form.get("due_date"))
     should_delete = request.form.get("delete") == "1"
     completed = request.form.get("completed") == "1"
+    important = request.form.get("important") == "1"
 
     task = db.get_or_404(DailyTask, task_id) if task_id else None
     if should_delete or (task is not None and not text):
@@ -101,9 +127,13 @@ def save():
         return jsonify({"error": "Введите текст дела."}), 400
 
     if task is None:
-        task = create_daily_task(text, due_date, completed=completed)
+        task = create_daily_task(
+            text, due_date, completed=completed, important=important
+        )
     else:
         task.text = text
+        task.due_date = due_date
+        task.is_important = important
         task.completed_at = utcnow() if completed else None
         sync_event_from_task(task)
     db.session.commit()
@@ -113,5 +143,9 @@ def save():
             "text": task.text,
             "due_date": task.due_date.isoformat(),
             "completed": task.is_completed,
+            "important": task.is_important,
+            "calendar_url": url_for(
+                "calendar.edit_event", event_id=task.calendar_event_id
+            ),
         }
     )

@@ -207,6 +207,7 @@ class DailyTask(TimestampMixin, db.Model):
     )
     text = db.Column(db.String(500), nullable=False)
     due_date = db.Column(db.Date, nullable=False, index=True)
+    is_important = db.Column(db.Boolean, nullable=False, default=False)
     completed_at = db.Column(db.DateTime, nullable=True)
 
     calendar_event = db.relationship(

@@ -39,14 +39,13 @@ bp = Blueprint("clients", __name__, url_prefix="/clients")
 
 INTERACTION_TYPES = {"call", "meeting", "message", "documents"}
 CLIENT_GROUP_LABELS = {
-    "a": "А",
-    "v": "В",
     "d": "Д",
-    "k": "К",
-    "kn": "КН",
+    "v": "Б",
+    "r": "Р",
     "m": "М",
     "p": "П",
-    "r": "Р",
+    "a": "А",
+    "k": "Н",
 }
 CLIENT_GROUPS = set(CLIENT_GROUP_LABELS)
 CLIENT_FLAG_FIELDS = (
@@ -256,12 +255,18 @@ def detail(client_id):
 def toggle_group(client_id):
     client = get_client_or_404(client_id)
     requested_group = request.form.get("group", "")
-    if requested_group not in CLIENT_GROUPS:
+    if requested_group != "none" and requested_group not in CLIENT_GROUPS:
         abort(400)
     client.client_group = requested_group
     regenerate_quarterly_events(client)
     db.session.commit()
-    flash(f"Клиент добавлен в группу {CLIENT_GROUP_LABELS[requested_group]}.", "success")
+    if requested_group == "none":
+        flash("Клиент удалён из группы.", "success")
+    else:
+        flash(
+            f"Клиент добавлен в группу {CLIENT_GROUP_LABELS[requested_group]}.",
+            "success",
+        )
     return redirect(request.referrer or url_for("clients.detail", client_id=client.id))
 
 
