@@ -46,7 +46,8 @@ def test_login_supports_non_ascii_credentials(tmp_path):
 def test_login_opens_dashboard(auth_client):
     response = auth_client.get("/")
     assert response.status_code == 200
-    assert "Добро пожаловать".encode() in response.data
+    assert "Связаться сегодня".encode() in response.data
+    assert "Добро пожаловать".encode() not in response.data
 
 
 def test_login_requires_totp_when_enabled(app, client):

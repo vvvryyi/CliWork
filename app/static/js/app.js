@@ -268,7 +268,8 @@ if (taskEditor) {
     const taskStatus = taskEditor.querySelector("[data-task-status]");
     const taskCsrf = taskEditor.querySelector("[data-task-csrf]").value;
     const selectedTaskDate = taskEditor.dataset.selectedDate;
-    const showAllTasks = taskEditor.dataset.showAll === "1";
+    const taskScope = taskEditor.dataset.taskScope || "daily";
+    const isGeneralTasks = taskScope === "general";
     const undoStack = [];
     const redoStack = [];
     let taskHistoryBusy = false;
@@ -319,6 +320,7 @@ if (taskEditor) {
         row.dataset.savedCompleted = task.completed ? "1" : "0";
         row.dataset.savedImportant = task.important ? "1" : "0";
         row.dataset.calendarUrl = task.calendarUrl || "";
+        if (isGeneralTasks) row.classList.add("is-general");
         if (!task.id) row.classList.add("is-new");
 
         const checkbox = document.createElement("input");
@@ -352,13 +354,6 @@ if (taskEditor) {
         input.placeholder = task.id ? "" : "Введите дело и нажмите Enter";
         input.setAttribute("aria-label", task.id ? "Текст дела" : "Новое дело");
         content.append(input);
-        if (showAllTasks) {
-            const date = document.createElement("small");
-            date.textContent = new Date(`${row.dataset.dueDate}T00:00:00`)
-                .toLocaleDateString("ru-RU");
-            content.append(date);
-        }
-
         const calendarLink = document.createElement("a");
         calendarLink.className = `task-calendar-link${task.completed || !task.calendarUrl ? " is-hidden" : ""}`;
         calendarLink.dataset.taskCalendar = "";
@@ -393,10 +388,6 @@ if (taskEditor) {
             const completionOrder = Number(left.dataset.savedCompleted === "1")
                 - Number(right.dataset.savedCompleted === "1");
             if (completionOrder) return completionOrder;
-            if (showAllTasks) {
-                const dateOrder = left.dataset.dueDate.localeCompare(right.dataset.dueDate);
-                if (dateOrder) return dateOrder;
-            }
             const leftText = left.dataset.savedText.toLocaleLowerCase("ru").replaceAll("ё", "е");
             const rightText = right.dataset.savedText.toLocaleLowerCase("ru").replaceAll("ё", "е");
             if (leftText < rightText) return -1;
@@ -431,7 +422,11 @@ if (taskEditor) {
         setTaskStatus("Сохраняем…");
         try {
             if (remove || !text) {
-                await postTask({ task_id: row.dataset.taskId, delete: "1" });
+                await postTask({
+                    task_id: row.dataset.taskId,
+                    task_scope: taskScope,
+                    delete: "1",
+                });
                 row.remove();
                 if (remember && before) rememberTaskChange(before, null);
                 ensureBlankTaskRow();
@@ -441,6 +436,7 @@ if (taskEditor) {
 
             const result = await postTask({
                 task_id: row.dataset.taskId,
+                task_scope: taskScope,
                 text,
                 due_date: row.dataset.dueDate,
                 completed: checkbox.checked ? "1" : "0",
@@ -462,7 +458,10 @@ if (taskEditor) {
             if (remember && JSON.stringify(before) !== JSON.stringify(after)) {
                 rememberTaskChange(before, after);
             }
-            if (!showAllTasks && result.completed && row.dataset.dueDate !== selectedTaskDate) {
+            if (isGeneralTasks && result.completed) {
+                row.remove();
+                ensureBlankTaskRow();
+            } else if (!isGeneralTasks && result.completed && row.dataset.dueDate !== selectedTaskDate) {
                 row.remove();
             }
             sortTaskRows();
@@ -489,13 +488,14 @@ if (taskEditor) {
         const source = direction === "undo" ? action.after : action.before;
 
         if (!target && source) {
-            await postTask({ task_id: source.id, delete: "1" });
+            await postTask({ task_id: source.id, task_scope: taskScope, delete: "1" });
             taskList.querySelector(`[data-task-id="${source.id}"]`)?.remove();
             sortTaskRows();
             return;
         }
 
         const payload = {
+            task_scope: taskScope,
             text: target.text,
             due_date: target.dueDate,
             completed: target.completed ? "1" : "0",
@@ -537,6 +537,10 @@ if (taskEditor) {
             calendarLink.href = result.calendar_url;
             calendarLink.classList.toggle("is-hidden", result.completed);
             row.classList.toggle("is-completed", result.completed);
+        }
+        if (isGeneralTasks && result.completed) {
+            row.remove();
+            ensureBlankTaskRow();
         }
         sortTaskRows();
     };

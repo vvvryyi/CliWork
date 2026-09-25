@@ -219,3 +219,18 @@ class DailyTask(TimestampMixin, db.Model):
     @property
     def is_completed(self):
         return self.completed_at is not None
+
+
+class GeneralTask(TimestampMixin, db.Model):
+    """A standalone task from the separate "Все дела" list."""
+
+    __tablename__ = "general_tasks"
+
+    id = db.Column(db.Integer, primary_key=True)
+    text = db.Column(db.String(500), nullable=False)
+    is_important = db.Column(db.Boolean, nullable=False, default=False)
+    completed_at = db.Column(db.DateTime, nullable=True, index=True)
+
+    @property
+    def is_completed(self):
+        return self.completed_at is not None

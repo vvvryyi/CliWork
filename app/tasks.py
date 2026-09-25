@@ -3,7 +3,7 @@ from datetime import date, timedelta
 from flask import Blueprint, flash, jsonify, redirect, render_template, request, url_for
 from flask_login import login_required
 from .extensions import db
-from .models import DailyTask, utcnow
+from .models import DailyTask, GeneralTask, utcnow
 from .task_service import (
     create_daily_task,
     daily_task_sort_key,
@@ -52,16 +52,11 @@ def index():
 def all_tasks():
     today = utc_naive_to_local(utcnow()).date()
     tasks = db.session.scalars(
-        db.select(DailyTask).order_by(DailyTask.due_date, DailyTask.id)
+        db.select(GeneralTask)
+        .where(GeneralTask.completed_at.is_(None))
+        .order_by(GeneralTask.id)
     ).all()
-    tasks.sort(
-        key=lambda task: (
-            task.is_completed,
-            task.due_date,
-            task.text.casefold().replace("ё", "е"),
-            task.id,
-        )
-    )
+    tasks.sort(key=daily_task_sort_key)
     return render_template(
         "tasks/index.html",
         tasks=tasks,
@@ -113,39 +108,54 @@ def save():
     task_id = request.form.get("task_id", type=int)
     text = request.form.get("text", "").strip()[:500]
     due_date = parse_date(request.form.get("due_date"))
+    task_scope = request.form.get("task_scope", "daily")
+    is_general = task_scope == "general"
     should_delete = request.form.get("delete") == "1"
     completed = request.form.get("completed") == "1"
     important = request.form.get("important") == "1"
 
-    task = db.get_or_404(DailyTask, task_id) if task_id else None
+    task_model = GeneralTask if is_general else DailyTask
+    task = db.get_or_404(task_model, task_id) if task_id else None
     if should_delete or (task is not None and not text):
         if task is not None:
-            delete_task_and_event(task)
+            if is_general:
+                db.session.delete(task)
+            else:
+                delete_task_and_event(task)
         db.session.commit()
         return jsonify({"deleted": True, "task_id": task_id})
     if not text:
         return jsonify({"error": "Введите текст дела."}), 400
 
     if task is None:
-        task = create_daily_task(
-            text, due_date, completed=completed, important=important
-        )
+        if is_general:
+            task = GeneralTask(
+                text=text,
+                is_important=important,
+                completed_at=utcnow() if completed else None,
+            )
+            db.session.add(task)
+        else:
+            task = create_daily_task(
+                text, due_date, completed=completed, important=important
+            )
     else:
         task.text = text
-        task.due_date = due_date
         task.is_important = important
         task.completed_at = utcnow() if completed else None
-        sync_event_from_task(task)
+        if not is_general:
+            task.due_date = due_date
+            sync_event_from_task(task)
     db.session.commit()
     return jsonify(
         {
             "task_id": task.id,
             "text": task.text,
-            "due_date": task.due_date.isoformat(),
+            "due_date": due_date.isoformat() if is_general else task.due_date.isoformat(),
             "completed": task.is_completed,
             "important": task.is_important,
-            "calendar_url": url_for(
-                "calendar.edit_event", event_id=task.calendar_event_id
-            ),
+            "calendar_url": ""
+            if is_general
+            else url_for("calendar.edit_event", event_id=task.calendar_event_id),
         }
     )

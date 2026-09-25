@@ -1,18 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Главная — Персональная CRM{% endblock %}
 {% block content %}
-<div class="page-heading">
-    <div>
-        <p class="eyebrow">Рабочий стол</p>
-        <h1>Добро пожаловать</h1>
-        <p class="muted">Клиенты и ближайшие дела в одном месте.</p>
-    </div>
-    <div class="heading-actions dashboard-actions">
-        <a class="button" href="{{ url_for('tasks.index') }}">Дела</a>
-        <a class="button" href="{{ url_for('tasks.all_tasks') }}">Все дела</a>
-    </div>
-</div>
-
 <div class="stat-grid">
     <a class="stat-card stat-card-compact" href="{{ url_for('tasks.index') }}">
         <span class="stat-value">{{ task_count }}</span>
@@ -21,6 +9,10 @@
     <a class="stat-card {% if overdue_contact_ids %}stat-card-alert{% endif %}" href="#contacts-today">
         <span class="stat-value">{{ contact_count }}</span>
         <span class="stat-label">Связаться сегодня</span>
+    </a>
+    <a class="stat-card" href="{{ url_for('tasks.all_tasks') }}">
+        <span class="stat-value">{{ general_task_count }}</span>
+        <span class="stat-label">Все дела</span>
     </a>
 </div>
 

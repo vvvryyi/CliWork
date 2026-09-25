@@ -82,7 +82,6 @@ h3 { margin-top: 1.5rem; margin-bottom: .4rem; font-size: .95rem; }
 .auth-shell { display: grid; min-height: 100vh; place-items: center; padding: 24px; background: radial-gradient(circle at top left, #eaf0ff, var(--bg) 45%); }
 .page-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; margin-bottom: 28px; }
 .heading-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
-.dashboard-actions .button { width: 152px; }
 .centered { justify-content: center; }
 .eyebrow { margin-bottom: .35rem; color: var(--primary); font-size: .75rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
 .muted { color: var(--muted); }
@@ -193,7 +192,7 @@ legend { padding: 0 8px; font-weight: 750; }
 .flash-success { border-color: #aadcc8; background: var(--success-soft); color: #0b6548; }
 .flash-error { border-color: #f3b8b2; background: var(--danger-soft); color: var(--danger); }
 
-.stat-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 220px)); gap: 12px; margin-bottom: 24px; }
+.stat-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 220px)); gap: 12px; margin-bottom: 24px; }
 .stat-card { display: grid; gap: 2px; padding: 12px 15px; border: 1px solid var(--line); border-radius: 11px; background: var(--surface); color: var(--text); box-shadow: var(--shadow); }
 .stat-card:hover { color: var(--text); border-color: #b9c7d3; }
 .stat-card-alert .stat-value { color: var(--danger); }
@@ -231,6 +230,8 @@ legend { padding: 0 8px; font-weight: 750; }
 .task-panel { max-width: 900px; }
 .task-sheet { overflow: hidden; border: 1px solid var(--line); border-radius: 10px; background: white; }
 .task-line { display: grid; grid-template-columns: 30px 30px minmax(0, 1fr) 44px 28px; align-items: center; min-height: 43px; border-bottom: 1px solid var(--line); }
+.task-panel-general .task-line { grid-template-columns: 30px 30px minmax(0, 1fr) 28px; }
+.task-panel-general .task-calendar-link { display: none; }
 .task-line:last-child { border-bottom: 0; }
 .task-line:focus-within { background: #f7faff; }
 .task-line-check { width: 15px; height: 15px; min-height: 0; margin: 0 auto; accent-color: var(--primary); }
@@ -442,7 +443,6 @@ legend { padding: 0 8px; font-weight: 750; }
     .client-workflow { grid-template-columns: 1fr; }
     .compact-upload { align-items: flex-start; flex-direction: column; }
     .stat-grid { grid-template-columns: 1fr; }
-    .dashboard-actions .button { width: auto; }
     .client-segments { grid-template-columns: repeat(4, minmax(0, 1fr)); }
     .task-sheet-footer { flex-direction: column; gap: 3px; }
 }

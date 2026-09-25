@@ -4,7 +4,7 @@ from icalendar import Event
 
 from app.calendar_sync import sync_icloud_calendar
 from app.extensions import db
-from app.models import CalendarEvent, Client, DailyTask, Interaction
+from app.models import CalendarEvent, Client, DailyTask, GeneralTask, Interaction
 from app.utils import add_months, local_to_utc_naive, utc_naive_to_local
 
 
@@ -178,30 +178,69 @@ def test_tasks_are_alphabetical_with_completed_tasks_at_the_bottom(auth_client):
     assert positions == sorted(positions)
 
 
-def test_all_tasks_has_no_date_toolbar_and_shows_calendar_arrow_for_open_tasks(
-    auth_client,
-):
-    open_task = auth_client.post(
+def test_all_tasks_is_a_separate_list_and_hides_completed_tasks(app, auth_client):
+    daily_task = auth_client.post(
         "/tasks/save",
-        data={"text": "Перенести меня", "due_date": "2026-09-20"},
+        data={"text": "Ежедневное дело", "due_date": "2026-09-20"},
     ).get_json()
-    completed_task = auth_client.post(
+    general_task = auth_client.post(
         "/tasks/save",
         data={
-            "text": "Уже выполнено",
-            "due_date": "2026-09-19",
+            "task_scope": "general",
+            "text": "Отдельное дело",
+            "due_date": "2026-09-20",
+        },
+    ).get_json()
+    completed_general_task = auth_client.post(
+        "/tasks/save",
+        data={
+            "task_scope": "general",
+            "text": "Завершенное отдельное дело",
+            "due_date": "2026-09-20",
             "completed": "1",
         },
     ).get_json()
 
     page = auth_client.get("/tasks/all").data.decode()
-    assert 'data-show-all="1"' in page
+    assert 'data-task-scope="general"' in page
     assert '<div class="task-toolbar">' not in page
-    assert open_task["calendar_url"] in page
-    open_row = page.split('data-saved-text="Перенести меня"', 1)[1][:1500]
-    completed_row = page.split('data-saved-text="Уже выполнено"', 1)[1][:1500]
-    assert 'task-calendar-link is-hidden' not in open_row
-    assert 'task-calendar-link is-hidden' in completed_row
+    assert "Ежедневное дело" not in page
+    assert "Отдельное дело" in page
+    assert "Завершенное отдельное дело" not in page
+    assert daily_task["calendar_url"]
+    assert general_task["calendar_url"] == ""
+    assert completed_general_task["completed"] is True
+
+    with app.app_context():
+        stored = db.session.get(GeneralTask, general_task["task_id"])
+        assert stored is not None
+        assert stored.completed_at is None
+        assert db.session.get(DailyTask, daily_task["task_id"]) is not None
+
+
+def test_completing_general_task_removes_it_from_all_tasks(auth_client):
+    created = auth_client.post(
+        "/tasks/save",
+        data={
+            "task_scope": "general",
+            "text": "Скрыть после выполнения",
+            "due_date": "2026-09-20",
+        },
+    ).get_json()
+
+    completed = auth_client.post(
+        "/tasks/save",
+        data={
+            "task_scope": "general",
+            "task_id": created["task_id"],
+            "text": "Скрыть после выполнения",
+            "due_date": "2026-09-20",
+            "completed": "1",
+        },
+    )
+
+    assert completed.get_json()["completed"] is True
+    assert "Скрыть после выполнения".encode() not in auth_client.get("/tasks/all").data
 
 
 def test_task_sheet_autosaves_and_stays_linked_to_calendar(app, auth_client):
@@ -293,15 +332,38 @@ def test_task_page_and_dashboard_use_new_compact_wording(auth_client):
 
     dashboard = auth_client.get("/")
     assert "Активные клиенты".encode() not in dashboard.data
+    assert "Рабочий стол".encode() not in dashboard.data
+    assert "Добро пожаловать".encode() not in dashboard.data
+    assert "Клиенты и ближайшие дела в одном месте".encode() not in dashboard.data
     assert "Связаться сегодня".encode() in dashboard.data
     assert "+ Новый клиент".encode() not in dashboard.data
     assert "+ Новое дело".encode() not in dashboard.data
     assert "Все дела".encode() in dashboard.data
+    assert dashboard.data.count(b'class="stat-card') == 3
 
     calendar_form = auth_client.get("/calendar/events/new?date=2026-09-18")
     assert b"calendar-form-grid" in calendar_form.data
     assert "Новое дело".encode() in calendar_form.data
     assert "Название дела".encode() in calendar_form.data
+
+
+def test_dashboard_counts_only_open_general_tasks(auth_client):
+    for text, completed in (("Открытое", "0"), ("Выполненное", "1")):
+        auth_client.post(
+            "/tasks/save",
+            data={
+                "task_scope": "general",
+                "text": text,
+                "due_date": "2026-09-20",
+                "completed": completed,
+            },
+        )
+
+    page = auth_client.get("/").data.decode()
+    all_tasks_card = page.split("Все дела", 1)[0].rsplit(
+        '<a class="stat-card"', 1
+    )[1]
+    assert '<span class="stat-value">1</span>' in all_tasks_card
 
 
 def test_dashboard_open_task_has_calendar_arrow_but_completed_task_does_not(
