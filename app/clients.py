@@ -41,6 +41,7 @@ INTERACTION_TYPES = {"call", "meeting", "message", "documents"}
 CLIENT_GROUP_LABELS = {
     "d": "Д",
     "v": "Б",
+    "b": "В",
     "r": "Р",
     "m": "М",
     "p": "П",
@@ -58,6 +59,8 @@ CLIENT_FLAG_FIELDS = (
     "flag_ks",
     "flag_kr",
 )
+# Invisible boundary keeps entries separate in storage without drawing a line in the editor.
+HISTORY_DIVIDER = "\n\u2063"
 
 
 def get_client_or_404(client_id, include_archived=False):
@@ -128,6 +131,87 @@ def add_interaction(client, text, interaction_type="call", submission_token=None
         )
         db.session.add(calendar_event)
     return interaction, calendar_event, planned_local, date_suffix_found
+
+
+def history_entry_date(interaction):
+    return utc_naive_to_local(interaction.created_at).strftime("%y%m%d")
+
+
+def build_history_text(interactions, now):
+    entries = [
+        f"{history_entry_date(item)}\n{interaction_text_body(item.text)}"
+        for item in interactions
+    ]
+    entries.append(normalize_interaction_text("", now))
+    return HISTORY_DIVIDER.join(entries)
+
+
+def parse_history_text(value, interactions, now):
+    sections = value.replace("\r\n", "\n").split(HISTORY_DIVIDER)
+    if len(sections) != len(interactions) + 1:
+        raise ValueError("Граница между записями была удалена. Обновите страницу и повторите правку.")
+    updates = []
+    for interaction, section in zip(interactions, sections):
+        if not section.strip():
+            updates.append(None)
+            continue
+        date, separator, body = section.lstrip("\n").partition("\n")
+        if not separator or date.strip() != history_entry_date(interaction):
+            raise ValueError("Не меняйте дату в начале существующей записи.")
+        body = body.strip()
+        if not body and (interaction_text_body(interaction.text) or not interaction.attachments):
+            updates.append(None)
+        else:
+            updates.append(f"{history_entry_date(interaction)} {body}" if body else "")
+    return updates, normalize_interaction_text(sections[-1], now)
+
+
+def remove_interaction(interaction):
+    paths = [Path(item.file_path) for item in interaction.attachments]
+    completed_events = db.session.scalars(
+        db.select(CalendarEvent).where(
+            CalendarEvent.completed_by_interaction_id == interaction.id
+        )
+    ).all()
+    for event in completed_events:
+        event.completed_by_interaction_id = None
+    if interaction.calendar_event is not None:
+        if interaction.calendar_event.external_uid:
+            interaction.calendar_event.source_interaction_id = None
+            interaction.calendar_event.status = "cancelled"
+        else:
+            db.session.delete(interaction.calendar_event)
+    db.session.delete(interaction)
+    return paths
+
+
+def reschedule_interaction_event(client, interaction):
+    planned_local, date_suffix_found, is_important = parse_planning_details(
+        interaction.text
+    )
+    calendar_event = interaction.calendar_event
+    if planned_local:
+        starts_at = local_to_utc_naive(planned_local.isoformat(timespec="minutes"))
+        if calendar_event is None:
+            calendar_event = CalendarEvent(
+                client_id=client.id,
+                source_interaction_id=interaction.id,
+                origin="interaction",
+                event_type="task",
+                status="overdue" if starts_at < utcnow() else "planned",
+            )
+            db.session.add(calendar_event)
+        calendar_event.starts_at = starts_at
+        calendar_event.comment = ""
+        calendar_event.is_important = is_important
+        if calendar_event.status != "completed":
+            calendar_event.status = "overdue" if starts_at < utcnow() else "planned"
+    elif calendar_event is not None:
+        if calendar_event.external_uid:
+            calendar_event.status = "cancelled"
+        else:
+            db.session.delete(calendar_event)
+    return planned_local, date_suffix_found
 
 
 @bp.get("/")
@@ -239,13 +323,13 @@ def detail(client_id):
         .where(Interaction.client_id == client.id)
         .order_by(Interaction.created_at)
     ).all()
+    now = utcnow()
     return render_template(
         "clients/detail.html",
         client=client,
         interactions=interactions,
-        interaction_text=normalize_interaction_text("", utcnow()),
+        history_text=build_history_text(interactions, now),
         interaction_token=uuid4().hex,
-        new_interaction_date=utcnow(),
         client_categories=CLIENT_GROUP_LABELS,
     )
 
@@ -396,6 +480,65 @@ def delete_permanently(client_id):
     return redirect(url_for("clients.index", archived=1))
 
 
+@bp.post("/<int:client_id>/history")
+@login_required
+def save_history(client_id):
+    client = get_client_or_404(client_id)
+    interactions = db.session.scalars(
+        db.select(Interaction)
+        .where(Interaction.client_id == client.id)
+        .order_by(Interaction.created_at)
+    ).all()
+    submitted_text = request.form.get("history_text", "")
+    files = request.files.getlist("files")
+    try:
+        if request.form.get("history_ids", "") != ",".join(
+            str(item.id) for item in interactions
+        ):
+            raise ValueError("История изменилась. Обновите страницу перед сохранением.")
+        updates, new_text = parse_history_text(submitted_text, interactions, utcnow())
+        apply_client_workflow_form(client)
+        deleted_paths = []
+        for interaction, updated_text in zip(interactions, updates):
+            if updated_text is None:
+                deleted_paths.extend(remove_interaction(interaction))
+                continue
+            if interaction.text != updated_text:
+                interaction.text = updated_text
+                reschedule_interaction_event(client, interaction)
+        submission_token = request.form.get("submission_token", "").strip()
+        already_saved = submission_token and db.session.scalar(
+            db.select(Interaction).where(Interaction.submission_token == submission_token)
+        )
+        if (interaction_text_body(new_text) or any(item.filename for item in files)) and not already_saved:
+            if not re.fullmatch(r"[A-Za-z0-9_-]{16,64}", submission_token):
+                submission_token = uuid4().hex
+            interaction, _, _, _ = add_interaction(
+                client, new_text, submission_token=submission_token
+            )
+            save_uploads(files, client.id, interaction.id)
+        complete_due_quarterly_events(client.id)
+        regenerate_quarterly_events(
+            client, after_date=utc_naive_to_local(utcnow()).date()
+        )
+        db.session.commit()
+        for path in deleted_paths:
+            path.unlink(missing_ok=True)
+    except ValueError as error:
+        db.session.rollback()
+        flash(str(error), "error")
+        return render_template(
+            "clients/detail.html",
+            client=client,
+            interactions=interactions,
+            history_text=submitted_text,
+            interaction_token=request.form.get("submission_token", uuid4().hex),
+            client_categories=CLIENT_GROUP_LABELS,
+        ), 400
+    flash("История клиента сохранена.", "success")
+    return redirect(url_for("clients.detail", client_id=client.id))
+
+
 @bp.post("/<int:client_id>/interactions")
 @login_required
 def create_interaction(client_id):
@@ -477,35 +620,9 @@ def edit_interaction(client_id, interaction_id):
             interaction.interaction_type = (
                 interaction_type if interaction_type in INTERACTION_TYPES else "call"
             )
-            planned_local, date_suffix_found, is_important = parse_planning_details(
-                interaction.text
+            planned_local, date_suffix_found = reschedule_interaction_event(
+                client, interaction
             )
-            calendar_event = interaction.calendar_event
-            if planned_local:
-                starts_at = local_to_utc_naive(
-                    planned_local.isoformat(timespec="minutes")
-                )
-                if calendar_event is None:
-                    calendar_event = CalendarEvent(
-                        client_id=client.id,
-                        source_interaction_id=interaction.id,
-                        origin="interaction",
-                        event_type="task",
-                        status="overdue" if starts_at < utcnow() else "planned",
-                    )
-                    db.session.add(calendar_event)
-                calendar_event.starts_at = starts_at
-                calendar_event.comment = ""
-                calendar_event.is_important = is_important
-                if calendar_event.status != "completed":
-                    calendar_event.status = (
-                        "overdue" if starts_at < utcnow() else "planned"
-                    )
-            elif calendar_event is not None:
-                if calendar_event.external_uid:
-                    calendar_event.status = "cancelled"
-                else:
-                    db.session.delete(calendar_event)
             if request.form.get("workflow_fields_present"):
                 complete_due_quarterly_events(client.id)
                 regenerate_quarterly_events(
@@ -547,21 +664,7 @@ def delete_interaction(client_id, interaction_id):
     interaction = db.get_or_404(Interaction, interaction_id)
     if interaction.client_id != client.id:
         abort(404)
-    paths = [Path(item.file_path) for item in interaction.attachments]
-    completed_events = db.session.scalars(
-        db.select(CalendarEvent).where(
-            CalendarEvent.completed_by_interaction_id == interaction.id
-        )
-    ).all()
-    for event in completed_events:
-        event.completed_by_interaction_id = None
-    if interaction.calendar_event is not None:
-        if interaction.calendar_event.external_uid:
-            interaction.calendar_event.source_interaction_id = None
-            interaction.calendar_event.status = "cancelled"
-        else:
-            db.session.delete(interaction.calendar_event)
-    db.session.delete(interaction)
+    paths = remove_interaction(interaction)
     db.session.commit()
     for path in paths:
         path.unlink(missing_ok=True)

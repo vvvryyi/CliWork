@@ -152,6 +152,105 @@ document.querySelectorAll("textarea[data-dated-interaction]").forEach((source) =
     source.form?.addEventListener("submit", () => syncSource(true));
 });
 
+document.querySelectorAll("textarea[data-history-editor]").forEach((editor) => {
+    const divider = "\n\u2063";
+    const dots = editor.parentElement.querySelector(".client-history-dots");
+    const mirror = document.createElement("div");
+    mirror.className = "client-history-mirror";
+    editor.parentElement.append(mirror);
+    let datePositions = [];
+
+    const paintDots = () => {
+        const visibleDots = datePositions.map((position) => {
+            const dot = document.createElement("span");
+            dot.className = "client-history-dot";
+            dot.style.top = `${position - editor.scrollTop}px`;
+            return dot;
+        });
+        dots.replaceChildren(...visibleDots);
+    };
+
+    const layoutDots = () => {
+        const style = window.getComputedStyle(editor);
+        mirror.style.width = `${editor.clientWidth}px`;
+        mirror.style.boxSizing = "border-box";
+        mirror.style.padding = style.padding;
+        mirror.style.font = style.font;
+        mirror.style.lineHeight = style.lineHeight;
+        mirror.style.letterSpacing = style.letterSpacing;
+        mirror.style.tabSize = style.tabSize;
+        mirror.style.whiteSpace = style.whiteSpace;
+        mirror.style.overflowWrap = style.overflowWrap;
+        mirror.style.wordBreak = style.wordBreak;
+        mirror.textContent = editor.value;
+        const content = mirror.firstChild;
+        const mirrorTop = mirror.getBoundingClientRect().top;
+        datePositions = [];
+        if (content) {
+            const range = document.createRange();
+            let offset = 0;
+            editor.value.split("\n").forEach((line) => {
+                for (const match of line.matchAll(/\d{6}/g)) {
+                    range.setStart(content, offset + match.index);
+                    range.setEnd(content, offset + match.index + 1);
+                    const rect = range.getBoundingClientRect();
+                    const position = rect.top - mirrorTop + rect.height / 2;
+                    if (!datePositions.some((existing) => Math.abs(existing - position) < 2)) {
+                        datePositions.push(position);
+                    }
+                }
+                offset += line.length + 1;
+            });
+        }
+        paintDots();
+    };
+
+    const historyIds = editor.form?.elements.namedItem("history_ids")?.value || "";
+    const expectedSections = historyIds ? historyIds.split(",").length + 1 : 1;
+    let validValue = editor.value;
+    let previousCaret = editor.selectionStart;
+    editor.addEventListener("beforeinput", () => { previousCaret = editor.selectionStart; });
+    editor.addEventListener("input", () => {
+        if (editor.value.split(divider).length !== expectedSections) {
+            editor.value = validValue;
+            editor.setSelectionRange(previousCaret, previousCaret);
+        } else {
+            validValue = editor.value;
+        }
+        layoutDots();
+    });
+    editor.addEventListener("scroll", paintDots);
+    if (window.ResizeObserver) new ResizeObserver(layoutDots).observe(editor);
+    window.addEventListener("resize", layoutDots);
+    layoutDots();
+
+    const focusRecord = (id) => {
+        const ids = historyIds ? historyIds.split(",") : [];
+        const index = ids.indexOf(id);
+        if (index < 0) return;
+        const sections = editor.value.split(divider);
+        const section = sections[index];
+        if (!section) return;
+        const start = sections.slice(0, index).reduce(
+            (offset, section) => offset + section.length + divider.length, 0,
+        );
+        const bodyStart = section.indexOf("\n") + 1;
+        const selectionStart = bodyStart && section.slice(bodyStart).trim()
+            ? start + bodyStart : start;
+        editor.focus();
+        editor.setSelectionRange(selectionStart, start + section.length);
+    };
+    editor.form?.querySelectorAll("[data-history-edit]").forEach((button) => {
+        button.addEventListener("click", () => focusRecord(button.dataset.historyEdit));
+    });
+    const focusLinkedRecord = () => {
+        const match = window.location.hash.match(/^#interaction-(\d+)$/);
+        if (match) focusRecord(match[1]);
+    };
+    window.addEventListener("hashchange", focusLinkedRecord);
+    focusLinkedRecord();
+});
+
 const searchDialog = document.querySelector("[data-search-dialog]");
 const searchInput = searchDialog?.querySelector("[data-search-input]");
 const searchForm = searchDialog?.querySelector("[data-search-form]");

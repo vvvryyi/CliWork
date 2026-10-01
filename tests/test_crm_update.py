@@ -21,7 +21,7 @@ def test_client_and_note_redirects(app, auth_client, sample_client):
     assert note_save.headers["Location"].endswith("/clients/")
 
 
-def test_opening_card_adds_a_fresh_dated_row_below_history(app, auth_client, sample_client, monkeypatch):
+def test_opening_card_adds_a_fresh_dated_section_to_history(app, auth_client, sample_client, monkeypatch):
     import app.clients as clients_module
 
     fixed_now = datetime(2026, 9, 18, 9)
@@ -32,8 +32,8 @@ def test_opening_card_adds_a_fresh_dated_row_below_history(app, auth_client, sam
 
     page = auth_client.get(f"/clients/{sample_client}")
     assert "Старый текст 261201".encode() in page.data
-    assert b">260918 </textarea>" in page.data
-    assert page.data.index("Старый текст 261201".encode()) < page.data.index(b">260918 </textarea>")
+    assert "\n\u2063260918 </textarea>".encode() in page.data
+    assert page.data.index("Старый текст 261201".encode()) < page.data.index(b"260918 </textarea>")
     with app.app_context():
         assert db.session.get(Interaction, 1).text.startswith("250101")
 
@@ -105,7 +105,7 @@ def test_quarterly_dates_keep_original_day_after_short_month():
     assert add_months(date(2028, 2, 29), 3, 30) == date(2028, 5, 30)
 
 
-def test_rescheduling_removes_client_from_dashboard_overdue_list(app, auth_client, sample_client):
+def test_rescheduling_clears_dashboard_overdue_contact_alert(app, auth_client, sample_client):
     with app.app_context():
         db.session.add_all(
             [
@@ -130,13 +130,14 @@ def test_rescheduling_removes_client_from_dashboard_overdue_list(app, auth_clien
         db.session.commit()
 
     before = auth_client.get("/")
-    assert b"overdue-client-panel" in before.data
+    assert b"stat-card-alert" in before.data
     auth_client.post(
         f"/clients/{sample_client}/interactions",
         data={"text": "Новая запись и дата 311231", "workflow_fields_present": "1"},
     )
     after = auth_client.get("/")
-    assert "Иван Петров".encode() not in after.data
+    assert b"stat-card-alert" not in after.data
+    assert b'<span class="stat-value">0</span>' in after.data
     with app.app_context():
         old_event = db.session.get(CalendarEvent, 1)
         assert old_event.status == "completed"
@@ -366,7 +367,7 @@ def test_dashboard_counts_only_open_general_tasks(auth_client):
     assert '<span class="stat-value">1</span>' in all_tasks_card
 
 
-def test_dashboard_open_task_has_calendar_arrow_but_completed_task_does_not(
+def test_daily_task_open_row_has_calendar_arrow_but_completed_row_does_not(
     app, auth_client, monkeypatch
 ):
     import app.main as main_module
@@ -385,15 +386,14 @@ def test_dashboard_open_task_has_calendar_arrow_but_completed_task_does_not(
         },
     ).get_json()
 
-    page = auth_client.get("/").data.decode()
-    open_row = page.split("Открытое дело", 1)[1][:500]
-    completed_row = page.split("Готовое дело", 1)[1][:500]
-    assert open_task["calendar_url"] in open_row
-    assert completed_task["calendar_url"] not in completed_row
-    assert '<details class="panel dashboard-collapsible" open' not in page
+    page = auth_client.get("/tasks/?date=2026-09-24").data.decode()
+    open_row = page.split(f'data-task-id="{open_task["task_id"]}"', 1)[1].split("data-task-row", 1)[0]
+    completed_row = page.split(f'data-task-id="{completed_task["task_id"]}"', 1)[1].split("data-task-row", 1)[0]
+    assert f'href="{open_task["calendar_url"]}"' in open_row
+    assert 'class="task-calendar-link is-hidden"' in completed_row
 
 
-def test_dashboard_contacts_due_today_turn_red_only_the_next_day(
+def test_dashboard_contact_card_turns_red_when_a_contact_is_overdue(
     app, auth_client, sample_client, monkeypatch
 ):
     import app.main as main_module
@@ -422,10 +422,10 @@ def test_dashboard_contacts_due_today_turn_red_only_the_next_day(
         db.session.commit()
 
     page = auth_client.get("/").data.decode()
-    today_row = page.split("Иван Петров", 1)[0].rsplit('<a class="list-item ', 1)[1]
-    overdue_row = page.split("Вчерашний клиент", 1)[0].rsplit('<a class="list-item ', 1)[1]
-    assert "event-important" not in today_row
-    assert "event-important" in overdue_row
+    assert '<a class="stat-card stat-card-alert" href="/clients/">' in page
+    assert '<span class="stat-value">2</span>' in page
+    assert "Иван Петров" not in page
+    assert "Вчерашний клиент" not in page
 
 
 class FakeRemoteEvent:

@@ -179,7 +179,7 @@ def test_past_planned_event_becomes_overdue(app, auth_client, sample_client):
         assert db.session.scalar(db.select(CalendarEvent)).status == "overdue"
 
 
-def test_dashboard_shows_only_todays_daily_tasks(app, auth_client, sample_client, monkeypatch):
+def test_dashboard_counts_only_todays_daily_tasks(app, auth_client, sample_client, monkeypatch):
     import app.main as main_module
 
     fixed_now = datetime(2026, 9, 9, 12, 0)
@@ -201,10 +201,11 @@ def test_dashboard_shows_only_todays_daily_tasks(app, auth_client, sample_client
         db.session.commit()
 
     response = auth_client.get("/")
-    assert "Сегодня".encode() in response.data
+    assert b'<span class="stat-value">1</span>' in response.data
+    assert "Сегодня".encode() not in response.data
     assert "Вчера".encode() not in response.data
     assert "Клиентское событие".encode() not in response.data
-    assert "Дела на сегодня".encode() in response.data
+    assert b'panel dashboard-collapsible' not in response.data
 
 
 def test_prepare_and_confirm_message(app, auth_client, sample_client):

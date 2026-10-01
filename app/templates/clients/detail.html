@@ -54,10 +54,11 @@
     </aside>
 
     <section>
-        <form class="panel form-stack" method="post" action="{{ url_for('clients.create_interaction', client_id=client.id) }}" enctype="multipart/form-data" data-disable-on-submit>
+        <form class="panel form-stack" method="post" action="{{ url_for('clients.save_history', client_id=client.id) }}" enctype="multipart/form-data" data-disable-on-submit>
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <input type="hidden" name="workflow_fields_present" value="1">
             <input type="hidden" name="submission_token" value="{{ interaction_token }}">
+            <input type="hidden" name="history_ids" value="{{ interactions|map(attribute='id')|join(',') }}">
             <div class="client-workflow client-workflow-panel">
                 <div>
                     <span class="field-label">Отметки</span>
@@ -79,42 +80,39 @@
                     <input name="quarterly_reminder_mmdd" value="{{ client.quarterly_reminder_mmdd }}" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" placeholder="ММДД">
                 </label>
             </div>
-            {% if interactions %}
-                <div class="timeline client-history">
-                    {% for interaction in interactions %}
-                        <article class="timeline-item" id="interaction-{{ interaction.id }}">
-                            <time class="timeline-date">{{ interaction.created_at|history_date }}</time>
-                            <div class="timeline-card">
-                                <p class="pre-wrap">{{ interaction.text|interaction_body }}</p>
-                                {% if interaction.attachments %}
-                                    <div class="attachment-list">
-                                        {% for attachment in interaction.attachments %}
-                                            <a class="attachment" href="{{ url_for('clients.download_attachment', attachment_id=attachment.id) }}">📎 {{ attachment.original_name }}</a>
-                                        {% endfor %}
-                                    </div>
-                                {% endif %}
-                                <div class="inline-actions">
-                                    <a href="{{ url_for('clients.edit_interaction', client_id=client.id, interaction_id=interaction.id) }}">Редактировать</a>
-                                    <button class="link-danger" type="submit" formmethod="post" formaction="{{ url_for('clients.delete_interaction', client_id=client.id, interaction_id=interaction.id) }}" data-confirm-button="Удалить эту запись из истории клиента?">Удалить</button>
-                                </div>
-                            </div>
-                        </article>
-                    {% endfor %}
+            <div class="timeline client-history">
+                <label class="sr-only" for="history-editor">История клиента</label>
+                <div class="client-history-editor">
+                    <div class="client-history-dots" aria-hidden="true"></div>
+                    <textarea id="history-editor" class="client-history-items" name="history_text" aria-label="История клиента" data-history-editor>{{ history_text }}</textarea>
                 </div>
-            {% endif %}
-            <label class="client-entry-field">
-                <span class="sr-only">Запись о клиенте</span>
-                <textarea name="text" rows="5" placeholder="Добавьте новую запись о работе с клиентом" data-dated-interaction data-current-date="{{ new_interaction_date|history_date }}">{{ interaction_text }}</textarea>
-                <small>Дату следующего действия укажите в конце записи: ГГММДД, при необходимости время ЧЧ:ММ и ! для важного дела.</small>
-            </label>
-            <div class="compact-upload">
-                <label class="button button-small">
-                    📎 Выбрать файлы
-                    <input name="files" type="file" multiple data-file-input>
-                </label>
-                <small data-file-status>До 20 МБ</small>
+                {% if interactions %}
+                    <div class="client-history-record-actions">
+                    {% for interaction in interactions %}
+                        <div class="client-history-record" id="interaction-{{ interaction.id }}">
+                            <span>Запись {{ loop.index }}</span>
+                            <span class="client-history-record-summary">{{ interaction.text|interaction_body|truncate(40) }}</span>
+                            {% for attachment in interaction.attachments %}
+                                <a class="attachment" href="{{ url_for('clients.download_attachment', attachment_id=attachment.id) }}">📎 {{ attachment.original_name }}</a>
+                            {% endfor %}
+                            <button class="link-button" type="button" data-history-edit="{{ interaction.id }}">Редактировать</button>
+                        </div>
+                    {% endfor %}
+                    </div>
+                {% endif %}
+                <div class="client-history-compose">
+                    <div class="client-history-compose-actions">
+                        <div class="compact-upload">
+                            <label class="button button-small">
+                                📎 Выбрать файлы
+                                <input name="files" type="file" multiple data-file-input>
+                            </label>
+                            <small data-file-status>До 20 МБ</small>
+                        </div>
+                        <button class="button button-primary" type="submit">Сохранить</button>
+                    </div>
+                </div>
             </div>
-            <div><button class="button button-primary" type="submit">Сохранить</button></div>
         </form>
     </section>
 </div>

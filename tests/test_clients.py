@@ -1,3 +1,4 @@
+import html
 import re
 from datetime import datetime
 from io import BytesIO
@@ -53,7 +54,7 @@ def test_create_client_with_interaction_and_next_action(app, auth_client):
         assert utc_naive_to_local(event.starts_at).strftime("%y%m%d %H:%M") == "260920 14:30"
 
 
-def test_client_card_shows_history_and_opens_a_new_note_below_it(
+def test_client_history_is_one_editor_and_saves_old_and_new_entries(
     app, auth_client, sample_client
 ):
     original_text = "Строка один\nСтрока два 260920"
@@ -64,24 +65,35 @@ def test_client_card_shows_history_and_opens_a_new_note_below_it(
 
     detail = auth_client.get(f"/clients/{sample_client}")
     assert b'class="timeline client-history"' in detail.data
-    assert f'<textarea name="text" rows="5"'.encode() in detail.data
+    assert detail.data.count(b"<textarea") == 1
+    assert b'name="history_text"' in detail.data
+    assert b"data-history-editor" in detail.data
+    assert b"data-dated-interaction" not in detail.data
     assert original_text.encode() in detail.data
-    assert f'action="/clients/{sample_client}/interactions"'.encode() in detail.data
-    assert f'formaction="/clients/{sample_client}/interactions/1/delete"'.encode() in detail.data
+    assert f'action="/clients/{sample_client}/history"'.encode() in detail.data
+    assert 'data-history-edit="1">Редактировать</button>'.encode() in detail.data
+    assert "Новую запись добавьте внизу истории".encode() not in detail.data
     assert detail.data.count(b"<form") == detail.data.count(b"</form>")
-    assert detail.data.index(original_text.encode()) < detail.data.index(b'<textarea name="text"')
-
-    updated_text = "Новая запись\nСледующий шаг 260921 11:00"
-    auth_client.post(
-        f"/clients/{sample_client}/interactions",
-        data={"text": updated_text},
+    history_text = html.unescape(
+        re.search(rb'<textarea id="history-editor"[^>]*>(.*?)</textarea>', detail.data, re.S)
+        .group(1)
+        .decode()
     )
+    assert "──────────" not in history_text
+    assert "\n\u2063" in history_text
+    updated_text = "Новая запись\nСледующий шаг 260921 11:00"
+    history_text = history_text.replace("Строка один", "Исправленная строка") + updated_text
+    response = auth_client.post(
+        f"/clients/{sample_client}/history",
+        data={"history_ids": "1", "history_text": history_text},
+    )
+    assert response.status_code == 302
     with app.app_context():
         interactions = db.session.scalars(
             db.select(Interaction).order_by(Interaction.id)
         ).all()
         assert len(interactions) == 2
-        assert interactions[0].text.endswith(original_text)
+        assert interactions[0].text.endswith("Исправленная строка\nСтрока два 260920")
         assert interactions[1].text.endswith(updated_text)
 
 
@@ -197,8 +209,115 @@ def test_history_uses_compact_date(auth_client, sample_client):
     response = auth_client.get(f"/clients/{sample_client}")
     assert response.status_code == 200
     assert "Новая запись".encode() in response.data
-    assert re.search(rb'class="timeline-date">\d{6}</time>', response.data)
-    assert re.search(rb'<textarea[^>]+>\d{6} </textarea>', response.data)
+    assert re.search(rb'<textarea id="history-editor"[^>]+>\d{6}\n', response.data)
+    assert "──────────".encode() not in response.data
+    assert "\n\u2063".encode() in response.data
+    assert re.search(rb'\d{6} </textarea>', response.data)
+
+
+def test_inline_history_edit_keeps_record_date_and_updates_its_event(
+    app, auth_client, sample_client
+):
+    auth_client.post(
+        f"/clients/{sample_client}/interactions",
+        data={"text": "Следующий шаг 301201"},
+    )
+    with app.app_context():
+        original = db.session.scalar(db.select(Interaction))
+        created_at = original.created_at
+        original_prefix = original.text.split(" ", 1)[0]
+        event_id = original.calendar_event.id
+
+    detail = auth_client.get(f"/clients/{sample_client}")
+    history_text = html.unescape(
+        re.search(rb'<textarea id="history-editor"[^>]*>(.*?)</textarea>', detail.data, re.S)
+        .group(1)
+        .decode()
+    ).replace("Следующий шаг 301201", "Исправленный шаг 301202 14:00!")
+    response = auth_client.post(
+        f"/clients/{sample_client}/history",
+        data={"history_ids": "1", "history_text": history_text},
+    )
+    assert response.status_code == 302
+    with app.app_context():
+        interaction = db.session.get(Interaction, 1)
+        event = db.session.get(CalendarEvent, event_id)
+        assert interaction.created_at == created_at
+        assert interaction.text == f"{original_prefix} Исправленный шаг 301202 14:00!"
+        saved_text = interaction.text
+        assert utc_naive_to_local(event.starts_at).strftime("%y%m%d %H:%M") == "301202 14:00"
+        assert event.is_important is True
+
+    invalid = auth_client.post(
+        f"/clients/{sample_client}/history",
+        data={"history_ids": "1", "history_text": "260101\nПовреждённая история"},
+    )
+    assert invalid.status_code == 400
+    with app.app_context():
+        assert db.session.get(Interaction, 1).text == saved_text
+
+
+def test_clearing_history_entry_removes_record_event_and_attachment(
+    app, auth_client, sample_client
+):
+    auth_client.post(
+        f"/clients/{sample_client}/interactions",
+        data={
+            "text": "Созвон 301201",
+            "files": (BytesIO(b"note"), "note.txt"),
+        },
+        content_type="multipart/form-data",
+    )
+    with app.app_context():
+        interaction = db.session.scalar(db.select(Interaction))
+        attachment_path = Path(interaction.attachments[0].file_path)
+        assert attachment_path.exists()
+
+    detail = auth_client.get(f"/clients/{sample_client}")
+    history_text = html.unescape(
+        re.search(rb'<textarea id="history-editor"[^>]*>(.*?)</textarea>', detail.data, re.S)
+        .group(1)
+        .decode()
+    ).replace("Созвон 301201", "")
+    response = auth_client.post(
+        f"/clients/{sample_client}/history",
+        data={"history_ids": "1", "history_text": history_text},
+    )
+    assert response.status_code == 302
+    with app.app_context():
+        assert db.session.get(Interaction, 1) is None
+        assert db.session.scalar(db.select(CalendarEvent)) is None
+    assert not attachment_path.exists()
+
+
+def test_unchanged_attachment_only_history_entry_is_kept(app, auth_client, sample_client):
+    auth_client.post(
+        f"/clients/{sample_client}/interactions",
+        data={"text": "", "files": (BytesIO(b"note"), "note.txt")},
+        content_type="multipart/form-data",
+    )
+    detail = auth_client.get(f"/clients/{sample_client}")
+    history_text = html.unescape(
+        re.search(rb'<textarea id="history-editor"[^>]*>(.*?)</textarea>', detail.data, re.S)
+        .group(1)
+        .decode()
+    )
+    response = auth_client.post(
+        f"/clients/{sample_client}/history",
+        data={"history_ids": "1", "history_text": history_text},
+    )
+    assert response.status_code == 302
+    with app.app_context():
+        assert db.session.get(Interaction, 1) is not None
+
+    cleared = "\n\u2063" + history_text.split("\n\u2063", 1)[1]
+    response = auth_client.post(
+        f"/clients/{sample_client}/history",
+        data={"history_ids": "1", "history_text": cleared},
+    )
+    assert response.status_code == 302
+    with app.app_context():
+        assert db.session.get(Interaction, 1) is None
 
 
 def test_client_list_is_grouped_and_only_shows_names(auth_client, sample_client):
@@ -323,7 +442,7 @@ def test_client_categories_are_in_one_row_and_mutually_exclusive(
         assert db.session.get(Client, sample_client).client_group == "a"
 
     listing = auth_client.get("/clients/")
-    labels = ("Д", "Б", "Р", "М", "П", "А", "Н")
+    labels = ("Д", "Б", "В", "Р", "М", "П", "А", "Н")
     for label in labels:
         assert f"<span>{label}</span>".encode() in listing.data
     positions = [listing.data.index(f"<span>{label}</span>".encode()) for label in labels]
@@ -333,6 +452,19 @@ def test_client_categories_are_in_one_row_and_mutually_exclusive(
     assert b'id="client-segment-a" data-client-segment-dialog' in listing.data
     assert f'href="/clients/{sample_client}"'.encode() in listing.data
     assert "Иван Петров".encode() in listing.data
+
+    detail = auth_client.get(f"/clients/{sample_client}")
+    assert b'<option value="b"' in detail.data
+    auth_client.post(
+        f"/clients/{sample_client}/group", data={"group": "b"}
+    )
+    with app.app_context():
+        assert db.session.get(Client, sample_client).client_group == "b"
+    listing = auth_client.get("/clients/")
+    assert b'data-client-segment-open="client-segment-b"' in listing.data
+    assert b'id="client-segment-b" data-client-segment-dialog' in listing.data
+    assert f'href="/clients/{sample_client}"'.encode() in listing.data
+    assert "Группа В".encode() in auth_client.get(f"/clients/{sample_client}").data
 
     auth_client.post(
         f"/clients/{sample_client}/group", data={"group": "p"}

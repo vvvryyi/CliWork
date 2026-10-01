@@ -25,6 +25,7 @@ MONTH_NAMES = (
     "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
     "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь",
 )
+WEEKDAY_ABBREVIATIONS = ("пн.", "вт.", "ср.", "чт.", "пт.", "сб.", "вс.")
 
 
 def parse_date(value, fallback=None):
@@ -138,6 +139,7 @@ def index():
         "calendar/index.html",
         view=view,
         selected_date=selected_date,
+        weekday_abbreviation=WEEKDAY_ABBREVIATIONS[selected_date.weekday()],
         first_day=first_day,
         last_day=last_day,
         weeks=weeks,

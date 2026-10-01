@@ -25,7 +25,7 @@
             <span class="icon-button is-disabled" aria-hidden="true">←</span>
         {% endif %}
         <strong>
-            {% if view == "day" %}{{ selected_date.strftime("%d.%m.%Y") }}
+            {% if view == "day" %}{{ weekday_abbreviation }} {{ selected_date.strftime("%d.%m.%Y") }}
             {% elif view == "week" %}{{ first_day.strftime("%d.%m") }} — {{ last_day.strftime("%d.%m.%Y") }}
             {% elif view == "month" %}{{ first_day.strftime("%m.%Y") }}
             {% else %}{{ selected_date.year }} год{% endif %}
