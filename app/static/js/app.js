@@ -240,8 +240,8 @@ document.querySelectorAll("textarea[data-history-editor]").forEach((editor) => {
         editor.focus();
         editor.setSelectionRange(selectionStart, start + section.length);
     };
-    editor.form?.querySelectorAll("[data-history-edit]").forEach((button) => {
-        button.addEventListener("click", () => focusRecord(button.dataset.historyEdit));
+    editor.form?.querySelector("[data-history-edit]")?.addEventListener("click", () => {
+        editor.focus();
     });
     const focusLinkedRecord = () => {
         const match = window.location.hash.match(/^#interaction-(\d+)$/);

@@ -86,18 +86,13 @@
                     <div class="client-history-dots" aria-hidden="true"></div>
                     <textarea id="history-editor" class="client-history-items" name="history_text" aria-label="История клиента" data-history-editor>{{ history_text }}</textarea>
                 </div>
-                {% if interactions %}
-                    <div class="client-history-record-actions">
-                    {% for interaction in interactions %}
-                        <div class="client-history-record" id="interaction-{{ interaction.id }}">
-                            <span>Запись {{ loop.index }}</span>
-                            <span class="client-history-record-summary">{{ interaction.text|interaction_body|truncate(40) }}</span>
+                {% if interactions|selectattr('attachments')|list %}
+                    <div class="attachment-list">
+                        {% for interaction in interactions %}
                             {% for attachment in interaction.attachments %}
                                 <a class="attachment" href="{{ url_for('clients.download_attachment', attachment_id=attachment.id) }}">📎 {{ attachment.original_name }}</a>
                             {% endfor %}
-                            <button class="link-button" type="button" data-history-edit="{{ interaction.id }}">Редактировать</button>
-                        </div>
-                    {% endfor %}
+                        {% endfor %}
                     </div>
                 {% endif %}
                 <div class="client-history-compose">
@@ -109,6 +104,7 @@
                             </label>
                             <small data-file-status>До 20 МБ</small>
                         </div>
+                        <button class="button button-small" type="button" data-history-edit>Редактировать</button>
                         <button class="button button-primary" type="submit">Сохранить</button>
                     </div>
                 </div>

@@ -71,7 +71,9 @@ def test_client_history_is_one_editor_and_saves_old_and_new_entries(
     assert b"data-dated-interaction" not in detail.data
     assert original_text.encode() in detail.data
     assert f'action="/clients/{sample_client}/history"'.encode() in detail.data
-    assert 'data-history-edit="1">Редактировать</button>'.encode() in detail.data
+    assert detail.data.count(b"data-history-edit>") == 1
+    assert b"client-history-record-actions" not in detail.data
+    assert "Запись 1".encode() not in detail.data
     assert "Новую запись добавьте внизу истории".encode() not in detail.data
     assert detail.data.count(b"<form") == detail.data.count(b"</form>")
     history_text = html.unescape(
@@ -180,6 +182,8 @@ def test_interaction_with_attachment(
         assert len(interaction.attachments) == 1
         attachment_id = interaction.attachments[0].id
 
+    detail = auth_client.get(f"/clients/{sample_client}")
+    assert f'href="/clients/attachments/{attachment_id}"'.encode() in detail.data
     response = auth_client.get(f"/clients/attachments/{attachment_id}")
     assert response.status_code == 200
     assert response.data == b"test document"
