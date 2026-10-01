@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}{{ client.full_name }} — Персональная CRM{% endblock %}
 {% block content %}
-<div class="page-heading">
+<div class="page-heading client-detail-heading">
     <div>
         <a class="back-link" href="{{ url_for('clients.index') }}">← Клиенты</a>
         <div class="title-with-avatar">
@@ -54,7 +54,7 @@
     </aside>
 
     <section>
-        <form class="panel form-stack" method="post" action="{{ url_for('clients.save_history', client_id=client.id) }}" enctype="multipart/form-data" data-disable-on-submit>
+        <form class="panel form-stack client-detail-form" method="post" action="{{ url_for('clients.save_history', client_id=client.id) }}" enctype="multipart/form-data" data-disable-on-submit>
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <input type="hidden" name="workflow_fields_present" value="1">
             <input type="hidden" name="submission_token" value="{{ interaction_token }}">
