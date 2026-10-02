@@ -6,7 +6,7 @@
         <span class="stat-value">{{ task_count }}</span>
         <span class="stat-label">Дела</span>
     </a>
-    <a class="stat-card {% if overdue_contact_ids %}stat-card-alert{% endif %}" href="{{ url_for('clients.index') }}">
+    <a class="stat-card {% if overdue_contact_ids %}stat-card-alert{% endif %}" href="{{ url_for('clients.contacts_today') }}">
         <span class="stat-value">{{ contact_count }}</span>
         <span class="stat-label">Связаться сегодня</span>
     </a>

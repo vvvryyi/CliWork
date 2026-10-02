@@ -86,6 +86,7 @@ class Interaction(TimestampMixin, db.Model):
         db.Integer, db.ForeignKey("clients.id"), nullable=False, index=True
     )
     text = db.Column(db.Text, nullable=False, default="")
+    show_history_date = db.Column(db.Boolean, nullable=False, default=True)
     interaction_type = db.Column(db.String(30), nullable=False, default="call")
     channel = db.Column(db.String(30), nullable=False, default="")
     delivery_status = db.Column(db.String(30), nullable=False, default="")
@@ -228,6 +229,7 @@ class GeneralTask(TimestampMixin, db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     text = db.Column(db.String(500), nullable=False)
+    comment = db.Column(db.Text, nullable=False, default="")
     is_important = db.Column(db.Boolean, nullable=False, default=False)
     completed_at = db.Column(db.DateTime, nullable=True, index=True)
 

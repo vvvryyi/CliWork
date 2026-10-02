@@ -6,7 +6,7 @@ from pathlib import Path
 
 from app.extensions import db
 from app.models import CalendarEvent, Client, Interaction
-from app.utils import utc_naive_to_local
+from app.utils import interaction_text_body, utc_naive_to_local
 
 
 def test_create_client_form_replaces_notes_with_interaction_field(
@@ -259,6 +259,71 @@ def test_inline_history_edit_keeps_record_date_and_updates_its_event(
     assert invalid.status_code == 400
     with app.app_context():
         assert db.session.get(Interaction, 1).text == saved_text
+
+
+def test_history_date_can_be_removed_without_deleting_record_or_event(
+    app, auth_client, sample_client
+):
+    auth_client.post(
+        f"/clients/{sample_client}/interactions",
+        data={"text": "Позвонить 301201"},
+    )
+    with app.app_context():
+        interaction = db.session.get(Interaction, 1)
+        created_at = interaction.created_at
+        event_id = interaction.calendar_event.id
+
+    detail = auth_client.get(f"/clients/{sample_client}")
+    history_text = html.unescape(
+        re.search(rb'<textarea id="history-editor"[^>]*>(.*?)</textarea>', detail.data, re.S)
+        .group(1)
+        .decode()
+    )
+    history_text = history_text.split("\n", 1)[1]
+    response = auth_client.post(
+        f"/clients/{sample_client}/history",
+        data={"history_ids": "1", "history_text": history_text},
+    )
+    assert response.status_code == 302
+
+    with app.app_context():
+        interaction = db.session.get(Interaction, 1)
+        assert interaction.created_at == created_at
+        assert interaction.show_history_date is False
+        assert db.session.get(CalendarEvent, event_id) is not None
+
+    detail = auth_client.get(f"/clients/{sample_client}")
+    history_text = html.unescape(
+        re.search(rb'<textarea id="history-editor"[^>]*>(.*?)</textarea>', detail.data, re.S)
+        .group(1)
+        .decode()
+    )
+    assert history_text.startswith("Позвонить 301201")
+    edit_page = auth_client.get(f"/clients/{sample_client}/interactions/1/edit")
+    assert b"data-dated-interaction" not in edit_page.data
+    assert "<textarea name=\"text\" rows=\"7\" >Позвонить 301201</textarea>".encode() in edit_page.data
+
+
+def test_new_history_entry_can_be_saved_without_visible_date(
+    app, auth_client, sample_client
+):
+    response = auth_client.post(
+        f"/clients/{sample_client}/history",
+        data={"history_ids": "", "history_text": "Запись без даты"},
+    )
+    assert response.status_code == 302
+    with app.app_context():
+        interaction = db.session.scalar(db.select(Interaction))
+        assert interaction.show_history_date is False
+        assert interaction_text_body(interaction.text) == "Запись без даты"
+
+    detail = auth_client.get(f"/clients/{sample_client}")
+    history_text = html.unescape(
+        re.search(rb'<textarea id="history-editor"[^>]*>(.*?)</textarea>', detail.data, re.S)
+        .group(1)
+        .decode()
+    )
+    assert history_text.startswith("Запись без даты")
 
 
 def test_clearing_history_entry_removes_record_event_and_attachment(

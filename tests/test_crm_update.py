@@ -209,7 +209,7 @@ def test_all_tasks_is_a_separate_list_and_hides_completed_tasks(app, auth_client
     assert "Отдельное дело" in page
     assert "Завершенное отдельное дело" not in page
     assert daily_task["calendar_url"]
-    assert general_task["calendar_url"] == ""
+    assert general_task["calendar_url"] == f'/tasks/all/{general_task["task_id"]}'
     assert completed_general_task["completed"] is True
 
     with app.app_context():
@@ -393,6 +393,37 @@ def test_daily_task_open_row_has_calendar_arrow_but_completed_row_does_not(
     assert 'class="task-calendar-link is-hidden"' in completed_row
 
 
+def test_daily_task_arrow_is_orange_when_calendar_comment_has_text(app, auth_client):
+    commented = auth_client.post(
+        "/tasks/save", data={"text": "С комментарием", "due_date": "2026-09-24"}
+    ).get_json()
+    plain = auth_client.post(
+        "/tasks/save", data={"text": "Без комментария", "due_date": "2026-09-24"}
+    ).get_json()
+    assert commented["has_comment"] is False
+
+    with app.app_context():
+        task = db.session.get(DailyTask, commented["task_id"])
+        task.calendar_event.comment = "Подробности дела"
+        db.session.commit()
+
+    page = auth_client.get("/tasks/?date=2026-09-24").data.decode()
+    commented_row = page.split(f'data-task-id="{commented["task_id"]}"', 1)[1].split("data-task-row", 1)[0]
+    plain_row = page.split(f'data-task-id="{plain["task_id"]}"', 1)[1].split("data-task-row", 1)[0]
+    assert 'class="task-calendar-link has-comment"' in commented_row
+    assert "has-comment" not in plain_row
+
+    updated = auth_client.post(
+        "/tasks/save",
+        data={
+            "task_id": commented["task_id"],
+            "text": "С комментарием, обновлено",
+            "due_date": "2026-09-24",
+        },
+    ).get_json()
+    assert updated["has_comment"] is True
+
+
 def test_dashboard_contact_card_turns_red_when_a_contact_is_overdue(
     app, auth_client, sample_client, monkeypatch
 ):
@@ -422,7 +453,7 @@ def test_dashboard_contact_card_turns_red_when_a_contact_is_overdue(
         db.session.commit()
 
     page = auth_client.get("/").data.decode()
-    assert '<a class="stat-card stat-card-alert" href="/clients/">' in page
+    assert '<a class="stat-card stat-card-alert" href="/clients/contacts-today">' in page
     assert '<span class="stat-value">2</span>' in page
     assert "Иван Петров" not in page
     assert "Вчерашний клиент" not in page

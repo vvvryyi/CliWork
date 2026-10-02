@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Связаться сегодня — Персональная CRM{% endblock %}
+{% block content %}
+<div class="page-heading">
+    <div>
+        <p class="eyebrow">Клиенты</p>
+        <h1>Связаться сегодня</h1>
+    </div>
+    <a class="button" href="{{ url_for('clients.index') }}">Все клиенты</a>
+</div>
+
+<section class="panel">
+    {% if contact_events %}
+        <div class="agenda-list">
+            {% for event in contact_events %}
+                {% set event_date = (event.starts_at|local_datetime('%d.%m.%Y')) %}
+                <div class="agenda-item">
+                    <time>{{ event.starts_at|local_datetime('%H:%M') }}</time>
+                    <span class="event-dot event-{{ event.event_type }}"></span>
+                    <span>
+                        <strong><a href="{{ url_for('clients.detail', client_id=event.client_id) }}">{{ event.client.full_name }}</a></strong>
+                        <small>{% if event.starts_at|local_datetime('%Y-%m-%d') < today.isoformat() %}{{ event_date }} · Просрочено{% else %}Сегодня{% endif %}{% if event.title %} · {{ event.title }}{% endif %}</small>
+                    </span>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="empty-state">На сегодня нет клиентов, с которыми нужно связаться.</div>
+    {% endif %}
+</section>
+{% endblock %}

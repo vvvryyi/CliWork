@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Карточка дела — Персональная CRM{% endblock %}
+{% block content %}
+<div class="page-heading">
+    <div><a class="back-link" href="{{ url_for('tasks.all_tasks') }}">← Все дела</a><h1>Карточка дела</h1></div>
+</div>
+<form class="panel form-stack task-panel" method="post">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <label>
+        Название дела
+        <input name="text" maxlength="500" required value="{{ request.form.get('text', task.text) }}">
+    </label>
+    <label>
+        Комментарий
+        <textarea name="comment" rows="6">{{ request.form.get('comment', task.comment) }}</textarea>
+    </label>
+    <label class="task-detail-important"><input type="checkbox" name="important" value="1" {% if request.method == 'POST' and request.form.get('important') == '1' or request.method != 'POST' and task.is_important %}checked{% endif %}> Важно</label>
+    <div class="form-actions">
+        <button class="button button-primary" type="submit">Сохранить</button>
+        <a class="button button-ghost" href="{{ url_for('tasks.all_tasks') }}">Отмена</a>
+    </div>
+</form>
+{% endblock %}

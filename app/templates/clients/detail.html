@@ -86,6 +86,7 @@
                     <div class="client-history-dots" aria-hidden="true"></div>
                     <textarea id="history-editor" class="client-history-items" name="history_text" aria-label="История клиента" data-history-editor>{{ history_text }}</textarea>
                 </div>
+                <small class="muted">Чтобы убрать дату из истории, удалите строку с датой и сохраните.</small>
                 {% if interactions|selectattr('attachments')|list %}
                     <div class="attachment-list">
                         {% for interaction in interactions %}

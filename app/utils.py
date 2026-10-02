@@ -11,7 +11,7 @@ from sqlalchemy import or_
 from werkzeug.utils import secure_filename
 
 from .extensions import db
-from .models import AppSetting, Attachment, CalendarEvent, utcnow
+from .models import AppSetting, Attachment, CalendarEvent, Client, utcnow
 
 
 CHANNEL_LABELS = {
@@ -41,6 +41,33 @@ EVENT_TYPE_LABELS = {
 PLANNING_START_YEAR = 2020
 PLANNING_END_YEAR = 2031
 OPEN_EVENT_STATUSES = ("planned", "overdue")
+
+
+def due_client_contact_events(now):
+    """Return one earliest due open event per active client, in local date order."""
+    local_today = utc_naive_to_local(now).date()
+    events = db.session.scalars(
+        db.select(CalendarEvent)
+        .join(Client, CalendarEvent.client_id == Client.id)
+        .where(
+            CalendarEvent.status.in_(OPEN_EVENT_STATUSES),
+            Client.archived_at.is_(None),
+        )
+        .order_by(CalendarEvent.starts_at, CalendarEvent.id)
+    ).all()
+    due_events = []
+    seen_client_ids = set()
+    for event in events:
+        if (
+            event.client_id in seen_client_ids
+            or utc_naive_to_local(event.starts_at).date() > local_today
+        ):
+            continue
+        seen_client_ids.add(event.client_id)
+        due_events.append(event)
+    return due_events
+
+
 PLANNING_SUFFIX = re.compile(
     r"(?:^|\s)(?P<date>\d{6})(?:\s+(?:в\s*)?(?P<hour>[01]\d|2[0-3]):(?P<minute>[0-5]\d))?(?P<important>!)?\s*$"
 )

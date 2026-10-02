@@ -5,7 +5,7 @@
     <div>
         <a class="back-link" href="{{ url_for('clients.detail', client_id=client.id) }}">← {{ client.full_name }}</a>
         <h1>Редактирование записи</h1>
-        <p class="muted">Создано {{ interaction.created_at|local_datetime }} · дата истории {{ interaction.created_at|history_date }}</p>
+        <p class="muted">Создано {{ interaction.created_at|local_datetime }}{% if interaction.show_history_date %} · дата истории {{ interaction.created_at|history_date }}{% endif %}</p>
     </div>
 </div>
 <form class="panel form-stack" method="post" enctype="multipart/form-data">
@@ -20,7 +20,7 @@
     </label>
     <label>
         Текст
-        <textarea name="text" rows="7" data-dated-interaction data-current-date="{{ new_interaction_date|history_date }}">{{ interaction_text }}</textarea>
+        <textarea name="text" rows="7" {% if interaction.show_history_date %}data-dated-interaction data-current-date="{{ new_interaction_date|history_date }}"{% endif %}>{{ interaction_text if interaction.show_history_date else interaction_text|interaction_body }}</textarea>
     </label>
     {% if interaction.attachments %}
         <div>

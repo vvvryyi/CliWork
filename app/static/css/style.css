@@ -230,8 +230,6 @@ legend { padding: 0 8px; font-weight: 750; }
 .task-panel { max-width: 900px; }
 .task-sheet { overflow: hidden; border: 1px solid var(--line); border-radius: 10px; background: white; }
 .task-line { display: grid; grid-template-columns: 30px 30px minmax(0, 1fr) 44px 28px; align-items: center; min-height: 43px; border-bottom: 1px solid var(--line); }
-.task-panel-general .task-line { grid-template-columns: 30px 30px minmax(0, 1fr) 28px; }
-.task-panel-general .task-calendar-link { display: none; }
 .task-line:last-child { border-bottom: 0; }
 .task-line:focus-within { background: #f7faff; }
 .task-line-check { width: 15px; height: 15px; min-height: 0; margin: 0 auto; accent-color: var(--primary); }
@@ -240,6 +238,8 @@ legend { padding: 0 8px; font-weight: 750; }
 .task-line-important span { color: #b8c1c9; cursor: pointer; font-size: 1.05rem; line-height: 1; }
 .task-line-important input:checked + span { color: var(--danger); }
 .task-line-important input:focus-visible + span { outline: 3px solid rgba(36, 107, 254, .2); border-radius: 4px; }
+.task-detail-important { display: flex; align-items: center; gap: 9px; }
+.task-detail-important input { width: 16px; min-height: 16px; height: 16px; padding: 0; accent-color: var(--primary); }
 .task-line-content { display: grid; min-width: 0; }
 .task-line-content small { padding: 0 .35rem .35rem; color: var(--muted); font-size: .7rem; }
 .task-line-text { height: 42px; min-height: 42px; padding: .62rem .35rem .4rem; overflow: hidden; resize: none; border: 0; border-radius: 0; background: transparent; line-height: 1.35; }
@@ -247,6 +247,8 @@ legend { padding: 0 8px; font-weight: 750; }
 .task-line.is-completed .task-line-text { color: var(--muted); text-decoration: line-through; }
 .task-calendar-link { display: grid; width: 44px; height: 44px; place-items: center; border-radius: 9px; color: var(--primary); font-size: 1.2rem; font-weight: 800; }
 .task-calendar-link:hover, .task-calendar-link:active { background: #e7efff; color: var(--primary-dark); }
+.task-calendar-link.has-comment { color: #c65a00; }
+.task-calendar-link.has-comment:hover, .task-calendar-link.has-comment:active { background: #fff3e6; color: #a84b00; }
 .task-calendar-link.is-hidden { visibility: hidden; pointer-events: none; }
 .task-origin { padding: 0 6px; color: var(--warning); white-space: nowrap; font-size: .7rem; }
 .task-line-remove { width: 28px; height: 28px; padding: 0; border: 0; background: transparent; color: #a2abb4; font-size: 1.15rem; }

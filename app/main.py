@@ -3,10 +3,10 @@ from flask_login import login_required
 from sqlalchemy import func
 
 from .extensions import db
-from .models import CalendarEvent, Client, DailyTask, GeneralTask, utcnow
+from .models import DailyTask, GeneralTask, utcnow
 from .task_service import daily_task_sort_key
 from .utils import (
-    OPEN_EVENT_STATUSES,
+    due_client_contact_events,
     synchronize_event_statuses,
     utc_naive_to_local,
 )
@@ -21,27 +21,7 @@ def dashboard():
     now = utcnow()
     synchronize_event_statuses(now)
     local_today = utc_naive_to_local(now).date()
-    contact_events = db.session.scalars(
-        db.select(CalendarEvent)
-        .join(Client, CalendarEvent.client_id == Client.id)
-        .where(
-            CalendarEvent.status.in_(OPEN_EVENT_STATUSES),
-            Client.archived_at.is_(None),
-        )
-        .order_by(CalendarEvent.starts_at)
-    ).all()
-    contact_events = [
-        event
-        for event in contact_events
-        if utc_naive_to_local(event.starts_at).date() <= local_today
-    ]
-    contact_clients = []
-    seen_client_ids = set()
-    for event in contact_events:
-        if event.client_id in seen_client_ids:
-            continue
-        seen_client_ids.add(event.client_id)
-        contact_clients.append(event)
+    contact_clients = due_client_contact_events(now)
     overdue_contact_ids = {
         event.id
         for event in contact_clients

@@ -66,6 +66,24 @@ def all_tasks():
     )
 
 
+@bp.route("/all/<int:task_id>", methods=["GET", "POST"])
+@login_required
+def general_detail(task_id):
+    task = db.get_or_404(GeneralTask, task_id)
+    if request.method == "POST":
+        text = request.form.get("text", "").strip()
+        if not text or len(text) > 500:
+            flash("Введите название дела длиной до 500 символов.", "error")
+        else:
+            task.text = text
+            task.comment = request.form.get("comment", "").strip()
+            task.is_important = request.form.get("important") == "1"
+            db.session.commit()
+            flash("Дело обновлено.", "success")
+            return redirect(url_for("tasks.all_tasks"))
+    return render_template("tasks/detail.html", task=task)
+
+
 @bp.post("/new")
 @login_required
 def create():
@@ -154,8 +172,11 @@ def save():
             "due_date": due_date.isoformat() if is_general else task.due_date.isoformat(),
             "completed": task.is_completed,
             "important": task.is_important,
-            "calendar_url": ""
+            "calendar_url": url_for("tasks.general_detail", task_id=task.id)
             if is_general
             else url_for("calendar.edit_event", event_id=task.calendar_event_id),
+            "has_comment": bool(task.comment.strip())
+            if is_general
+            else bool(task.calendar_event.comment.strip()),
         }
     )

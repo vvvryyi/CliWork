@@ -454,11 +454,11 @@ if (taskEditor) {
         input.setAttribute("aria-label", task.id ? "Текст дела" : "Новое дело");
         content.append(input);
         const calendarLink = document.createElement("a");
-        calendarLink.className = `task-calendar-link${task.completed || !task.calendarUrl ? " is-hidden" : ""}`;
+        calendarLink.className = `task-calendar-link${task.completed || !task.calendarUrl ? " is-hidden" : ""}${task.hasComment ? " has-comment" : ""}`;
         calendarLink.dataset.taskCalendar = "";
         calendarLink.href = task.calendarUrl || "#";
-        calendarLink.setAttribute("aria-label", "Перенести дело в календаре");
-        calendarLink.title = "Перенести в календаре";
+        calendarLink.setAttribute("aria-label", isGeneralTasks ? "Открыть карточку дела" : "Перенести дело в календаре");
+        calendarLink.title = isGeneralTasks ? "Открыть карточку дела" : "Перенести в календаре";
         calendarLink.textContent = "→";
 
         const remove = document.createElement("button");
@@ -553,6 +553,7 @@ if (taskEditor) {
             const calendarLink = row.querySelector("[data-task-calendar]");
             calendarLink.href = result.calendar_url;
             calendarLink.classList.toggle("is-hidden", result.completed);
+            calendarLink.classList.toggle("has-comment", result.has_comment);
             const after = taskSnapshot(row);
             if (remember && JSON.stringify(before) !== JSON.stringify(after)) {
                 rememberTaskChange(before, after);
@@ -620,6 +621,7 @@ if (taskEditor) {
                 completed: result.completed,
                 important: result.important,
                 calendarUrl: result.calendar_url,
+                hasComment: result.has_comment,
             });
             taskList.insertBefore(row, ensureBlankTaskRow());
         } else {
@@ -635,6 +637,7 @@ if (taskEditor) {
             const calendarLink = row.querySelector("[data-task-calendar]");
             calendarLink.href = result.calendar_url;
             calendarLink.classList.toggle("is-hidden", result.completed);
+            calendarLink.classList.toggle("has-comment", result.has_comment);
             row.classList.toggle("is-completed", result.completed);
         }
         if (isGeneralTasks && result.completed) {

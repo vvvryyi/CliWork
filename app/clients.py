@@ -24,6 +24,7 @@ from .utils import (
     OPEN_EVENT_STATUSES,
     complete_due_quarterly_events,
     complete_client_events,
+    due_client_contact_events,
     interaction_text_body,
     local_to_utc_naive,
     normalize_interaction_text,
@@ -100,7 +101,9 @@ def apply_client_workflow_form(client):
     )
 
 
-def add_interaction(client, text, interaction_type="call", submission_token=None):
+def add_interaction(
+    client, text, interaction_type="call", submission_token=None, show_history_date=True
+):
     """Create a history record and its optional calendar event."""
     text = normalize_interaction_text(text, utcnow())
     if not interaction_text_body(text):
@@ -108,6 +111,7 @@ def add_interaction(client, text, interaction_type="call", submission_token=None
     interaction = Interaction(
         client_id=client.id,
         text=text,
+        show_history_date=show_history_date,
         interaction_type=interaction_type,
         submission_token=submission_token,
     )
@@ -139,7 +143,11 @@ def history_entry_date(interaction):
 
 def build_history_text(interactions, now):
     entries = [
-        f"{history_entry_date(item)}\n{interaction_text_body(item.text)}"
+        (
+            f"{history_entry_date(item)}\n{interaction_text_body(item.text)}"
+            if item.show_history_date
+            else interaction_text_body(item.text)
+        )
         for item in interactions
     ]
     entries.append(normalize_interaction_text("", now))
@@ -155,15 +163,24 @@ def parse_history_text(value, interactions, now):
         if not section.strip():
             updates.append(None)
             continue
-        date, separator, body = section.lstrip("\n").partition("\n")
-        if not separator or date.strip() != history_entry_date(interaction):
-            raise ValueError("Не меняйте дату в начале существующей записи.")
+        first_line, separator, remainder = section.lstrip("\n").partition("\n")
+        show_date = first_line.strip() == history_entry_date(interaction)
+        if show_date:
+            body = remainder
+        elif separator and re.fullmatch(r"\d{6}", first_line.strip()):
+            raise ValueError("Чтобы убрать дату записи, удалите её целиком.")
+        else:
+            body = section
         body = body.strip()
         if not body and (interaction_text_body(interaction.text) or not interaction.attachments):
             updates.append(None)
         else:
-            updates.append(f"{history_entry_date(interaction)} {body}" if body else "")
-    return updates, normalize_interaction_text(sections[-1], now)
+            updates.append(
+                (f"{history_entry_date(interaction)} {body}" if body else "", show_date)
+            )
+    new_section = sections[-1].strip()
+    new_show_date = bool(re.match(r"^\d{6}(?:\s|$)", new_section))
+    return updates, normalize_interaction_text(new_section, now), new_show_date
 
 
 def remove_interaction(interaction):
@@ -265,6 +282,18 @@ def index():
         selected_channel=channel,
         show_archived=show_archived,
         channels=CHANNEL_LABELS,
+    )
+
+
+@bp.get("/contacts-today")
+@login_required
+def contacts_today():
+    now = utcnow()
+    today = utc_naive_to_local(now).date()
+    return render_template(
+        "clients/contacts_today.html",
+        contact_events=due_client_contact_events(now),
+        today=today,
     )
 
 
@@ -496,13 +525,17 @@ def save_history(client_id):
             str(item.id) for item in interactions
         ):
             raise ValueError("История изменилась. Обновите страницу перед сохранением.")
-        updates, new_text = parse_history_text(submitted_text, interactions, utcnow())
+        updates, new_text, new_show_date = parse_history_text(
+            submitted_text, interactions, utcnow()
+        )
         apply_client_workflow_form(client)
         deleted_paths = []
-        for interaction, updated_text in zip(interactions, updates):
-            if updated_text is None:
+        for interaction, update in zip(interactions, updates):
+            if update is None:
                 deleted_paths.extend(remove_interaction(interaction))
                 continue
+            updated_text, show_date = update
+            interaction.show_history_date = show_date
             if interaction.text != updated_text:
                 interaction.text = updated_text
                 reschedule_interaction_event(client, interaction)
@@ -514,7 +547,10 @@ def save_history(client_id):
             if not re.fullmatch(r"[A-Za-z0-9_-]{16,64}", submission_token):
                 submission_token = uuid4().hex
             interaction, _, _, _ = add_interaction(
-                client, new_text, submission_token=submission_token
+                client,
+                new_text,
+                submission_token=submission_token,
+                show_history_date=new_show_date,
             )
             save_uploads(files, client.id, interaction.id)
         complete_due_quarterly_events(client.id)
