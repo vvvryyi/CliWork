@@ -16,6 +16,7 @@ def test_general_task_arrow_opens_card_and_comment_is_saved(app, auth_client):
     row = listing.split(f'data-task-id="{task_id}"', 1)[1].split("data-task-row", 1)[0]
     assert f'href="{detail_url}"' in row
     assert "task-calendar-link is-hidden" not in row
+    assert 'style="color: #c65a00"' not in row
 
     detail = auth_client.get(detail_url)
     assert detail.status_code == 200
@@ -36,6 +37,7 @@ def test_general_task_arrow_opens_card_and_comment_is_saved(app, auth_client):
     listing = auth_client.get("/tasks/all").data.decode()
     row = listing.split(f'data-task-id="{task_id}"', 1)[1].split("data-task-row", 1)[0]
     assert "task-calendar-link has-comment" in row
+    assert 'style="color: #c65a00"' in row
     assert f'href="{detail_url}"' in row
 
 

@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}{{ "Все дела" if show_all else "Дела" }} — Персональная CRM{% endblock %}
+{% block title %}{{ "Все дела" if show_all else "Дела" }} — CRM{% endblock %}
 {% block content %}
 <div class="page-heading">
     <div><p class="eyebrow">{{ "Отдельный список" if show_all else "План дня" }}</p><h1>{{ "Все дела" if show_all else "Дела" }}</h1></div>
@@ -30,7 +30,7 @@
                 <div class="task-line-content">
                     <textarea class="task-line-text" data-task-text maxlength="500" rows="1" aria-label="Текст дела">{{ task.text }}</textarea>
                 </div>
-                <a class="task-calendar-link{% if task.is_completed or (not show_all and not task.calendar_event_id) %} is-hidden{% endif %}{% if (show_all and task.comment|trim) or (not show_all and task.calendar_event and task.calendar_event.comment|trim) %} has-comment{% endif %}" data-task-calendar href="{{ url_for('tasks.general_detail', task_id=task.id) if show_all else (url_for('calendar.edit_event', event_id=task.calendar_event_id) if task.calendar_event_id else '#') }}" aria-label="{{ 'Открыть карточку дела' if show_all else 'Перенести дело в календаре' }}" title="{{ 'Открыть карточку дела' if show_all else 'Перенести в календаре' }}">→</a>
+                <a class="task-calendar-link{% if task.is_completed or (not show_all and not task.calendar_event_id) %} is-hidden{% endif %}{% if (show_all and task.comment|trim) or (not show_all and task.calendar_event and task.calendar_event.comment|trim) %} has-comment{% endif %}" data-task-calendar href="{{ url_for('tasks.general_detail', task_id=task.id) if show_all else (url_for('calendar.edit_event', event_id=task.calendar_event_id) if task.calendar_event_id else '#') }}"{% if show_all and task.comment|trim %} style="color: #c65a00"{% endif %} aria-label="{{ 'Открыть карточку дела' if show_all else 'Перенести дело в календаре' }}" title="{{ 'Открыть карточку дела' if show_all else 'Перенести в календаре' }}">→</a>
                 <button class="task-line-remove" type="button" data-task-remove aria-label="Удалить дело">×</button>
             </div>
         {% endfor %}
