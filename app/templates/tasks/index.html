@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}{{ "Все дела" if show_all else "Дела" }} — CRM{% endblock %}
+{% block title %}{{ "Все дела" if show_all else "Дела" }} — Workspace{% endblock %}
 {% block content %}
 <div class="page-heading">
     <div><p class="eyebrow">{{ "Отдельный список" if show_all else "План дня" }}</p><h1>{{ "Все дела" if show_all else "Дела" }}</h1></div>
@@ -21,7 +21,7 @@
     <input type="hidden" data-task-csrf value="{{ csrf_token() }}">
     <div class="task-sheet" data-task-list>
         {% for task in tasks %}
-            <div class="task-line {% if task.is_completed %}is-completed{% endif %}" data-task-row data-task-id="{{ task.id }}" data-due-date="{{ selected_date.isoformat() if show_all else task.due_date.isoformat() }}" data-saved-text="{{ task.text }}" data-saved-completed="{{ '1' if task.is_completed else '0' }}" data-saved-important="{{ '1' if task.is_important else '0' }}" data-calendar-url="{{ url_for('tasks.general_detail', task_id=task.id) if show_all else (url_for('calendar.edit_event', event_id=task.calendar_event_id) if task.calendar_event_id else '') }}">
+            <div class="task-line {% if task.is_completed %}is-completed{% endif %}" data-task-row data-task-id="{{ task.id }}" data-due-date="{{ task.due_date.isoformat() if task.due_date else '' }}" data-saved-text="{{ task.text }}" data-saved-comment="{{ task.comment if show_all else '' }}" data-saved-completed="{{ '1' if task.is_completed else '0' }}" data-saved-important="{{ '1' if task.is_important else '0' }}" data-calendar-url="{{ url_for('tasks.general_detail', task_id=task.id) if show_all else (url_for('calendar.edit_event', event_id=task.calendar_event_id) if task.calendar_event_id else '') }}">
                 <input class="task-line-check" type="checkbox" data-task-check aria-label="Выполнено" {% if task.is_completed %}checked{% endif %}>
                 <label class="task-line-important" title="Важно">
                     <input type="checkbox" data-task-important aria-label="Важно" {% if task.is_important %}checked{% endif %}>
@@ -34,7 +34,7 @@
                 <button class="task-line-remove" type="button" data-task-remove aria-label="Удалить дело">×</button>
             </div>
         {% endfor %}
-        <div class="task-line is-new" data-task-row data-task-id="" data-due-date="{{ selected_date.isoformat() }}" data-saved-text="" data-saved-completed="0" data-saved-important="0" data-calendar-url="">
+        <div class="task-line is-new" data-task-row data-task-id="" data-due-date="{{ '' if show_all else selected_date.isoformat() }}" data-saved-text="" data-saved-comment="" data-saved-completed="0" data-saved-important="0" data-calendar-url="">
             <input class="task-line-check" type="checkbox" data-task-check aria-label="Выполнено">
             <label class="task-line-important" title="Важно">
                 <input type="checkbox" data-task-important aria-label="Важно">

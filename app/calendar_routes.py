@@ -102,9 +102,21 @@ def index():
             .order_by(CalendarEvent.starts_at)
         ).all()
     events_by_date = {}
+    task_events_by_date = {}
+    contact_events_by_date = {}
     for event in events:
         local_date = utc_naive_to_local(event.starts_at).date()
         events_by_date.setdefault(local_date, []).append(event)
+        group = contact_events_by_date if event.client_id is not None else task_events_by_date
+        group.setdefault(local_date, []).append(event)
+    day_tab = request.args.get("tab", "tasks")
+    if day_tab not in {"tasks", "contacts"}:
+        day_tab = "tasks"
+    day_events = (
+        contact_events_by_date.get(selected_date, [])
+        if day_tab == "contacts"
+        else task_events_by_date.get(selected_date, [])
+    ) if view == "day" else events
     today = utc_naive_to_local(utcnow()).date()
     highlighted_event_ids = {
         event.id
@@ -145,6 +157,10 @@ def index():
         weeks=weeks,
         events=events,
         events_by_date=events_by_date,
+        task_events_by_date=task_events_by_date,
+        contact_events_by_date=contact_events_by_date,
+        day_tab=day_tab,
+        day_events=day_events,
         previous_date=previous_date,
         next_date=next_date,
         today=today,
@@ -222,6 +238,8 @@ def create_event():
 @login_required
 def edit_event(event_id):
     event = db.get_or_404(CalendarEvent, event_id)
+    if event.general_task is not None:
+        return redirect(url_for("tasks.general_detail", task_id=event.general_task.id))
     clients = db.session.scalars(
         db.select(Client)
         .where(Client.archived_at.is_(None))
@@ -252,6 +270,9 @@ def edit_event(event_id):
 @login_required
 def delete_event(event_id):
     event = db.get_or_404(CalendarEvent, event_id)
+    if event.general_task is not None:
+        event.general_task.due_date = None
+        event.general_task.calendar_event = None
     delete_event_and_task(event)
     db.session.commit()
     flash("Дело удалено.", "success")

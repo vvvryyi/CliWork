@@ -9,8 +9,9 @@ from .task_service import (
     daily_task_sort_key,
     delete_task_and_event,
     sync_event_from_task,
+    sync_event_from_general_task,
 )
-from .utils import utc_naive_to_local
+from .utils import PLANNING_END_YEAR, utc_naive_to_local
 
 
 bp = Blueprint("tasks", __name__, url_prefix="/tasks")
@@ -75,13 +76,25 @@ def general_detail(task_id):
         if not text or len(text) > 500:
             flash("Введите название дела длиной до 500 символов.", "error")
         else:
-            task.text = text
-            task.comment = request.form.get("comment", "").strip()
-            task.is_important = request.form.get("important") == "1"
-            db.session.commit()
-            flash("Дело обновлено.", "success")
-            return redirect(url_for("tasks.all_tasks"))
-    return render_template("tasks/detail.html", task=task)
+            raw_date = request.form.get("due_date", "").strip()
+            try:
+                due_date = date.fromisoformat(raw_date) if raw_date else None
+            except ValueError:
+                due_date = None
+                flash("Укажите корректную дату исполнения.", "error")
+            else:
+                if due_date and due_date.year > PLANNING_END_YEAR:
+                    flash("Дела можно планировать не позднее 31.12.2031.", "error")
+                else:
+                    task.text = text
+                    task.comment = request.form.get("comment", "").strip()
+                    task.is_important = request.form.get("important") == "1"
+                    task.due_date = due_date
+                    sync_event_from_general_task(task)
+                    db.session.commit()
+                    flash("Дело обновлено.", "success")
+                    return redirect(url_for("tasks.all_tasks"))
+    return render_template("tasks/detail.html", task=task, planning_end=date(PLANNING_END_YEAR, 12, 31))
 
 
 @bp.post("/new")
@@ -134,9 +147,22 @@ def save():
 
     task_model = GeneralTask if is_general else DailyTask
     task = db.get_or_404(task_model, task_id) if task_id else None
+
+    general_due_date = None
+    if is_general and task is None and request.form.get("due_date"):
+        try:
+            general_due_date = date.fromisoformat(request.form["due_date"])
+        except ValueError:
+            return jsonify({"error": "Укажите корректную дату исполнения."}), 400
+        if general_due_date.year > PLANNING_END_YEAR:
+            return jsonify({"error": "Дела можно планировать не позднее 31.12.2031."}), 400
+
     if should_delete or (task is not None and not text):
         if task is not None:
             if is_general:
+                if task.calendar_event is not None:
+                    db.session.delete(task.calendar_event)
+                    task.calendar_event = None
                 db.session.delete(task)
             else:
                 delete_task_and_event(task)
@@ -149,10 +175,13 @@ def save():
         if is_general:
             task = GeneralTask(
                 text=text,
+                comment=request.form.get("comment", "").strip(),
+                due_date=general_due_date,
                 is_important=important,
                 completed_at=utcnow() if completed else None,
             )
             db.session.add(task)
+            sync_event_from_general_task(task)
         else:
             task = create_daily_task(
                 text, due_date, completed=completed, important=important
@@ -161,7 +190,9 @@ def save():
         task.text = text
         task.is_important = important
         task.completed_at = utcnow() if completed else None
-        if not is_general:
+        if is_general:
+            sync_event_from_general_task(task)
+        else:
             task.due_date = due_date
             sync_event_from_task(task)
     db.session.commit()
@@ -169,7 +200,8 @@ def save():
         {
             "task_id": task.id,
             "text": task.text,
-            "due_date": due_date.isoformat() if is_general else task.due_date.isoformat(),
+            "due_date": task.due_date.isoformat() if task.due_date else "",
+            "comment": task.comment if is_general else "",
             "completed": task.is_completed,
             "important": task.is_important,
             "calendar_url": url_for("tasks.general_detail", task_id=task.id)

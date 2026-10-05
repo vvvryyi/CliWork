@@ -35,7 +35,7 @@ def create_app(test_config=None):
     csrf.init_app(app)
     login_manager.init_app(app)
     login_manager.login_view = "auth.login"
-    login_manager.login_message = "Войдите, чтобы открыть CRM."
+    login_manager.login_message = "Войдите, чтобы открыть Workspace."
     login_manager.login_message_category = "error"
 
     from . import models

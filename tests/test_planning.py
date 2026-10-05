@@ -30,7 +30,7 @@ def test_create_calendar_event(app, auth_client, sample_client):
 
     response = auth_client.get("/calendar/?view=month&date=2026-07-01")
     assert response.status_code == 200
-    assert '<span class="calendar-count">1</span>'.encode() in response.data
+    assert 'class="calendar-count calendar-count-contact"'.encode() in response.data
     assert "/calendar/?view=day&amp;date=2026-07-28".encode() in response.data
 
 
@@ -148,7 +148,7 @@ def test_calendar_marks_only_important_events_red(app, auth_client, sample_clien
     response = auth_client.get("/calendar/?view=month&date=2031-12-01")
     assert response.status_code == 200
     assert "has-important".encode() in response.data
-    future_day = auth_client.get("/calendar/?view=day&date=2031-12-31")
+    future_day = auth_client.get("/calendar/?view=day&date=2031-12-31&tab=contacts")
     assert b"agenda-item event-important" in future_day.data
     future_week = auth_client.get("/calendar/?view=week&date=2031-12-31")
     assert b"event-bg-task event-important" in future_week.data

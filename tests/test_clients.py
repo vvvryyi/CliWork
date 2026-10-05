@@ -42,7 +42,7 @@ def test_create_client_with_interaction_and_next_action(app, auth_client):
 
     assert response.status_code == 200
     assert "дело добавлено на 20.09.2026 14:30".encode() in response.data
-    assert response.request.path == "/"
+    assert response.request.path == "/clients/contacts-today"
     with app.app_context():
         interaction = db.session.scalar(db.select(Interaction))
         event = db.session.scalar(db.select(CalendarEvent))
@@ -430,7 +430,7 @@ def test_interaction_date_creates_calendar_event_without_copying_text(
         assert event.source_interaction_id is not None
         assert utc_naive_to_local(event.starts_at).strftime("%y%m%d %H:%M") == "260911 09:00"
 
-    day = auth_client.get("/calendar/?view=day&date=2026-09-11")
+    day = auth_client.get("/calendar/?view=day&date=2026-09-11&tab=contacts")
     assert "Иван Петров".encode() in day.data
     assert note.encode() not in day.data
     assert f'/clients/{sample_client}'.encode() in day.data

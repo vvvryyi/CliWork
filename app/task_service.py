@@ -73,6 +73,38 @@ def sync_event_from_task(task):
     return event
 
 
+def sync_event_from_general_task(task):
+    """Keep a dated general task in the calendar without making it a daily task."""
+    event = task.calendar_event
+    if task.due_date is None:
+        if event is not None:
+            task.calendar_event = None
+            db.session.delete(event)
+        return None
+
+    starts_at = local_to_utc_naive(
+        datetime.combine(task.due_date, time(hour=9)).isoformat(timespec="minutes")
+    )
+    if event is None:
+        event = CalendarEvent(
+            origin="general_task",
+            event_type="task",
+            starts_at=starts_at,
+            title=task.text[:250],
+            status="planned",
+        )
+        db.session.add(event)
+        db.session.flush()
+        task.calendar_event = event
+    event.starts_at = starts_at
+    event.title = task.text[:250]
+    event.comment = task.comment
+    event.is_important = task.is_important
+    event.completed_at = task.completed_at
+    event.status = _event_status(starts_at, task.completed_at)
+    return event
+
+
 def sync_task_from_event(event):
     # The daily list is intentionally personal: client and imported iCloud
     # events stay in the calendar and never become daily tasks.

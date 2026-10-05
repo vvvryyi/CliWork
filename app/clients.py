@@ -332,7 +332,7 @@ def create():
                 flash("Клиент и запись истории созданы.", "success")
             else:
                 flash("Клиент создан.", "success")
-            return redirect(url_for("main.dashboard"))
+            return redirect(url_for("clients.contacts_today" if planned_local else "main.dashboard"))
     return render_template(
         "clients/form.html",
         client=client,
@@ -520,6 +520,7 @@ def save_history(client_id):
     ).all()
     submitted_text = request.form.get("history_text", "")
     files = request.files.getlist("files")
+    date_saved = False
     try:
         if request.form.get("history_ids", "") != ",".join(
             str(item.id) for item in interactions
@@ -538,7 +539,8 @@ def save_history(client_id):
             interaction.show_history_date = show_date
             if interaction.text != updated_text:
                 interaction.text = updated_text
-                reschedule_interaction_event(client, interaction)
+                planned_local, _ = reschedule_interaction_event(client, interaction)
+                date_saved = date_saved or planned_local is not None
         submission_token = request.form.get("submission_token", "").strip()
         already_saved = submission_token and db.session.scalar(
             db.select(Interaction).where(Interaction.submission_token == submission_token)
@@ -546,12 +548,13 @@ def save_history(client_id):
         if (interaction_text_body(new_text) or any(item.filename for item in files)) and not already_saved:
             if not re.fullmatch(r"[A-Za-z0-9_-]{16,64}", submission_token):
                 submission_token = uuid4().hex
-            interaction, _, _, _ = add_interaction(
+            interaction, _, planned_local, _ = add_interaction(
                 client,
                 new_text,
                 submission_token=submission_token,
                 show_history_date=new_show_date,
             )
+            date_saved = date_saved or planned_local is not None
             save_uploads(files, client.id, interaction.id)
         complete_due_quarterly_events(client.id)
         regenerate_quarterly_events(
@@ -572,6 +575,8 @@ def save_history(client_id):
             client_categories=CLIENT_GROUP_LABELS,
         ), 400
     flash("История клиента сохранена.", "success")
+    if date_saved:
+        return redirect(url_for("clients.contacts_today"))
     return redirect(url_for("clients.detail", client_id=client.id))
 
 
@@ -630,7 +635,7 @@ def create_interaction(client_id):
         )
     else:
         flash("Запись добавлена в историю.", "success")
-    return redirect(url_for("clients.index"))
+    return redirect(url_for("clients.contacts_today" if planned_local else "clients.index"))
 
 
 @bp.route("/<int:client_id>/interactions/<int:interaction_id>/edit", methods=["GET", "POST"])
@@ -683,7 +688,7 @@ def edit_interaction(client_id, interaction_id):
                 )
             else:
                 flash("Запись истории обновлена.", "success")
-            return redirect(url_for("clients.index"))
+            return redirect(url_for("clients.contacts_today" if planned_local else "clients.index"))
     return render_template(
         "clients/interaction_form.html",
         client=client,

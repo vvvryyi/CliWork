@@ -186,6 +186,12 @@ class CalendarEvent(TimestampMixin, db.Model):
         uselist=False,
         foreign_keys="DailyTask.calendar_event_id",
     )
+    general_task = db.relationship(
+        "GeneralTask",
+        back_populates="calendar_event",
+        uselist=False,
+        foreign_keys="GeneralTask.calendar_event_id",
+    )
 
 
 class AppSetting(db.Model):
@@ -228,10 +234,21 @@ class GeneralTask(TimestampMixin, db.Model):
     __tablename__ = "general_tasks"
 
     id = db.Column(db.Integer, primary_key=True)
+    calendar_event_id = db.Column(
+        db.Integer,
+        db.ForeignKey("calendar_events.id", ondelete="SET NULL"),
+        nullable=True,
+        unique=True,
+        index=True,
+    )
     text = db.Column(db.String(500), nullable=False)
     comment = db.Column(db.Text, nullable=False, default="")
+    due_date = db.Column(db.Date, nullable=True, index=True)
     is_important = db.Column(db.Boolean, nullable=False, default=False)
     completed_at = db.Column(db.DateTime, nullable=True, index=True)
+    calendar_event = db.relationship(
+        "CalendarEvent", back_populates="general_task", foreign_keys=[calendar_event_id]
+    )
 
     @property
     def is_completed(self):

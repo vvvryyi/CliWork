@@ -5,31 +5,26 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="color-scheme" content="light">
     <meta name="theme-color" content="#246bfe">
-    <title>{% block title %}CRM{% endblock %}</title>
+    <title>{% block title %}Workspace{% endblock %}</title>
     <link rel="manifest" href="{{ url_for('static', filename='manifest.webmanifest') }}">
     <link rel="icon" href="{{ url_for('static', filename='icon.svg') }}" type="image/svg+xml">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='15') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='16') }}">
 </head>
 <body>
     {% if current_user.is_authenticated %}
-        <header class="topbar">
-            <a class="brand" href="{{ url_for('main.dashboard') }}">
-                <span class="brand-mark">C</span>
-                <span>CRM</span>
-            </a>
-            <button class="nav-toggle" type="button" aria-label="Открыть меню" data-nav-toggle>☰</button>
-            <nav class="main-nav" data-main-nav>
-                <a href="{{ url_for('main.dashboard') }}">Главная</a>
-                <a href="{{ url_for('clients.index') }}">Клиенты</a>
-                <a href="{{ url_for('calendar.index') }}">Календарь</a>
-                <a href="{{ url_for('messaging.compose') }}">Сообщение</a>
-                <a href="{{ url_for('settings.index') }}">Настройки</a>
+        <nav class="main-nav workspace-tabs" aria-label="Разделы Workspace">
+                <a href="{{ url_for('tasks.index') }}" {% if request.endpoint == 'tasks.index' %}aria-current="page"{% endif %}>Дела</a>
+                <a href="{{ url_for('clients.contacts_today') }}" {% if request.endpoint == 'clients.contacts_today' %}aria-current="page"{% endif %}>Связаться сегодня</a>
+                <a href="{{ url_for('clients.index') }}" {% if request.blueprint == 'clients' and request.endpoint != 'clients.contacts_today' %}aria-current="page"{% endif %}>Клиенты</a>
+                <a href="{{ url_for('calendar.index') }}" {% if request.blueprint == 'calendar' %}aria-current="page"{% endif %}>Календарь</a>
+                <a href="{{ url_for('messaging.compose') }}" {% if request.blueprint == 'messaging' %}aria-current="page"{% endif %}>Сообщение</a>
+                <a href="{{ url_for('tasks.all_tasks') }}" {% if request.endpoint in ('tasks.all_tasks', 'tasks.general_detail') %}aria-current="page"{% endif %}>Все дела</a>
+                <a href="{{ url_for('settings.index') }}" {% if request.blueprint == 'settings' %}aria-current="page"{% endif %}>Настройки</a>
                 <form action="{{ url_for('auth.logout') }}" method="post">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <button class="nav-button" type="submit">Выйти</button>
                 </form>
-            </nav>
-        </header>
+        </nav>
     {% endif %}
 
     <main class="{% if current_user.is_authenticated %}page-shell{% else %}auth-shell{% endif %}">
@@ -45,7 +40,7 @@
         {% block content %}{% endblock %}
     </main>
 
-    <script src="{{ url_for('static', filename='js/app.js', v='14') }}"></script>
+    <script src="{{ url_for('static', filename='js/app.js', v='15') }}"></script>
     {% block scripts %}{% endblock %}
 </body>
 </html>

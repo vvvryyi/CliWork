@@ -111,7 +111,7 @@ def setup_2fa():
     uri = provisioning_uri(
         pending.value,
         current_app.config["CRM_USERNAME"],
-        "Персональная CRM",
+        "Workspace",
     )
     return render_template("settings/setup_2fa.html", secret=pending.value, uri=uri)
 

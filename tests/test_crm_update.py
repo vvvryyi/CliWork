@@ -361,9 +361,7 @@ def test_dashboard_counts_only_open_general_tasks(auth_client):
         )
 
     page = auth_client.get("/").data.decode()
-    all_tasks_card = page.split("Все дела", 1)[0].rsplit(
-        '<a class="stat-card"', 1
-    )[1]
+    all_tasks_card = page.split('href="/tasks/all"', 2)[2].split("</a>", 1)[0]
     assert '<span class="stat-value">1</span>' in all_tasks_card
 
 

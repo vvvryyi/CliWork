@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Карточка дела — CRM{% endblock %}
+{% block title %}Карточка дела — Workspace{% endblock %}
 {% block content %}
 <div class="page-heading">
     <div><a class="back-link" href="{{ url_for('tasks.all_tasks') }}">← Все дела</a><h1>Карточка дела</h1></div>
@@ -13,6 +13,10 @@
     <label>
         Комментарий
         <textarea name="comment" rows="6">{{ request.form.get('comment', task.comment) }}</textarea>
+    </label>
+    <label>
+        Дата исполнения в календаре
+        <input name="due_date" type="date" max="{{ planning_end.isoformat() }}" value="{{ request.form.get('due_date', task.due_date.isoformat() if task.due_date else '') }}">
     </label>
     <label class="task-detail-important"><input type="checkbox" name="important" value="1" {% if request.method == 'POST' and request.form.get('important') == '1' or request.method != 'POST' and task.is_important %}checked{% endif %}> Важно</label>
     <div class="form-actions">

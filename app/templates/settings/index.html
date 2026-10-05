@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Настройки — CRM{% endblock %}
+{% block title %}Настройки — Workspace{% endblock %}
 {% block content %}
 <div class="page-heading"><div><p class="eyebrow">Система</p><h1>Настройки</h1></div></div>
 <form class="panel form-stack settings-form" method="post">
@@ -34,7 +34,7 @@
         <h2>Двухфакторная аутентификация</h2>
         {% if two_factor_enabled %}
             <p><span class="status status-success">Включена</span></p>
-            <p class="muted">После ввода пароля CRM запрашивает одноразовый код из приложения-аутентификатора.</p>
+            <p class="muted">После ввода пароля Workspace запрашивает одноразовый код из приложения-аутентификатора.</p>
         {% else %}
             <p><span class="status status-neutral">Выключена</span></p>
             <p class="muted">Защитите вход дополнительным шестизначным TOTP-кодом.</p>

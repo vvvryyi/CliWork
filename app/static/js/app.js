@@ -1,5 +1,12 @@
-document.querySelector("[data-nav-toggle]")?.addEventListener("click", () => {
-    document.querySelector("[data-main-nav]")?.classList.toggle("is-open");
+document.querySelectorAll("[data-history-back]").forEach((button) => {
+    button.addEventListener("click", () => {
+        const previous = document.referrer ? new URL(document.referrer) : null;
+        if (previous?.origin === window.location.origin && window.history.length > 1) {
+            window.history.back();
+        } else {
+            window.location.assign(button.dataset.fallbackUrl);
+        }
+    });
 });
 
 document.addEventListener("click", (event) => {
@@ -382,7 +389,7 @@ if (taskEditor) {
         const formData = new FormData();
         formData.set("csrf_token", taskCsrf);
         Object.entries(payload).forEach(([key, value]) => {
-            if (value !== null && value !== undefined && value !== "") {
+            if (value !== null && value !== undefined) {
                 formData.set(key, value);
             }
         });
@@ -402,6 +409,7 @@ if (taskEditor) {
         completed: row.dataset.savedCompleted === "1",
         important: row.dataset.savedImportant === "1",
         dueDate: row.dataset.dueDate,
+        comment: row.dataset.savedComment || "",
     });
 
     const resizeTaskInput = (input, expand = false) => {
@@ -414,8 +422,9 @@ if (taskEditor) {
         row.className = `task-line${task.completed ? " is-completed" : ""}`;
         row.dataset.taskRow = "";
         row.dataset.taskId = task.id || "";
-        row.dataset.dueDate = task.dueDate || selectedTaskDate;
+        row.dataset.dueDate = task.dueDate || (isGeneralTasks ? "" : selectedTaskDate);
         row.dataset.savedText = task.text || "";
+        row.dataset.savedComment = task.comment || "";
         row.dataset.savedCompleted = task.completed ? "1" : "0";
         row.dataset.savedImportant = task.important ? "1" : "0";
         row.dataset.calendarUrl = task.calendarUrl || "";
@@ -538,6 +547,7 @@ if (taskEditor) {
                 task_scope: taskScope,
                 text,
                 due_date: row.dataset.dueDate,
+                comment: isGeneralTasks ? row.dataset.savedComment : undefined,
                 completed: checkbox.checked ? "1" : "0",
                 important: important.checked ? "1" : "0",
             });
@@ -545,6 +555,8 @@ if (taskEditor) {
             row.dataset.savedText = result.text;
             row.dataset.savedCompleted = result.completed ? "1" : "0";
             row.dataset.savedImportant = result.important ? "1" : "0";
+            row.dataset.dueDate = result.due_date;
+            row.dataset.savedComment = result.comment;
             row.dataset.calendarUrl = result.calendar_url;
             row.classList.remove("is-new");
             row.classList.toggle("is-completed", result.completed);
@@ -598,6 +610,7 @@ if (taskEditor) {
             task_scope: taskScope,
             text: target.text,
             due_date: target.dueDate,
+            comment: isGeneralTasks ? target.comment : undefined,
             completed: target.completed ? "1" : "0",
             important: target.important ? "1" : "0",
         };
@@ -618,6 +631,7 @@ if (taskEditor) {
                 id: resultId,
                 text: result.text,
                 dueDate: result.due_date,
+                comment: result.comment,
                 completed: result.completed,
                 important: result.important,
                 calendarUrl: result.calendar_url,
@@ -627,6 +641,7 @@ if (taskEditor) {
         } else {
             row.dataset.taskId = resultId;
             row.dataset.dueDate = result.due_date;
+            row.dataset.savedComment = result.comment;
             row.dataset.savedText = result.text;
             row.dataset.savedCompleted = result.completed ? "1" : "0";
             row.dataset.savedImportant = result.important ? "1" : "0";

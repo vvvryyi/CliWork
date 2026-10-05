@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Календарь — CRM{% endblock %}
+{% block title %}Календарь — Workspace{% endblock %}
 {% block content %}
 <div class="page-heading">
     <div>
@@ -53,10 +53,16 @@
 
 {% if view in ("day", "overdue") %}
     <section class="panel">
+        {% if view == "day" %}
+            <div class="segmented calendar-day-tabs" aria-label="Дела на дату">
+                <a class="{% if day_tab == 'tasks' %}active{% endif %}" href="{{ url_for('calendar.index', view='day', date=selected_date.isoformat(), tab='tasks') }}">Дела <span>{{ task_events_by_date.get(selected_date, [])|length }}</span></a>
+                <a class="{% if day_tab == 'contacts' %}active{% endif %}" href="{{ url_for('calendar.index', view='day', date=selected_date.isoformat(), tab='contacts') }}">Связаться сегодня <span>{{ contact_events_by_date.get(selected_date, [])|length }}</span></a>
+            </div>
+        {% endif %}
         {% if view == "overdue" %}<h2>Просроченные дела</h2>{% endif %}
-        {% if events %}
+        {% if day_events %}
             <div class="agenda-list">
-                {% for event in events %}
+                {% for event in day_events %}
                     <div class="agenda-item {% if event.id in highlighted_event_ids %}event-important{% endif %}">
                         <time>{{ event.starts_at|local_datetime("%H:%M") }}</time>
                         <span class="event-dot event-{{ event.event_type }} {% if event.id in highlighted_event_ids %}event-dot-important{% endif %}"></span>
@@ -64,7 +70,7 @@
                             {% if event.client %}
                                 <strong><a href="{{ url_for('clients.detail', client_id=event.client.id) }}">{{ event.client.full_name }}</a></strong>
                             {% else %}
-                                <strong><a href="{{ url_for('calendar.edit_event', event_id=event.id) }}">{{ event.title }}</a></strong>
+                                <strong><a href="{{ url_for('tasks.general_detail', task_id=event.general_task.id) if event.general_task else url_for('calendar.edit_event', event_id=event.id) }}">{{ event.title }}</a></strong>
                             {% endif %}
                             {% if view == "overdue" %}<small>{{ event.starts_at|local_datetime("%d.%m.%Y") }} · Просрочено</small>{% endif %}
                         </span>
@@ -72,7 +78,7 @@
                 {% endfor %}
             </div>
         {% else %}
-            <div class="empty-state">{{ "Просроченных дел нет." if view == "overdue" else "На этот день дел нет." }}</div>
+            <div class="empty-state">{{ "Просроченных дел нет." if view == "overdue" else ("На этот день нет клиентов для связи." if day_tab == "contacts" else "На этот день дел нет.") }}</div>
         {% endif %}
     </section>
 {% elif view == "month" %}
@@ -84,13 +90,13 @@
             <div class="calendar-row">
                 {% for day in week %}
                     {% set day_events = events_by_date.get(day, []) %}
-                    <a class="calendar-day {% if day == today %}is-today{% endif %} {% if day.month != first_day.month %}outside{% endif %} {% if day_events|selectattr('id', 'in', highlighted_event_ids)|list %}has-important{% endif %}"
-                       href="{{ url_for('calendar.index', view='day', date=day.isoformat()) }}"
-                       aria-label="{{ day.strftime('%d.%m.%Y') }}, дел: {{ events_by_date.get(day, [])|length }}">
-                        <span class="calendar-day-header"><strong>{{ day.day }}</strong></span>
-                        {% set day_count = day_events|length %}
-                        {% if day_count %}<span class="calendar-count">{{ day_count }}</span>{% endif %}
-                    </a>
+                    <div class="calendar-day {% if day == today %}is-today{% endif %} {% if day.month != first_day.month %}outside{% endif %} {% if day_events|selectattr('id', 'in', highlighted_event_ids)|list %}has-important{% endif %}">
+                        <span class="calendar-day-header"><a href="{{ url_for('calendar.index', view='day', date=day.isoformat()) }}" aria-label="{{ day.strftime('%d.%m.%Y') }}">{{ day.day }}</a></span>
+                        <div class="calendar-day-counts">
+                            {% if task_events_by_date.get(day) %}<a class="calendar-count{% if task_events_by_date[day]|selectattr('id', 'in', highlighted_event_ids)|list %} calendar-count-important{% endif %}" href="{{ url_for('calendar.index', view='day', date=day.isoformat(), tab='tasks') }}" aria-label="Дела: {{ task_events_by_date[day]|length }}">{{ task_events_by_date[day]|length }}</a>{% endif %}
+                            {% if contact_events_by_date.get(day) %}<a class="calendar-count calendar-count-contact{% if contact_events_by_date[day]|selectattr('id', 'in', highlighted_event_ids)|list %} calendar-count-important{% endif %}" href="{{ url_for('calendar.index', view='day', date=day.isoformat(), tab='contacts') }}" aria-label="Связаться сегодня: {{ contact_events_by_date[day]|length }}">{{ contact_events_by_date[day]|length }}</a>{% endif %}
+                        </div>
+                    </div>
                 {% endfor %}
             </div>
         {% endfor %}
@@ -109,7 +115,7 @@
                             {% if event.client %}
                                 <a class="calendar-event event-bg-{{ event.event_type }} {% if event.id in highlighted_event_ids %}event-important{% endif %}" href="{{ url_for('clients.detail', client_id=event.client.id) }}">{{ event.client.full_name }}</a>
                             {% else %}
-                                <a class="calendar-event event-bg-{{ event.event_type }} {% if event.id in highlighted_event_ids %}event-important{% endif %}" href="{{ url_for('calendar.edit_event', event_id=event.id) }}">{{ event.title }}</a>
+                                <a class="calendar-event event-bg-{{ event.event_type }} {% if event.id in highlighted_event_ids %}event-important{% endif %}" href="{{ url_for('tasks.general_detail', task_id=event.general_task.id) if event.general_task else url_for('calendar.edit_event', event_id=event.id) }}">{{ event.title }}</a>
                             {% endif %}
                         {% endfor %}
                     </div>
