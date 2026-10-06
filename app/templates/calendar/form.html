@@ -32,11 +32,7 @@
         </label>
         <label>
             Начало <span class="required">*</span>
-            <input name="starts_at" type="datetime-local" max="{{ planning_end.isoformat() }}T23:59" required value="{% if event.starts_at %}{{ event.starts_at|local_datetime('%Y-%m-%dT%H:%M') }}{% elif preset_date %}{{ preset_date.isoformat() }}T09:00{% endif %}">
-        </label>
-        <label>
-            Окончание
-            <input name="ends_at" type="datetime-local" max="{{ planning_end.isoformat() }}T23:59" value="{% if event.ends_at %}{{ event.ends_at|local_datetime('%Y-%m-%dT%H:%M') }}{% endif %}">
+            <input name="starts_at" type="text" inputmode="numeric" placeholder="ГГ.ММ.ДД ЧЧ:ММ" pattern="[0-9]{2}\.[0-9]{2}\.[0-9]{2} [0-9]{2}:[0-9]{2}" title="Формат: ГГ.ММ.ДД ЧЧ:ММ" required value="{{ request.form.get('starts_at', (event.starts_at|local_datetime('%y.%m.%d %H:%M')) if event.starts_at else (preset_date.strftime('%y.%m.%d') ~ ' 09:00') if preset_date else '') }}">
         </label>
         <label>
             Комментарий

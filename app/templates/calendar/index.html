@@ -3,7 +3,7 @@
 {% block content %}
 <div class="page-heading">
     <div>
-        <p class="eyebrow">Планирование</p>
+        <button class="back-link back-button" type="button" data-history-back data-fallback-url="{{ url_for('main.dashboard') }}">← Назад</button>
         <h1>Календарь</h1>
     </div>
     <a class="button button-primary" href="{{ url_for('calendar.create_event', date=selected_date.isoformat()) }}">+ Дело</a>
@@ -68,7 +68,7 @@
                         <span class="event-dot event-{{ event.event_type }} {% if event.id in highlighted_event_ids %}event-dot-important{% endif %}"></span>
                         <span>
                             {% if event.client %}
-                                <strong><a href="{{ url_for('clients.detail', client_id=event.client.id) }}">{{ event.client.full_name }}</a></strong>
+                                <strong><a href="{{ url_for('clients.detail', client_id=event.client.id, event_id=event.id) }}">{{ event.client.full_name }}</a></strong>
                             {% else %}
                                 <strong><a href="{{ url_for('tasks.general_detail', task_id=event.general_task.id) if event.general_task else url_for('calendar.edit_event', event_id=event.id) }}">{{ event.title }}</a></strong>
                             {% endif %}
@@ -113,7 +113,7 @@
                     <div class="day-events">
                         {% for event in events_by_date.get(day, []) %}
                             {% if event.client %}
-                                <a class="calendar-event event-bg-{{ event.event_type }} {% if event.id in highlighted_event_ids %}event-important{% endif %}" href="{{ url_for('clients.detail', client_id=event.client.id) }}">{{ event.client.full_name }}</a>
+                                <a class="calendar-event event-bg-{{ event.event_type }} {% if event.id in highlighted_event_ids %}event-important{% endif %}" href="{{ url_for('clients.detail', client_id=event.client.id, event_id=event.id) }}">{{ event.client.full_name }}</a>
                             {% else %}
                                 <a class="calendar-event event-bg-{{ event.event_type }} {% if event.id in highlighted_event_ids %}event-important{% endif %}" href="{{ url_for('tasks.general_detail', task_id=event.general_task.id) if event.general_task else url_for('calendar.edit_event', event_id=event.id) }}">{{ event.title }}</a>
                             {% endif %}

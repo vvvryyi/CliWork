@@ -2,7 +2,7 @@
 {% block title %}{{ "Все дела" if show_all else "Дела" }} — Workspace{% endblock %}
 {% block content %}
 <div class="page-heading">
-    <div><p class="eyebrow">{{ "Отдельный список" if show_all else "План дня" }}</p><h1>{{ "Все дела" if show_all else "Дела" }}</h1></div>
+    <div><button class="back-link back-button" type="button" data-history-back data-fallback-url="{{ url_for('main.dashboard') }}">← Назад</button><h1>{{ "Все дела" if show_all else "Дела" }}</h1></div>
 </div>
 
 {% if not show_all %}

@@ -2,7 +2,7 @@
 {% block title %}Карточка дела — Workspace{% endblock %}
 {% block content %}
 <div class="page-heading">
-    <div><a class="back-link" href="{{ url_for('tasks.all_tasks') }}">← Все дела</a><h1>Карточка дела</h1></div>
+    <div><button class="back-link back-button" type="button" data-history-back data-fallback-url="{{ url_for('tasks.all_tasks') }}">← Назад</button><h1>Карточка дела</h1></div>
 </div>
 <form class="panel form-stack task-panel" method="post">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -16,7 +16,7 @@
     </label>
     <label>
         Дата исполнения в календаре
-        <input name="due_date" type="date" max="{{ planning_end.isoformat() }}" value="{{ request.form.get('due_date', task.due_date.isoformat() if task.due_date else '') }}">
+        <input name="due_date" type="text" inputmode="numeric" placeholder="ГГ.ММ.ДД" pattern="[0-9]{2}\.[0-9]{2}\.[0-9]{2}" title="Формат: ГГ.ММ.ДД" value="{{ request.form.get('due_date', task.due_date.strftime('%y.%m.%d') if task.due_date else '') }}">
     </label>
     <label class="task-detail-important"><input type="checkbox" name="important" value="1" {% if request.method == 'POST' and request.form.get('important') == '1' or request.method != 'POST' and task.is_important %}checked{% endif %}> Важно</label>
     <div class="form-actions">

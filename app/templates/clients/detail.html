@@ -3,7 +3,7 @@
 {% block content %}
 <div class="page-heading client-detail-heading">
     <div>
-        <a class="back-link" href="{{ url_for('clients.index') }}">← Клиенты</a>
+        <button class="back-link back-button" type="button" data-history-back data-fallback-url="{{ url_for('clients.index') }}">← Назад</button>
         <div class="title-with-avatar">
             <span class="avatar avatar-large">{{ client.full_name[:1]|upper }}</span>
             <div>
@@ -59,6 +59,7 @@
             <input type="hidden" name="workflow_fields_present" value="1">
             <input type="hidden" name="submission_token" value="{{ interaction_token }}">
             <input type="hidden" name="history_ids" value="{{ interactions|map(attribute='id')|join(',') }}">
+            {% if selected_event_id %}<input type="hidden" name="event_id" value="{{ selected_event_id }}">{% endif %}
             <div class="client-workflow client-workflow-panel">
                 <div>
                     <span class="field-label">Отметки</span>
@@ -91,7 +92,7 @@
                     <div class="attachment-list">
                         {% for interaction in interactions %}
                             {% for attachment in interaction.attachments %}
-                                <a class="attachment" href="{{ url_for('clients.download_attachment', attachment_id=attachment.id) }}">📎 {{ attachment.original_name }}</a>
+                                <span class="attachment-row"><a class="attachment" href="{{ url_for('clients.download_attachment', attachment_id=attachment.id) }}">📎 {{ attachment.original_name }}</a><button class="link-danger" type="submit" form="delete-attachment-{{ attachment.id }}" data-confirm-button="Удалить файл {{ attachment.original_name }}?" aria-label="Удалить файл {{ attachment.original_name }}">Удалить</button></span>
                             {% endfor %}
                         {% endfor %}
                     </div>
@@ -111,6 +112,9 @@
                 </div>
             </div>
         </form>
+        {% for interaction in interactions %}{% for attachment in interaction.attachments %}
+            <form id="delete-attachment-{{ attachment.id }}" method="post" action="{{ url_for('clients.delete_attachment', attachment_id=attachment.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"></form>
+        {% endfor %}{% endfor %}
     </section>
 </div>
 {% endblock %}

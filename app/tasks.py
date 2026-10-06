@@ -11,7 +11,7 @@ from .task_service import (
     sync_event_from_task,
     sync_event_from_general_task,
 )
-from .utils import PLANNING_END_YEAR, utc_naive_to_local
+from .utils import PLANNING_END_YEAR, parse_display_date, utc_naive_to_local
 
 
 bp = Blueprint("tasks", __name__, url_prefix="/tasks")
@@ -78,7 +78,7 @@ def general_detail(task_id):
         else:
             raw_date = request.form.get("due_date", "").strip()
             try:
-                due_date = date.fromisoformat(raw_date) if raw_date else None
+                due_date = parse_display_date(raw_date) if raw_date else None
             except ValueError:
                 due_date = None
                 flash("Укажите корректную дату исполнения.", "error")

@@ -18,7 +18,7 @@ def test_client_and_note_redirects(app, auth_client, sample_client):
         data={"text": "Позвонили"},
     )
     assert client_save.headers["Location"].endswith("/")
-    assert note_save.headers["Location"].endswith("/clients/")
+    assert note_save.headers["Location"].endswith("/")
 
 
 def test_opening_card_adds_a_fresh_dated_section_to_history(app, auth_client, sample_client, monkeypatch):
@@ -130,14 +130,14 @@ def test_rescheduling_clears_dashboard_overdue_contact_alert(app, auth_client, s
         db.session.commit()
 
     before = auth_client.get("/")
-    assert b"stat-card-alert" in before.data
+    assert b"home-tab-alert" in before.data
     auth_client.post(
         f"/clients/{sample_client}/interactions",
         data={"text": "Новая запись и дата 311231", "workflow_fields_present": "1"},
     )
     after = auth_client.get("/")
-    assert b"stat-card-alert" not in after.data
-    assert b'<span class="stat-value">0</span>' in after.data
+    assert b"home-tab-alert" not in after.data
+    assert b'<span class="home-tab-count">0</span>' in after.data
     with app.app_context():
         old_event = db.session.get(CalendarEvent, 1)
         assert old_event.status == "completed"
@@ -340,7 +340,7 @@ def test_task_page_and_dashboard_use_new_compact_wording(auth_client):
     assert "+ Новый клиент".encode() not in dashboard.data
     assert "+ Новое дело".encode() not in dashboard.data
     assert "Все дела".encode() in dashboard.data
-    assert dashboard.data.count(b'class="stat-card') == 3
+    assert dashboard.data.count(b'class="home-tab-count"') == 3
 
     calendar_form = auth_client.get("/calendar/events/new?date=2026-09-18")
     assert b"calendar-form-grid" in calendar_form.data
@@ -361,8 +361,8 @@ def test_dashboard_counts_only_open_general_tasks(auth_client):
         )
 
     page = auth_client.get("/").data.decode()
-    all_tasks_card = page.split('href="/tasks/all"', 2)[2].split("</a>", 1)[0]
-    assert '<span class="stat-value">1</span>' in all_tasks_card
+    all_tasks_tab = page.split('href="/tasks/all"', 1)[1].split("</a>", 1)[0]
+    assert '<span class="home-tab-count">1</span>' in all_tasks_tab
 
 
 def test_daily_task_open_row_has_calendar_arrow_but_completed_row_does_not(
@@ -451,8 +451,8 @@ def test_dashboard_contact_card_turns_red_when_a_contact_is_overdue(
         db.session.commit()
 
     page = auth_client.get("/").data.decode()
-    assert '<a class="stat-card stat-card-alert" href="/clients/contacts-today">' in page
-    assert '<span class="stat-value">2</span>' in page
+    assert '<a href="/clients/contacts-today" class="home-tab-alert">' in page
+    assert '<span class="home-tab-count">2</span>' in page
     assert "Иван Петров" not in page
     assert "Вчерашний клиент" not in page
 

@@ -1,19 +1,13 @@
 {% extends "base.html" %}
-{% block title %}Главная — Workspace{% endblock %}
+{% block title %}Workspace{% endblock %}
 {% block content %}
-<div class="stat-grid">
-    <a class="stat-card stat-card-compact" href="{{ url_for('tasks.index') }}">
-        <span class="stat-value">{{ task_count }}</span>
-        <span class="stat-label">Дела</span>
-    </a>
-    <a class="stat-card {% if overdue_contact_ids %}stat-card-alert{% endif %}" href="{{ url_for('clients.contacts_today') }}">
-        <span class="stat-value">{{ contact_count }}</span>
-        <span class="stat-label">Связаться сегодня</span>
-    </a>
-    <a class="stat-card" href="{{ url_for('tasks.all_tasks') }}">
-        <span class="stat-value">{{ general_task_count }}</span>
-        <span class="stat-label">Все дела</span>
-    </a>
-</div>
+<nav class="workspace-home-tabs" aria-label="Разделы Workspace на главной">
+    <a href="{{ url_for('tasks.index') }}"><span class="home-tab-count">{{ task_count }}</span><span>Дела</span></a>
+    <a href="{{ url_for('clients.contacts_today') }}" class="{% if overdue_contact_ids %}home-tab-alert{% endif %}"><span class="home-tab-count">{{ contact_count }}</span><span>Связаться сегодня</span></a>
+    <a href="{{ url_for('clients.index') }}">Клиенты</a>
+    <a href="{{ url_for('calendar.index') }}">Календарь</a>
+    <a href="{{ url_for('messaging.compose') }}">Сообщение</a>
+    <a href="{{ url_for('tasks.all_tasks') }}"><span class="home-tab-count">{{ general_task_count }}</span><span>Все дела</span></a>
+</nav>
 
 {% endblock %}

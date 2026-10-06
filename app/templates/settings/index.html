@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Настройки — Workspace{% endblock %}
 {% block content %}
-<div class="page-heading"><div><p class="eyebrow">Система</p><h1>Настройки</h1></div></div>
+<div class="page-heading"><div><button class="back-link back-button" type="button" data-history-back data-fallback-url="{{ url_for('main.dashboard') }}">← Назад</button><h1>Настройки</h1></div></div>
 <form class="panel form-stack settings-form" method="post">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <div>

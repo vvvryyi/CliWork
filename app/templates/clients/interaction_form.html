@@ -3,7 +3,7 @@
 {% block content %}
 <div class="page-heading">
     <div>
-        <a class="back-link" href="{{ url_for('clients.detail', client_id=client.id) }}">← {{ client.full_name }}</a>
+        <button class="back-link back-button" type="button" data-history-back data-fallback-url="{{ url_for('clients.detail', client_id=client.id) }}">← Назад</button>
         <h1>Редактирование записи</h1>
         <p class="muted">Создано {{ interaction.created_at|local_datetime }}{% if interaction.show_history_date %} · дата истории {{ interaction.created_at|history_date }}{% endif %}</p>
     </div>

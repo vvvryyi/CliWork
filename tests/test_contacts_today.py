@@ -62,13 +62,13 @@ def test_contact_card_opens_only_due_active_clients(app, auth_client, sample_cli
 
     dashboard = auth_client.get("/").data.decode()
     assert 'href="/clients/contacts-today"' in dashboard
-    assert '<span class="stat-value">2</span>' in dashboard
+    assert '<span class="home-tab-count">2</span><span>Связаться сегодня</span>' in dashboard
 
     response = auth_client.get("/clients/contacts-today")
     assert response.status_code == 200
     page = response.data.decode()
-    assert f'href="/clients/{sample_client}"' in page
-    assert f'href="/clients/{overdue_id}"' in page
+    assert f'href="/clients/{sample_client}?event_id=' in page
+    assert f'href="/clients/{overdue_id}?event_id=' in page
     assert page.count("Иван Петров") == 1
     assert "Просроченный клиент" in page
     assert "23.09.2026 · Просрочено" in page

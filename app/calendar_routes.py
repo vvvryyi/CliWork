@@ -12,6 +12,8 @@ from .utils import (
     month_grid,
     PLANNING_END_YEAR,
     PLANNING_START_YEAR,
+    parse_display_datetime,
+    parse_planning_details,
     synchronize_event_statuses,
     utc_naive_to_local,
 )
@@ -175,8 +177,16 @@ def apply_event_form(event):
     event.client_id = request.form.get("client_id", type=int)
     event.title = request.form.get("title", "").strip()
     event.event_type = request.form.get("event_type", "other")
-    event.starts_at = local_to_utc_naive(request.form.get("starts_at"))
-    event.ends_at = local_to_utc_naive(request.form.get("ends_at"))
+    try:
+        raw_start = request.form.get("starts_at", "").strip()
+        event.starts_at = local_to_utc_naive(parse_display_datetime(raw_start).isoformat()) if raw_start else None
+    except ValueError:
+        event.starts_at = None
+    try:
+        raw_end = request.form.get("ends_at", "").strip()
+        event.ends_at = local_to_utc_naive(parse_display_datetime(raw_end).isoformat()) if raw_end else None
+    except ValueError:
+        event.ends_at = None
     event.comment = request.form.get("comment", "").strip()
     if not event.status:
         event.status = "planned"
@@ -247,13 +257,27 @@ def edit_event(event_id):
     ).all()
     if request.method == "POST":
         apply_event_form(event)
-        error = validate_event(event)
+        comment_date = None
+        invalid_comment_date = False
+        if event.daily_task is not None and event.client_id is None:
+            comment_date, date_found, _ = parse_planning_details(event.comment)
+            invalid_comment_date = date_found and comment_date is None
+            if comment_date:
+                original_start = event.starts_at
+                event.starts_at = local_to_utc_naive(
+                    comment_date.isoformat(timespec="minutes")
+                )
+                if event.ends_at and original_start:
+                    event.ends_at += event.starts_at - original_start
+        error = "Проверьте дату ГГММДД в комментарии." if invalid_comment_date else validate_event(event)
         if error:
             flash(error, "error")
         else:
             sync_task_from_event(event)
             db.session.commit()
             flash("Дело обновлено.", "success")
+            if event.daily_task is not None:
+                return redirect(url_for("tasks.index", date=utc_naive_to_local(event.starts_at).date().isoformat()))
             return redirect(url_for("calendar.index"))
     return render_template(
         "calendar/form.html",

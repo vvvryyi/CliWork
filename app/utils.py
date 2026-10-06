@@ -8,7 +8,6 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from flask import current_app
 from sqlalchemy import or_
-from werkzeug.utils import secure_filename
 
 from .extensions import db
 from .models import AppSetting, Attachment, CalendarEvent, Client, utcnow
@@ -43,9 +42,10 @@ PLANNING_END_YEAR = 2031
 OPEN_EVENT_STATUSES = ("planned", "overdue")
 
 
-def due_client_contact_events(now):
+def due_client_contact_events(now, selected_date=None):
     """Return one earliest due open event per active client, in local date order."""
     local_today = utc_naive_to_local(now).date()
+    selected_date = selected_date or local_today
     events = db.session.scalars(
         db.select(CalendarEvent)
         .join(Client, CalendarEvent.client_id == Client.id)
@@ -58,9 +58,10 @@ def due_client_contact_events(now):
     due_events = []
     seen_client_ids = set()
     for event in events:
-        if (
-            event.client_id in seen_client_ids
-            or utc_naive_to_local(event.starts_at).date() > local_today
+        event_date = utc_naive_to_local(event.starts_at).date()
+        if event.client_id in seen_client_ids or (
+            event_date > selected_date if selected_date == local_today
+            else event_date != selected_date
         ):
             continue
         seen_client_ids.add(event.client_id)
@@ -221,6 +222,20 @@ def local_to_utc_naive(value):
     return localized.astimezone(timezone.utc).replace(tzinfo=None)
 
 
+def parse_display_date(value):
+    """Read the form's ГГ.ММ.ДД date and existing ISO date values."""
+    if re.fullmatch(r"\d{2}\.\d{2}\.\d{2}", value):
+        return datetime.strptime(value, "%y.%m.%d").date()
+    return date.fromisoformat(value)
+
+
+def parse_display_datetime(value):
+    """Read the form's ГГ.ММ.ДД ЧЧ:ММ time and existing ISO values."""
+    if re.fullmatch(r"\d{2}\.\d{2}\.\d{2} \d{2}:\d{2}", value):
+        return datetime.strptime(value, "%y.%m.%d %H:%M")
+    return datetime.fromisoformat(value)
+
+
 def utc_naive_to_local(value):
     if value is None:
         return None
@@ -273,22 +288,22 @@ def save_uploads(files, client_id, interaction_id=None):
     for uploaded in files:
         if not uploaded or not uploaded.filename:
             continue
-        safe_name = secure_filename(uploaded.filename)
-        if not safe_name or "." not in safe_name:
+        original_name = Path(uploaded.filename.replace("\\", "/")).name
+        if not original_name or "." not in original_name:
             raise ValueError("Файл должен иметь допустимое имя и расширение.")
-        extension = safe_name.rsplit(".", 1)[1].lower()
+        extension = original_name.rsplit(".", 1)[1].lower()
         if extension not in current_app.config["ALLOWED_EXTENSIONS"]:
             raise ValueError(f"Формат .{extension} не разрешён.")
-        validated.append((uploaded, extension))
+        validated.append((uploaded, extension, original_name))
 
-    for uploaded, extension in validated:
+    for uploaded, extension, original_name in validated:
         stored_name = f"{uuid4().hex}.{extension}"
         target = upload_root / stored_name
         uploaded.save(target)
         attachment = Attachment(
             client_id=client_id,
             interaction_id=interaction_id,
-            original_name=uploaded.filename[:255],
+            original_name=original_name[:255],
             stored_name=stored_name,
             file_path=str(target),
             mime_type=uploaded.mimetype or "",

@@ -1,4 +1,5 @@
 import re
+from datetime import date, timedelta
 from pathlib import Path
 from uuid import uuid4
 
@@ -290,10 +291,17 @@ def index():
 def contacts_today():
     now = utcnow()
     today = utc_naive_to_local(now).date()
+    try:
+        selected_date = date.fromisoformat(request.args.get("date", ""))
+    except ValueError:
+        selected_date = today
     return render_template(
         "clients/contacts_today.html",
-        contact_events=due_client_contact_events(now),
+        contact_events=due_client_contact_events(now, selected_date),
         today=today,
+        selected_date=selected_date,
+        previous_date=selected_date - timedelta(days=1),
+        next_date=selected_date + timedelta(days=1),
     )
 
 
@@ -332,7 +340,7 @@ def create():
                 flash("Клиент и запись истории созданы.", "success")
             else:
                 flash("Клиент создан.", "success")
-            return redirect(url_for("clients.contacts_today" if planned_local else "main.dashboard"))
+            return redirect(url_for("main.dashboard"))
     return render_template(
         "clients/form.html",
         client=client,
@@ -347,6 +355,10 @@ def create():
 @login_required
 def detail(client_id):
     client = get_client_or_404(client_id)
+    event_id = request.args.get("event_id", type=int)
+    selected_event = db.session.get(CalendarEvent, event_id) if event_id else None
+    if selected_event is None or selected_event.client_id != client.id:
+        selected_event = None
     interactions = db.session.scalars(
         db.select(Interaction)
         .where(Interaction.client_id == client.id)
@@ -360,6 +372,7 @@ def detail(client_id):
         history_text=build_history_text(interactions, now),
         interaction_token=uuid4().hex,
         client_categories=CLIENT_GROUP_LABELS,
+        selected_event_id=selected_event.id if selected_event else None,
     )
 
 
@@ -520,7 +533,10 @@ def save_history(client_id):
     ).all()
     submitted_text = request.form.get("history_text", "")
     files = request.files.getlist("files")
-    date_saved = False
+    event_id = request.form.get("event_id", type=int)
+    selected_event = db.session.get(CalendarEvent, event_id) if event_id else None
+    if selected_event is None or selected_event.client_id != client.id:
+        selected_event = None
     try:
         if request.form.get("history_ids", "") != ",".join(
             str(item.id) for item in interactions
@@ -539,8 +555,7 @@ def save_history(client_id):
             interaction.show_history_date = show_date
             if interaction.text != updated_text:
                 interaction.text = updated_text
-                planned_local, _ = reschedule_interaction_event(client, interaction)
-                date_saved = date_saved or planned_local is not None
+                reschedule_interaction_event(client, interaction)
         submission_token = request.form.get("submission_token", "").strip()
         already_saved = submission_token and db.session.scalar(
             db.select(Interaction).where(Interaction.submission_token == submission_token)
@@ -548,14 +563,17 @@ def save_history(client_id):
         if (interaction_text_body(new_text) or any(item.filename for item in files)) and not already_saved:
             if not re.fullmatch(r"[A-Za-z0-9_-]{16,64}", submission_token):
                 submission_token = uuid4().hex
-            interaction, _, planned_local, _ = add_interaction(
+            interaction, _, _, _ = add_interaction(
                 client,
                 new_text,
                 submission_token=submission_token,
                 show_history_date=new_show_date,
             )
-            date_saved = date_saved or planned_local is not None
             save_uploads(files, client.id, interaction.id)
+            if selected_event is not None and selected_event.status in OPEN_EVENT_STATUSES:
+                selected_event.status = "completed"
+                selected_event.completed_at = interaction.created_at
+                selected_event.completed_by_interaction_id = interaction.id
         complete_due_quarterly_events(client.id)
         regenerate_quarterly_events(
             client, after_date=utc_naive_to_local(utcnow()).date()
@@ -573,11 +591,10 @@ def save_history(client_id):
             history_text=submitted_text,
             interaction_token=request.form.get("submission_token", uuid4().hex),
             client_categories=CLIENT_GROUP_LABELS,
+            selected_event_id=selected_event.id if selected_event else None,
         ), 400
     flash("История клиента сохранена.", "success")
-    if date_saved:
-        return redirect(url_for("clients.contacts_today"))
-    return redirect(url_for("clients.detail", client_id=client.id))
+    return redirect(url_for("main.dashboard"))
 
 
 @bp.post("/<int:client_id>/interactions")
@@ -635,7 +652,7 @@ def create_interaction(client_id):
         )
     else:
         flash("Запись добавлена в историю.", "success")
-    return redirect(url_for("clients.contacts_today" if planned_local else "clients.index"))
+    return redirect(url_for("main.dashboard"))
 
 
 @bp.route("/<int:client_id>/interactions/<int:interaction_id>/edit", methods=["GET", "POST"])
@@ -688,7 +705,7 @@ def edit_interaction(client_id, interaction_id):
                 )
             else:
                 flash("Запись истории обновлена.", "success")
-            return redirect(url_for("clients.contacts_today" if planned_local else "clients.index"))
+            return redirect(url_for("main.dashboard"))
     return render_template(
         "clients/interaction_form.html",
         client=client,
@@ -717,16 +734,14 @@ def delete_interaction(client_id, interaction_id):
 @login_required
 def download_attachment(attachment_id):
     attachment = db.get_or_404(Attachment, attachment_id)
-    path = Path(attachment.file_path)
-    upload_root = Path(current_app.config["UPLOAD_FOLDER"]).resolve()
-    try:
-        resolved = path.resolve(strict=True)
-    except FileNotFoundError:
+    path = Path(attachment.file_path).absolute()
+    upload_root = Path(current_app.config["UPLOAD_FOLDER"]).absolute()
+    if not path.exists() or path.is_symlink():
         abort(404)
-    if not resolved.is_relative_to(upload_root):
+    if not path.is_relative_to(upload_root):
         abort(403)
     return send_file(
-        resolved,
+        path,
         as_attachment=True,
         download_name=attachment.original_name,
         mimetype=attachment.mime_type or None,
@@ -738,18 +753,9 @@ def download_attachment(attachment_id):
 def delete_attachment(attachment_id):
     attachment = db.get_or_404(Attachment, attachment_id)
     client_id = attachment.client_id
-    interaction_id = attachment.interaction_id
     path = Path(attachment.file_path)
     db.session.delete(attachment)
     db.session.commit()
     path.unlink(missing_ok=True)
     flash("Файл удалён.", "success")
-    if interaction_id:
-        return redirect(
-            url_for(
-                "clients.edit_interaction",
-                client_id=client_id,
-                interaction_id=interaction_id,
-            )
-        )
     return redirect(url_for("clients.detail", client_id=client_id))

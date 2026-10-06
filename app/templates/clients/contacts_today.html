@@ -3,10 +3,16 @@
 {% block content %}
 <div class="page-heading">
     <div>
-        <p class="eyebrow">Клиенты</p>
+        <button class="back-link back-button" type="button" data-history-back data-fallback-url="{{ url_for('main.dashboard') }}">← Назад</button>
         <h1>Связаться сегодня</h1>
     </div>
     <a class="button" href="{{ url_for('clients.index') }}">Все клиенты</a>
+</div>
+<div class="task-toolbar">
+    <a class="icon-button" href="{{ url_for('clients.contacts_today', date=previous_date.isoformat()) }}" aria-label="Предыдущий день">←</a>
+    <div class="task-toolbar-date"><span class="task-toolbar-weekday">{{ ['пн.', 'вт.', 'ср.', 'чт.', 'пт.', 'сб.', 'вс.'][selected_date.weekday()] }}</span><strong>{{ selected_date.strftime('%d.%m.%Y') }}</strong></div>
+    <a class="icon-button" href="{{ url_for('clients.contacts_today', date=next_date.isoformat()) }}" aria-label="Следующий день">→</a>
+    {% if selected_date != today %}<a class="button button-small" href="{{ url_for('clients.contacts_today') }}">Сегодня</a>{% endif %}
 </div>
 
 <section class="panel">
@@ -18,14 +24,14 @@
                     <time>{{ event.starts_at|local_datetime('%H:%M') }}</time>
                     <span class="event-dot event-{{ event.event_type }}"></span>
                     <span>
-                        <strong><a href="{{ url_for('clients.detail', client_id=event.client_id) }}">{{ event.client.full_name }}</a></strong>
-                        <small>{% if event.starts_at|local_datetime('%Y-%m-%d') < today.isoformat() %}{{ event_date }} · Просрочено{% else %}Сегодня{% endif %}{% if event.title %} · {{ event.title }}{% endif %}</small>
+                        <strong><a href="{{ url_for('clients.detail', client_id=event.client_id, event_id=event.id) }}">{{ event.client.full_name }}</a></strong>
+                        <small>{% if event.starts_at|local_datetime('%Y-%m-%d') < today.isoformat() %}{{ event_date }} · Просрочено{% elif selected_date == today %}Сегодня{% else %}{{ event_date }}{% endif %}{% if event.title %} · {{ event.title }}{% endif %}</small>
                     </span>
                 </div>
             {% endfor %}
         </div>
     {% else %}
-        <div class="empty-state">На сегодня нет клиентов, с которыми нужно связаться.</div>
+        <div class="empty-state">{{ 'На сегодня нет клиентов, с которыми нужно связаться.' if selected_date == today else 'На выбранный день нет клиентов для связи.' }}</div>
     {% endif %}
 </section>
 {% endblock %}

@@ -42,7 +42,7 @@ def test_create_client_with_interaction_and_next_action(app, auth_client):
 
     assert response.status_code == 200
     assert "дело добавлено на 20.09.2026 14:30".encode() in response.data
-    assert response.request.path == "/clients/contacts-today"
+    assert response.request.path == "/"
     with app.app_context():
         interaction = db.session.scalar(db.select(Interaction))
         event = db.session.scalar(db.select(CalendarEvent))

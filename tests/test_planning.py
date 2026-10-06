@@ -201,7 +201,7 @@ def test_dashboard_counts_only_todays_daily_tasks(app, auth_client, sample_clien
         db.session.commit()
 
     response = auth_client.get("/")
-    assert b'<span class="stat-value">1</span>' in response.data
+    assert b'<span class="home-tab-count">1</span>' in response.data
     assert "Сегодня".encode() not in response.data
     assert "Вчера".encode() not in response.data
     assert "Клиентское событие".encode() not in response.data
