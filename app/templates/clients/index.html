@@ -38,7 +38,7 @@
     {% endif %}
 </form>
 
-{% if not show_archived %}
+{% if not show_archived and not query_text %}
     <div class="client-segments">
         {% for group_key, title in client_categories.items() %}
             {% set grouped_clients = clients_by_category[group_key] %}

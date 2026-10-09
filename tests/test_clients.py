@@ -90,6 +90,7 @@ def test_client_history_is_one_editor_and_saves_old_and_new_entries(
         data={"history_ids": "1", "history_text": history_text},
     )
     assert response.status_code == 302
+    assert response.headers["Location"].endswith(f"/clients/{sample_client}")
     with app.app_context():
         interactions = db.session.scalars(
             db.select(Interaction).order_by(Interaction.id)
@@ -213,7 +214,10 @@ def test_history_uses_compact_date(auth_client, sample_client):
     response = auth_client.get(f"/clients/{sample_client}")
     assert response.status_code == 200
     assert "Новая запись".encode() in response.data
-    assert re.search(rb'<textarea id="history-editor"[^>]+>\d{6}\n', response.data)
+    assert re.search(
+        '<textarea id="history-editor"[^>]+>\\d{6} Новая запись'.encode(),
+        response.data,
+    )
     assert "──────────".encode() not in response.data
     assert "\n\u2063".encode() in response.data
     assert re.search(rb'\d{6} </textarea>', response.data)
@@ -252,6 +256,9 @@ def test_inline_history_edit_keeps_record_date_and_updates_its_event(
         assert utc_naive_to_local(event.starts_at).strftime("%y%m%d %H:%M") == "301202 14:00"
         assert event.is_important is True
 
+    saved_page = auth_client.get(f"/clients/{sample_client}").data.decode()
+    assert f"{original_prefix} Исправленный шаг 301202 14:00!" in saved_page
+
     invalid = auth_client.post(
         f"/clients/{sample_client}/history",
         data={"history_ids": "1", "history_text": "260101\nПовреждённая история"},
@@ -279,7 +286,7 @@ def test_history_date_can_be_removed_without_deleting_record_or_event(
         .group(1)
         .decode()
     )
-    history_text = history_text.split("\n", 1)[1]
+    history_text = history_text.split(" ", 1)[1]
     response = auth_client.post(
         f"/clients/{sample_client}/history",
         data={"history_ids": "1", "history_text": history_text},
@@ -396,6 +403,17 @@ def test_client_list_is_grouped_and_only_shows_names(auth_client, sample_client)
     assert f'/clients/{sample_client}'.encode() in response.data
     assert "+7 999 111-22-33".encode() not in response.data
     assert "ivan@example.com".encode() not in response.data
+
+
+def test_search_shows_matching_client_from_group(auth_client, sample_client):
+    auth_client.post(f"/clients/{sample_client}/group", data={"group": "a"})
+
+    response = auth_client.get("/clients/?q=Иван")
+    assert response.status_code == 200
+    assert "Иван Петров".encode() in response.data
+    assert '<details class="alphabet-group" open>'.encode() in response.data
+    assert b'class="client-segments"' not in response.data
+    assert f'href="/clients/{sample_client}"'.encode() in response.data
 
 
 def test_interaction_defaults_to_call_and_note_is_not_available(app, auth_client, sample_client):

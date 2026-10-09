@@ -24,7 +24,7 @@ def test_workspace_navigation_and_client_date_redirect(auth_client, sample_clien
         data={"history_ids": "", "history_text": "Позвонить 301201"},
     )
     assert response.status_code == 302
-    assert response.headers["Location"].endswith("/")
+    assert response.headers["Location"] == f"/clients/{sample_client}"
 
 
 def test_general_task_date_creates_and_updates_single_calendar_event(app, auth_client):
@@ -115,8 +115,35 @@ def test_calendar_event_has_back_button_before_calendar_link(auth_client):
     heading = page.split('class="calendar-form-heading"', 1)[1].split("</div>", 1)[0]
     assert heading.index("data-history-back") < heading.index(">Календарь</a>")
     assert 'name="starts_at" type="text"' in page
-    assert 'placeholder="ГГ.ММ.ДД ЧЧ:ММ"' in page
+    assert 'placeholder="ГГДДММ"' in page
+    assert 'Начало <span class="required">' not in page
     assert 'name="ends_at"' not in page
+
+
+def test_calendar_date_field_uses_year_day_month_and_keeps_existing_time(
+    app, auth_client
+):
+    response = auth_client.post(
+        "/calendar/events/new",
+        data={"title": "Дело", "starts_at": "301202"},
+    )
+    assert response.status_code == 302
+    with app.app_context():
+        event = db.session.scalar(db.select(CalendarEvent))
+        assert utc_naive_to_local(event.starts_at).strftime("%Y-%m-%d %H:%M") == "2030-02-12 09:00"
+        event_id = event.id
+        event.starts_at = local_to_utc_naive("2030-02-12T14:30")
+        db.session.commit()
+
+    edit_page = auth_client.get(f"/calendar/events/{event_id}/edit").data.decode()
+    assert 'value="301202"' in edit_page
+    auth_client.post(
+        f"/calendar/events/{event_id}/edit",
+        data={"title": "Дело", "starts_at": "301302"},
+    )
+    with app.app_context():
+        event = db.session.get(CalendarEvent, event_id)
+        assert utc_naive_to_local(event.starts_at).strftime("%Y-%m-%d %H:%M") == "2030-02-13 14:30"
 
 
 def test_deleting_scheduled_general_task_removes_only_its_event(app, auth_client):
@@ -180,7 +207,7 @@ def test_calendar_client_comment_completes_selected_event_and_plans_next(
             "event_id": event_id,
         },
     )
-    assert response.headers["Location"] == "/"
+    assert response.headers["Location"] == f"/clients/{sample_client}"
     with app.app_context():
         completed = db.session.get(CalendarEvent, event_id)
         assert completed.status == "completed"
@@ -227,7 +254,7 @@ def test_cyrillic_xlsx_can_be_uploaded_and_deleted(app, auth_client, sample_clie
         },
         content_type="multipart/form-data",
     )
-    assert response.headers["Location"] == "/"
+    assert response.headers["Location"] == f"/clients/{sample_client}"
     with app.app_context():
         attachment = db.session.scalar(db.select(Interaction)).attachments[0]
         attachment_id = attachment.id

@@ -1,4 +1,5 @@
 from datetime import date, datetime, timedelta
+import re
 
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 from flask_login import login_required
@@ -179,7 +180,16 @@ def apply_event_form(event):
     event.event_type = request.form.get("event_type", "other")
     try:
         raw_start = request.form.get("starts_at", "").strip()
-        event.starts_at = local_to_utc_naive(parse_display_datetime(raw_start).isoformat()) if raw_start else None
+        if re.fullmatch(r"\d{6}", raw_start):
+            selected_date = datetime.strptime(raw_start, "%y%d%m").date()
+            existing_time = (
+                utc_naive_to_local(event.starts_at).time()
+                if event.starts_at else datetime.min.time().replace(hour=9)
+            )
+            local_start = datetime.combine(selected_date, existing_time)
+        else:
+            local_start = parse_display_datetime(raw_start) if raw_start else None
+        event.starts_at = local_to_utc_naive(local_start.isoformat()) if local_start else None
     except ValueError:
         event.starts_at = None
     try:

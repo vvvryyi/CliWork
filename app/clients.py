@@ -145,7 +145,7 @@ def history_entry_date(interaction):
 def build_history_text(interactions, now):
     entries = [
         (
-            f"{history_entry_date(item)}\n{interaction_text_body(item.text)}"
+            f"{history_entry_date(item)} {interaction_text_body(item.text)}"
             if item.show_history_date
             else interaction_text_body(item.text)
         )
@@ -164,11 +164,16 @@ def parse_history_text(value, interactions, now):
         if not section.strip():
             updates.append(None)
             continue
-        first_line, separator, remainder = section.lstrip("\n").partition("\n")
-        show_date = first_line.strip() == history_entry_date(interaction)
+        dated_section = section.lstrip("\n")
+        first_line, separator, remainder = dated_section.partition("\n")
+        expected_date = history_entry_date(interaction)
+        show_date = first_line.strip() == expected_date or first_line.startswith(expected_date + " ")
         if show_date:
-            body = remainder
-        elif separator and re.fullmatch(r"\d{6}", first_line.strip()):
+            body = (
+                remainder if first_line.strip() == expected_date
+                else dated_section[len(expected_date):].lstrip(" \t")
+            )
+        elif re.match(r"^\d{6}(?:\s|$)", dated_section):
             raise ValueError("Чтобы убрать дату записи, удалите её целиком.")
         else:
             body = section
@@ -260,7 +265,7 @@ def index():
     clients.sort(key=lambda item: item.full_name.casefold())
     grouped_by_category = {key: [] for key in CLIENT_GROUP_LABELS}
     alphabetical_clients = clients
-    if not show_archived:
+    if not show_archived and not query_text:
         for item in clients:
             if item.client_group in grouped_by_category:
                 grouped_by_category[item.client_group].append(item)
@@ -594,7 +599,7 @@ def save_history(client_id):
             selected_event_id=selected_event.id if selected_event else None,
         ), 400
     flash("История клиента сохранена.", "success")
-    return redirect(url_for("main.dashboard"))
+    return redirect(url_for("clients.detail", client_id=client.id))
 
 
 @bp.post("/<int:client_id>/interactions")

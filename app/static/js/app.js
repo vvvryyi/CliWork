@@ -241,7 +241,8 @@ document.querySelectorAll("textarea[data-history-editor]").forEach((editor) => {
         const start = sections.slice(0, index).reduce(
             (offset, section) => offset + section.length + divider.length, 0,
         );
-        const bodyStart = section.indexOf("\n") + 1;
+        const datePrefix = section.match(/^\d{6} /);
+        const bodyStart = datePrefix ? datePrefix[0].length : 0;
         const selectionStart = bodyStart && section.slice(bodyStart).trim()
             ? start + bodyStart : start;
         editor.focus();
