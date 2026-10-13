@@ -1,9 +1,11 @@
 from app.extensions import db
+import html
+import re
 from datetime import datetime
 from io import BytesIO
 from pathlib import Path
 
-from app.models import CalendarEvent, DailyTask, GeneralTask, Interaction
+from app.models import CalendarEvent, Client, DailyTask, GeneralTask, Interaction
 from app.utils import local_to_utc_naive, utc_naive_to_local
 
 
@@ -24,7 +26,62 @@ def test_workspace_navigation_and_client_date_redirect(auth_client, sample_clien
         data={"history_ids": "", "history_text": "Позвонить 301201"},
     )
     assert response.status_code == 302
-    assert response.headers["Location"] == f"/clients/{sample_client}"
+    assert response.headers["Location"] == "/"
+
+
+def test_dashboard_sections_and_client_counter(app, auth_client, sample_client):
+    home = auth_client.get("/").data.decode()
+    tabs = home.split('<nav class="workspace-home-tabs"', 1)[1].split("</nav>", 1)[0]
+    assert re.findall(r'href="([^"]+)"', tabs) == [
+        "/clients/", "/clients/contacts-today", "/tasks/",
+        "/calendar/", "/messages/compose", "/tasks/all",
+    ]
+    cards = re.findall(r"<a\b[^>]*>(.*?)</a>", tabs, re.S)
+    assert [re.sub(r"<[^>]+>", "", card).strip("0123456789 ") for card in cards] == [
+        "Клиенты", "Связаться сегодня", "Дела",
+        "Календарь", "Сообщения", "Все дела",
+    ]
+    clients_tab = tabs.split('href="/clients/"', 1)[1].split("</a>", 1)[0]
+    all_tasks_tab = tabs.split('href="/tasks/all"', 1)[1].split("</a>", 1)[0]
+    assert '<span class="home-tab-count">1</span><span>Клиенты</span>' in clients_tab
+    assert 'home-tab-count' not in all_tasks_tab
+
+    auth_client.post("/clients/new", data={"full_name": "Второй клиент"})
+    assert '<span class="home-tab-count">2</span><span>Клиенты</span>' in auth_client.get("/").data.decode()
+    auth_client.post(f"/clients/{sample_client}/archive")
+    assert '<span class="home-tab-count">1</span><span>Клиенты</span>' in auth_client.get("/").data.decode()
+
+
+def test_history_save_keeps_previous_entry_and_date_on_same_line(
+    app, auth_client, sample_client
+):
+    with app.app_context():
+        db.session.add(Interaction(client_id=sample_client, text="250101 Старая запись"))
+        db.session.commit()
+        original_text = db.session.get(Interaction, 1).text
+
+    detail = auth_client.get(f"/clients/{sample_client}").data.decode()
+    history_text = html.unescape(
+        re.search(r'<textarea id="history-editor"[^>]*>(.*?)</textarea>', detail, re.S).group(1)
+    )
+    assert history_text.startswith("250101 Старая запись")
+    assert re.search(r"\n\u2063\d{6} $", history_text)
+    saved = auth_client.post(
+        f"/clients/{sample_client}/history",
+        data={"history_ids": "1", "history_text": history_text + "Новая заметка"},
+    )
+    assert saved.headers["Location"] == "/"
+    with app.app_context():
+        assert db.session.get(Interaction, 1).text == original_text
+        assert db.session.get(Interaction, 2).show_history_date is True
+
+    reopened = auth_client.get(f"/clients/{sample_client}").data.decode()
+    reopened_text = html.unescape(
+        re.search(r'<textarea id="history-editor"[^>]*>(.*?)</textarea>', reopened, re.S).group(1)
+    )
+    assert reopened_text.startswith("250101 Старая запись")
+    assert re.search(r"\d{6} Новая заметка", reopened_text)
+    assert not re.search(r"\d{6}\nНовая заметка", reopened_text)
 
 
 def test_general_task_date_creates_and_updates_single_calendar_event(app, auth_client):
@@ -34,11 +91,12 @@ def test_general_task_date_creates_and_updates_single_calendar_event(app, auth_c
     detail_url = f"/tasks/all/{task_id}"
     detail = auth_client.get(detail_url).data.decode()
     assert 'name="due_date" type="text"' in detail
-    assert 'placeholder="ГГ.ММ.ДД"' in detail
+    assert 'placeholder="ГГММДД"' in detail
+    assert 'pattern="[0-9]{6}"' in detail
 
     response = auth_client.post(
         detail_url,
-        data={"text": "Общее дело", "comment": "Пояснение", "due_date": "30.12.01"},
+        data={"text": "Общее дело", "comment": "Пояснение", "due_date": "301201"},
     )
     assert response.status_code == 302
     with app.app_context():
@@ -48,6 +106,7 @@ def test_general_task_date_creates_and_updates_single_calendar_event(app, auth_c
         assert event_id is not None
         assert task.calendar_event.origin == "general_task"
         assert task.calendar_event.comment == "Пояснение"
+    assert 'value="301201"' in auth_client.get(detail_url).data.decode()
 
     auth_client.post(
         "/tasks/save",
@@ -63,7 +122,7 @@ def test_general_task_date_creates_and_updates_single_calendar_event(app, auth_c
 
     response = auth_client.post(
         detail_url,
-        data={"text": "Общее дело", "comment": "Пояснение", "due_date": "2030-12-02"},
+        data={"text": "Общее дело", "comment": "Пояснение", "due_date": "301202"},
     )
     assert response.status_code == 302
     with app.app_context():
@@ -207,7 +266,7 @@ def test_calendar_client_comment_completes_selected_event_and_plans_next(
             "event_id": event_id,
         },
     )
-    assert response.headers["Location"] == f"/clients/{sample_client}"
+    assert response.headers["Location"] == "/"
     with app.app_context():
         completed = db.session.get(CalendarEvent, event_id)
         assert completed.status == "completed"
@@ -254,7 +313,7 @@ def test_cyrillic_xlsx_can_be_uploaded_and_deleted(app, auth_client, sample_clie
         },
         content_type="multipart/form-data",
     )
-    assert response.headers["Location"] == f"/clients/{sample_client}"
+    assert response.headers["Location"] == "/"
     with app.app_context():
         attachment = db.session.scalar(db.select(Interaction)).attachments[0]
         attachment_id = attachment.id

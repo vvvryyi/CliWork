@@ -30,6 +30,14 @@ def test_create_client_form_replaces_notes_with_interaction_field(
     )
 
 
+def test_client_card_prefills_current_date(auth_client, sample_client, monkeypatch):
+    import app.clients as clients_module
+
+    monkeypatch.setattr(clients_module, "utcnow", lambda: datetime(2026, 10, 13, 9))
+    detail = auth_client.get(f"/clients/{sample_client}").data.decode()
+    assert 'data-history-editor>261013 </textarea>' in detail
+
+
 def test_create_client_with_interaction_and_next_action(app, auth_client):
     response = auth_client.post(
         "/clients/new",
@@ -90,7 +98,7 @@ def test_client_history_is_one_editor_and_saves_old_and_new_entries(
         data={"history_ids": "1", "history_text": history_text},
     )
     assert response.status_code == 302
-    assert response.headers["Location"].endswith(f"/clients/{sample_client}")
+    assert response.headers["Location"] == "/"
     with app.app_context():
         interactions = db.session.scalars(
             db.select(Interaction).order_by(Interaction.id)

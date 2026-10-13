@@ -139,18 +139,21 @@ def add_interaction(
 
 
 def history_entry_date(interaction):
-    return utc_naive_to_local(interaction.created_at).strftime("%y%m%d")
+    saved_date = re.match(r"^([0-9]{6})(?:\s|$)", (interaction.text or "").strip())
+    return (
+        saved_date.group(1)
+        if saved_date
+        else utc_naive_to_local(interaction.created_at).strftime("%y%m%d")
+    )
+
+
+def rendered_history_entry(interaction):
+    body = interaction_text_body(interaction.text)
+    return f"{history_entry_date(interaction)} {body}" if interaction.show_history_date else body
 
 
 def build_history_text(interactions, now):
-    entries = [
-        (
-            f"{history_entry_date(item)} {interaction_text_body(item.text)}"
-            if item.show_history_date
-            else interaction_text_body(item.text)
-        )
-        for item in interactions
-    ]
+    entries = [rendered_history_entry(item) for item in interactions]
     entries.append(normalize_interaction_text("", now))
     return HISTORY_DIVIDER.join(entries)
 
@@ -161,6 +164,9 @@ def parse_history_text(value, interactions, now):
         raise ValueError("Граница между записями была удалена. Обновите страницу и повторите правку.")
     updates = []
     for interaction, section in zip(interactions, sections):
+        if section == rendered_history_entry(interaction):
+            updates.append((interaction.text, interaction.show_history_date))
+            continue
         if not section.strip():
             updates.append(None)
             continue
@@ -599,7 +605,7 @@ def save_history(client_id):
             selected_event_id=selected_event.id if selected_event else None,
         ), 400
     flash("История клиента сохранена.", "success")
-    return redirect(url_for("clients.detail", client_id=client.id))
+    return redirect(url_for("main.dashboard"))
 
 
 @bp.post("/<int:client_id>/interactions")

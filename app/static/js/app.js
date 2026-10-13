@@ -250,6 +250,7 @@ document.querySelectorAll("textarea[data-history-editor]").forEach((editor) => {
     };
     editor.form?.querySelector("[data-history-edit]")?.addEventListener("click", () => {
         editor.focus();
+        editor.setSelectionRange(editor.value.length, editor.value.length);
     });
     const focusLinkedRecord = () => {
         const match = window.location.hash.match(/^#interaction-(\d+)$/);

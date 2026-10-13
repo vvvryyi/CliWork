@@ -2,12 +2,12 @@
 {% block title %}Workspace{% endblock %}
 {% block content %}
 <nav class="workspace-home-tabs" aria-label="Разделы Workspace на главной">
-    <a href="{{ url_for('tasks.index') }}"><span class="home-tab-count">{{ task_count }}</span><span>Дела</span></a>
+    <a href="{{ url_for('clients.index') }}"><span class="home-tab-count">{{ client_count }}</span><span>Клиенты</span></a>
     <a href="{{ url_for('clients.contacts_today') }}" class="{% if overdue_contact_ids %}home-tab-alert{% endif %}"><span class="home-tab-count">{{ contact_count }}</span><span>Связаться сегодня</span></a>
-    <a href="{{ url_for('clients.index') }}">Клиенты</a>
+    <a href="{{ url_for('tasks.index') }}"><span class="home-tab-count">{{ task_count }}</span><span>Дела</span></a>
     <a href="{{ url_for('calendar.index') }}">Календарь</a>
-    <a href="{{ url_for('messaging.compose') }}">Сообщение</a>
-    <a href="{{ url_for('tasks.all_tasks') }}"><span class="home-tab-count">{{ general_task_count }}</span><span>Все дела</span></a>
+    <a href="{{ url_for('messaging.compose') }}">Сообщения</a>
+    <a href="{{ url_for('tasks.all_tasks') }}">Все дела</a>
 </nav>
 
 {% endblock %}

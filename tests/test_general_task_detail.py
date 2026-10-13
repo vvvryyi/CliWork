@@ -53,3 +53,21 @@ def test_general_task_card_requires_valid_title(app, auth_client):
         task = db.session.get(GeneralTask, task_id)
         assert task.text == "Исходное"
         assert task.comment == ""
+
+
+def test_general_task_card_rejects_separators_and_invalid_dates(app, auth_client):
+    task_id = auth_client.post(
+        "/tasks/save", data={"task_scope": "general", "text": "Исходное"}
+    ).get_json()["task_id"]
+    detail_url = f"/tasks/all/{task_id}"
+    for invalid_date in ("26.10.13", "2026-10-13", "261332"):
+        response = auth_client.post(
+            detail_url,
+            data={"text": "Изменённое", "due_date": invalid_date},
+        )
+        assert response.status_code == 200
+        assert "ГГММДД" in response.data.decode()
+        with app.app_context():
+            task = db.session.get(GeneralTask, task_id)
+            assert task.text == "Исходное"
+            assert task.due_date is None

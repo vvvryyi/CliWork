@@ -1,3 +1,4 @@
+import re
 from datetime import date, timedelta
 
 from flask import Blueprint, flash, jsonify, redirect, render_template, request, url_for
@@ -11,7 +12,7 @@ from .task_service import (
     sync_event_from_task,
     sync_event_from_general_task,
 )
-from .utils import PLANNING_END_YEAR, parse_display_date, utc_naive_to_local
+from .utils import PLANNING_END_YEAR, utc_naive_to_local
 
 
 bp = Blueprint("tasks", __name__, url_prefix="/tasks")
@@ -24,6 +25,15 @@ def parse_date(value):
         return date.fromisoformat(value)
     except (TypeError, ValueError):
         return utc_naive_to_local(utcnow()).date()
+
+
+def parse_general_task_date(value):
+    if not re.fullmatch(r"[0-9]{6}", value):
+        raise ValueError("Укажите дату в формате ГГММДД.")
+    try:
+        return date(2000 + int(value[:2]), int(value[2:4]), int(value[4:]))
+    except ValueError as error:
+        raise ValueError("Укажите существующую дату в формате ГГММДД.") from error
 
 
 @bp.get("/")
@@ -78,10 +88,10 @@ def general_detail(task_id):
         else:
             raw_date = request.form.get("due_date", "").strip()
             try:
-                due_date = parse_display_date(raw_date) if raw_date else None
-            except ValueError:
+                due_date = parse_general_task_date(raw_date) if raw_date else None
+            except ValueError as error:
                 due_date = None
-                flash("Укажите корректную дату исполнения.", "error")
+                flash(str(error), "error")
             else:
                 if due_date and due_date.year > PLANNING_END_YEAR:
                     flash("Дела можно планировать не позднее 31.12.2031.", "error")

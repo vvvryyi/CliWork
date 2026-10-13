@@ -31,6 +31,7 @@ def test_opening_card_adds_a_fresh_dated_section_to_history(app, auth_client, sa
         db.session.commit()
 
     page = auth_client.get(f"/clients/{sample_client}")
+    assert "250101 Старый текст 261201".encode() in page.data
     assert "Старый текст 261201".encode() in page.data
     assert "\n\u2063260918 </textarea>".encode() in page.data
     assert page.data.index("Старый текст 261201".encode()) < page.data.index(b"260918 </textarea>")
@@ -348,7 +349,7 @@ def test_task_page_and_dashboard_use_new_compact_wording(auth_client):
     assert "Название дела".encode() in calendar_form.data
 
 
-def test_dashboard_counts_only_open_general_tasks(auth_client):
+def test_dashboard_all_tasks_has_no_counter(auth_client):
     for text, completed in (("Открытое", "0"), ("Выполненное", "1")):
         auth_client.post(
             "/tasks/save",
@@ -362,7 +363,7 @@ def test_dashboard_counts_only_open_general_tasks(auth_client):
 
     page = auth_client.get("/").data.decode()
     all_tasks_tab = page.split('href="/tasks/all"', 1)[1].split("</a>", 1)[0]
-    assert '<span class="home-tab-count">1</span>' in all_tasks_tab
+    assert 'home-tab-count' not in all_tasks_tab
 
 
 def test_daily_task_open_row_has_calendar_arrow_but_completed_row_does_not(

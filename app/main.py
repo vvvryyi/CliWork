@@ -3,7 +3,7 @@ from flask_login import login_required
 from sqlalchemy import func
 
 from .extensions import db
-from .models import DailyTask, GeneralTask, utcnow
+from .models import Client, DailyTask, utcnow
 from .task_service import daily_task_sort_key
 from .utils import (
     due_client_contact_events,
@@ -34,10 +34,8 @@ def dashboard():
             DailyTask.due_date == local_today,
         )
     )
-    general_task_count = db.session.scalar(
-        db.select(func.count(GeneralTask.id)).where(
-            GeneralTask.completed_at.is_(None)
-        )
+    client_count = db.session.scalar(
+        db.select(func.count(Client.id)).where(Client.archived_at.is_(None))
     )
     today_tasks = db.session.scalars(
         db.select(DailyTask)
@@ -51,7 +49,7 @@ def dashboard():
         contact_clients=contact_clients,
         overdue_contact_ids=overdue_contact_ids,
         task_count=task_count or 0,
-        general_task_count=general_task_count or 0,
+        client_count=client_count or 0,
         today_tasks=today_tasks,
         today=local_today,
     )
