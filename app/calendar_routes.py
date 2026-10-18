@@ -6,7 +6,7 @@ from flask_login import login_required
 
 from .extensions import db
 from .models import CalendarEvent, Client, utcnow
-from .task_service import delete_event_and_task, sync_task_from_event
+from .task_service import daily_task_sort_key, delete_event_and_task, sync_task_from_event
 from .utils import (
     EVENT_TYPE_LABELS,
     local_to_utc_naive,
@@ -120,6 +120,23 @@ def index():
         if day_tab == "contacts"
         else task_events_by_date.get(selected_date, [])
     ) if view == "day" else events
+    daily_tasks = []
+    general_tasks = []
+    agenda_events = []
+    for event in day_events if view in {"day", "overdue"} else ():
+        if event.client_id is None and event.general_task is not None:
+            general_tasks.append(event.general_task)
+        elif event.client_id is None and event.daily_task is not None:
+            daily_tasks.append(event.daily_task)
+        else:
+            agenda_events.append(event)
+    calendar_task_groups = [
+        (show_all, title, sorted(tasks, key=daily_task_sort_key))
+        for show_all, title, tasks in (
+            (False, "Дела", daily_tasks), (True, "Все дела", general_tasks)
+        )
+        if tasks
+    ]
     today = utc_naive_to_local(utcnow()).date()
     highlighted_event_ids = {
         event.id
@@ -164,6 +181,8 @@ def index():
         contact_events_by_date=contact_events_by_date,
         day_tab=day_tab,
         day_events=day_events,
+        calendar_task_groups=calendar_task_groups,
+        agenda_events=agenda_events,
         previous_date=previous_date,
         next_date=next_date,
         today=today,

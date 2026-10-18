@@ -113,5 +113,5 @@ def verify_2fa():
 @bp.post("/logout")
 def logout():
     logout_user()
-    flash("Вы вышли из Workspace.", "success")
+    flash("Вы вышли из WorkSpace.", "success")
     return redirect(url_for("auth.login"))

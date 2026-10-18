@@ -36,6 +36,7 @@ class Config:
     MAX_CONTENT_LENGTH = int(os.getenv("MAX_CONTENT_LENGTH", 20 * 1024 * 1024))
     ALLOWED_EXTENSIONS = {
         "pdf",
+        "pptx",
         "doc",
         "docx",
         "xls",

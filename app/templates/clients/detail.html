@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}{{ client.full_name }} — Workspace{% endblock %}
+{% block title %}{{ client.full_name }} — WorkSpace{% endblock %}
 {% block content %}
 <div class="page-heading client-detail-heading">
     <div>
@@ -102,7 +102,7 @@
                         <div class="compact-upload">
                             <label class="button button-small">
                                 📎 Выбрать файлы
-                                <input name="files" type="file" multiple data-file-input>
+                                <input name="files" type="file" accept="{{ upload_accept }}" multiple data-file-input>
                             </label>
                             <small data-file-status>До 20 МБ</small>
                         </div>

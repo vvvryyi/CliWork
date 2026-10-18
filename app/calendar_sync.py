@@ -76,7 +76,7 @@ def _event_ical(event):
     component = Event()
     component.add("uid", event.external_uid)
     component.add("dtstamp", datetime.now(timezone.utc))
-    component.add("summary", event.title or (event.client.full_name if event.client else "Дело CRM"))
+    component.add("summary", event.title or (event.client.full_name if event.client else "Дело WorkSpace"))
     component.add("dtstart", event.starts_at.replace(tzinfo=timezone.utc))
     if event.ends_at:
         component.add("dtend", event.ends_at.replace(tzinfo=timezone.utc))

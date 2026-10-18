@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Редактирование записи — Workspace{% endblock %}
+{% block title %}Редактирование записи — WorkSpace{% endblock %}
 {% block content %}
 <div class="page-heading">
     <div>
@@ -36,7 +36,7 @@
         </div>
     {% endif %}
     <div class="compact-upload">
-        <label class="button button-small">📎 Выбрать файлы<input name="files" type="file" multiple data-file-input></label>
+        <label class="button button-small">📎 Выбрать файлы<input name="files" type="file" accept="{{ upload_accept }}" multiple data-file-input></label>
         <small data-file-status>До 20 МБ</small>
     </div>
     <div class="form-actions">

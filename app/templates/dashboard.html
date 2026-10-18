@@ -1,8 +1,8 @@
 {% extends "base.html" %}
-{% block title %}Workspace{% endblock %}
+{% block title %}WorkSpace{% endblock %}
 {% block content %}
-<nav class="workspace-home-tabs" aria-label="Разделы Workspace на главной">
-    <a href="{{ url_for('clients.index') }}"><span class="home-tab-count">{{ client_count }}</span><span>Клиенты</span></a>
+<nav class="workspace-home-tabs" aria-label="Разделы WorkSpace на главной">
+    <a href="{{ url_for('clients.index') }}"><span class="home-tab-count">{{ client_count }}</span><span>Контакты</span></a>
     <a href="{{ url_for('clients.contacts_today') }}" class="{% if overdue_contact_ids %}home-tab-alert{% endif %}"><span class="home-tab-count">{{ contact_count }}</span><span>Связаться сегодня</span></a>
     <a href="{{ url_for('tasks.index') }}"><span class="home-tab-count">{{ task_count }}</span><span>Дела</span></a>
     <a href="{{ url_for('calendar.index') }}">Календарь</a>

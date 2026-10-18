@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="color-scheme" content="light">
     <meta name="theme-color" content="#246bfe">
-    <title>{% block title %}Workspace{% endblock %}</title>
+    <title>{% block title %}WorkSpace{% endblock %}</title>
     <link rel="manifest" href="{{ url_for('static', filename='manifest.webmanifest') }}">
     <link rel="icon" href="{{ url_for('static', filename='icon.svg') }}" type="image/svg+xml">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='18') }}">
@@ -13,12 +13,12 @@
 <body>
     {% if current_user.is_authenticated %}
         <header class="workspace-header">
-            <a class="brand" href="{{ url_for('main.dashboard') }}" aria-label="Workspace — главная">
-                <span class="brand-mark" aria-hidden="true">W</span><span>Workspace</span>
+            <a class="brand" href="{{ url_for('main.dashboard') }}" aria-label="WorkSpace — главная">
+                <span class="brand-mark" aria-hidden="true">W</span><span>WorkSpace</span>
             </a>
             <details class="mobile-menu">
                 <summary aria-label="Открыть меню"><span aria-hidden="true">☰</span></summary>
-                <nav class="mobile-menu-content" aria-label="Меню Workspace">
+                <nav class="mobile-menu-content" aria-label="Меню WorkSpace">
                     <a href="{{ url_for('settings.index') }}">Настройки</a>
                     <form action="{{ url_for('auth.logout') }}" method="post">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -27,7 +27,7 @@
                 </nav>
             </details>
         </header>
-        <nav class="main-nav workspace-tabs" aria-label="Разделы Workspace">
+        <nav class="main-nav workspace-tabs" aria-label="Разделы WorkSpace">
                 <a href="{{ url_for('settings.index') }}" {% if request.blueprint == 'settings' %}aria-current="page"{% endif %}>Настройки</a>
                 <form action="{{ url_for('auth.logout') }}" method="post">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -49,7 +49,7 @@
         {% block content %}{% endblock %}
     </main>
 
-    <script src="{{ url_for('static', filename='js/app.js', v='17') }}"></script>
+    <script src="{{ url_for('static', filename='js/app.js', v='18') }}"></script>
     {% block scripts %}{% endblock %}
 </body>
 </html>

@@ -1,4 +1,4 @@
-# Workspace
+# WorkSpace
 
 Локальное однопользовательское Flask-приложение для ведения клиентов, истории взаимодействий, файлов и календаря.
 
@@ -73,6 +73,12 @@ python run.py
 
 ```powershell
 .\.venv\Scripts\python.exe -m pytest
+```
+
+Проверка подтверждения и отмены удаления дел (при установленном Node.js):
+
+```powershell
+node --test tests/task_editor.test.cjs
 ```
 
 ## Развёртывание на VPS

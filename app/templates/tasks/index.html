@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}{{ "Все дела" if show_all else "Дела" }} — Workspace{% endblock %}
+{% block title %}{{ "Все дела" if show_all else "Дела" }} — WorkSpace{% endblock %}
 {% block content %}
 <div class="page-heading">
     <div><button class="back-link back-button" type="button" data-history-back data-fallback-url="{{ url_for('main.dashboard') }}">← Назад</button><h1>{{ "Все дела" if show_all else "Дела" }}</h1></div>
@@ -17,39 +17,5 @@
 </div>
 {% endif %}
 
-<section class="panel task-panel{% if show_all %} task-panel-general{% endif %}" data-task-editor data-save-url="{{ url_for('tasks.save') }}" data-selected-date="{{ selected_date.isoformat() }}" data-task-scope="{{ 'general' if show_all else 'daily' }}">
-    <input type="hidden" data-task-csrf value="{{ csrf_token() }}">
-    <div class="task-sheet" data-task-list>
-        {% for task in tasks %}
-            <div class="task-line {% if task.is_completed %}is-completed{% endif %}" data-task-row data-task-id="{{ task.id }}" data-due-date="{{ task.due_date.isoformat() if task.due_date else '' }}" data-saved-text="{{ task.text }}" data-saved-comment="{{ task.comment if show_all else '' }}" data-saved-completed="{{ '1' if task.is_completed else '0' }}" data-saved-important="{{ '1' if task.is_important else '0' }}" data-calendar-url="{{ url_for('tasks.general_detail', task_id=task.id) if show_all else (url_for('calendar.edit_event', event_id=task.calendar_event_id) if task.calendar_event_id else '') }}">
-                <input class="task-line-check" type="checkbox" data-task-check aria-label="Выполнено" {% if task.is_completed %}checked{% endif %}>
-                <label class="task-line-important" title="Важно">
-                    <input type="checkbox" data-task-important aria-label="Важно" {% if task.is_important %}checked{% endif %}>
-                    <span aria-hidden="true">★</span>
-                </label>
-                <div class="task-line-content">
-                    <textarea class="task-line-text" data-task-text maxlength="500" rows="1" aria-label="Текст дела">{{ task.text }}</textarea>
-                </div>
-                <a class="task-calendar-link{% if task.is_completed or (not show_all and not task.calendar_event_id) %} is-hidden{% endif %}{% if (show_all and task.comment|trim) or (not show_all and task.calendar_event and task.calendar_event.comment|trim) %} has-comment{% endif %}" data-task-calendar href="{{ url_for('tasks.general_detail', task_id=task.id) if show_all else (url_for('calendar.edit_event', event_id=task.calendar_event_id) if task.calendar_event_id else '#') }}"{% if show_all and task.comment|trim %} style="color: #c65a00"{% endif %} aria-label="{{ 'Открыть карточку дела' if show_all else 'Перенести дело в календаре' }}" title="{{ 'Открыть карточку дела' if show_all else 'Перенести в календаре' }}">→</a>
-                <button class="task-line-remove" type="button" data-task-remove aria-label="Удалить дело">×</button>
-            </div>
-        {% endfor %}
-        <div class="task-line is-new" data-task-row data-task-id="" data-due-date="{{ '' if show_all else selected_date.isoformat() }}" data-saved-text="" data-saved-comment="" data-saved-completed="0" data-saved-important="0" data-calendar-url="">
-            <input class="task-line-check" type="checkbox" data-task-check aria-label="Выполнено">
-            <label class="task-line-important" title="Важно">
-                <input type="checkbox" data-task-important aria-label="Важно">
-                <span aria-hidden="true">★</span>
-            </label>
-            <div class="task-line-content">
-                <textarea class="task-line-text" data-task-text maxlength="500" rows="1" placeholder="Введите дело и нажмите Enter" aria-label="Новое дело"></textarea>
-            </div>
-            <a class="task-calendar-link is-hidden" data-task-calendar href="#" aria-label="{{ 'Открыть карточку дела' if show_all else 'Перенести дело в календаре' }}" title="{{ 'Открыть карточку дела' if show_all else 'Перенести в календаре' }}">→</a>
-            <button class="task-line-remove" type="button" data-task-remove aria-label="Удалить строку">×</button>
-        </div>
-    </div>
-    <div class="task-sheet-footer">
-        <small>Enter — новая строка · ⌘/Ctrl + Z — отменить · ⇧⌘Z/Ctrl + Y — повторить</small>
-        <small class="task-save-status" data-task-status aria-live="polite">Сохраняется автоматически</small>
-    </div>
-</section>
+{% include "tasks/_editor.html" %}
 {% endblock %}

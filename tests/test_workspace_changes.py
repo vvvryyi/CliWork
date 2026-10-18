@@ -18,9 +18,9 @@ def test_workspace_navigation_and_client_date_redirect(auth_client, sample_clien
     assert '<details class="mobile-menu">' in page
     home = auth_client.get("/").data.decode()
     assert '<div class="stat-grid">' not in home
-    assert '<h1>Workspace</h1>' not in home
+    assert '<h1>WorkSpace</h1>' not in home
     assert 'class="home-tab-count"' in home
-    assert "— Workspace" in page
+    assert "— WorkSpace" in page
     response = auth_client.post(
         f"/clients/{sample_client}/history",
         data={"history_ids": "", "history_text": "Позвонить 301201"},
@@ -38,18 +38,18 @@ def test_dashboard_sections_and_client_counter(app, auth_client, sample_client):
     ]
     cards = re.findall(r"<a\b[^>]*>(.*?)</a>", tabs, re.S)
     assert [re.sub(r"<[^>]+>", "", card).strip("0123456789 ") for card in cards] == [
-        "Клиенты", "Связаться сегодня", "Дела",
+        "Контакты", "Связаться сегодня", "Дела",
         "Календарь", "Сообщения", "Все дела",
     ]
     clients_tab = tabs.split('href="/clients/"', 1)[1].split("</a>", 1)[0]
     all_tasks_tab = tabs.split('href="/tasks/all"', 1)[1].split("</a>", 1)[0]
-    assert '<span class="home-tab-count">1</span><span>Клиенты</span>' in clients_tab
+    assert '<span class="home-tab-count">1</span><span>Контакты</span>' in clients_tab
     assert 'home-tab-count' not in all_tasks_tab
 
     auth_client.post("/clients/new", data={"full_name": "Второй клиент"})
-    assert '<span class="home-tab-count">2</span><span>Клиенты</span>' in auth_client.get("/").data.decode()
+    assert '<span class="home-tab-count">2</span><span>Контакты</span>' in auth_client.get("/").data.decode()
     auth_client.post(f"/clients/{sample_client}/archive")
-    assert '<span class="home-tab-count">1</span><span>Клиенты</span>' in auth_client.get("/").data.decode()
+    assert '<span class="home-tab-count">1</span><span>Контакты</span>' in auth_client.get("/").data.decode()
 
 
 def test_history_save_keeps_previous_entry_and_date_on_same_line(

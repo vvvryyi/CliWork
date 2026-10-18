@@ -1,11 +1,11 @@
 {% extends "base.html" %}
-{% block title %}Новое сообщение — Workspace{% endblock %}
+{% block title %}Новое сообщение — WorkSpace{% endblock %}
 {% block content %}
 <div class="page-heading">
     <div>
         <button class="back-link back-button" type="button" data-history-back data-fallback-url="{{ url_for('main.dashboard') }}">← Назад</button>
         <h1>Сообщение</h1>
-        <p class="muted">Workspace сохранит текст и откроет выбранный канал. Фактическую отправку подтвердите отдельно.</p>
+        <p class="muted">WorkSpace сохранит текст и откроет выбранный канал. Фактическую отправку подтвердите отдельно.</p>
     </div>
 </div>
 
@@ -37,8 +37,8 @@
     </label>
     <label class="file-field">
         <span>Прикрепить файлы</span>
-        <input name="files" type="file" multiple>
-        <small>Внешнее приложение может не принять вложения автоматически. Workspace сохранит их в истории.</small>
+        <input name="files" type="file" accept="{{ upload_accept }}" multiple>
+        <small>Внешнее приложение может не принять вложения автоматически. WorkSpace сохранит их в истории.</small>
     </label>
     <div><button class="button button-primary" type="submit">Подготовить и продолжить</button></div>
 </form>

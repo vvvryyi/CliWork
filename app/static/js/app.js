@@ -370,14 +370,15 @@ document.querySelectorAll("[data-file-input]").forEach((input) => {
     });
 });
 
-const taskEditor = document.querySelector("[data-task-editor]");
-if (taskEditor) {
+document.querySelectorAll("[data-task-editor]").forEach((taskEditor) => {
     const taskList = taskEditor.querySelector("[data-task-list]");
     const taskStatus = taskEditor.querySelector("[data-task-status]");
     const taskCsrf = taskEditor.querySelector("[data-task-csrf]").value;
     const selectedTaskDate = taskEditor.dataset.selectedDate;
     const taskScope = taskEditor.dataset.taskScope || "daily";
     const isGeneralTasks = taskScope === "general";
+    const allowCreate = taskEditor.dataset.allowCreate !== "0";
+    const hideCompleted = taskEditor.dataset.hideCompleted === "1";
     const undoStack = [];
     const redoStack = [];
     let taskHistoryBusy = false;
@@ -483,6 +484,7 @@ if (taskEditor) {
     };
 
     const ensureBlankTaskRow = () => {
+        if (!allowCreate) return null;
         let blank = taskList.querySelector(".task-line.is-new");
         if (!blank) {
             blank = buildTaskRow({ dueDate: selectedTaskDate });
@@ -520,6 +522,17 @@ if (taskEditor) {
         const important = row.querySelector("[data-task-important]");
         const before = row.dataset.taskId ? taskSnapshot(row) : null;
         const text = input.value.trim();
+        if ((remove || (!text && before)) && (before || text)
+            && !window.confirm("Удалить дело?")) {
+            if (!text && before) input.value = before.text;
+            return null;
+        }
+        if (remove && !before) {
+            input.value = "";
+            checkbox.checked = false;
+            important.checked = false;
+            return null;
+        }
         if (!text && !row.dataset.taskId) {
             checkbox.checked = false;
             important.checked = false;
@@ -572,7 +585,7 @@ if (taskEditor) {
             if (remember && JSON.stringify(before) !== JSON.stringify(after)) {
                 rememberTaskChange(before, after);
             }
-            if (isGeneralTasks && result.completed) {
+            if ((isGeneralTasks || hideCompleted) && result.completed) {
                 row.remove();
                 ensureBlankTaskRow();
             } else if (!isGeneralTasks && result.completed && row.dataset.dueDate !== selectedTaskDate) {
@@ -657,7 +670,7 @@ if (taskEditor) {
             calendarLink.classList.toggle("has-comment", result.has_comment);
             row.classList.toggle("is-completed", result.completed);
         }
-        if (isGeneralTasks && result.completed) {
+        if ((isGeneralTasks || hideCompleted) && result.completed) {
             row.remove();
             ensureBlankTaskRow();
         }
@@ -695,7 +708,8 @@ if (taskEditor) {
         try {
             await saveTaskRow(row);
             const blank = ensureBlankTaskRow();
-            blank.querySelector("[data-task-text]").focus();
+            if (blank) blank.querySelector("[data-task-text]").focus();
+            else input.blur();
         } catch (_) {
             input.focus();
         }
@@ -758,7 +772,7 @@ if (taskEditor) {
         event.preventDefault();
         applyTaskHistory(redoRequested ? "redo" : "undo");
     });
-}
+});
 
 if ("serviceWorker" in navigator && window.isSecureContext) {
     window.addEventListener("load", () => {

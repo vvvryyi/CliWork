@@ -35,7 +35,7 @@ def create_app(test_config=None):
     csrf.init_app(app)
     login_manager.init_app(app)
     login_manager.login_view = "auth.login"
-    login_manager.login_message = "Войдите, чтобы открыть Workspace."
+    login_manager.login_message = "Войдите, чтобы открыть WorkSpace."
     login_manager.login_message_category = "error"
 
     from . import models
@@ -85,6 +85,7 @@ def create_app(test_config=None):
             "status_labels": STATUS_LABELS,
             "event_type_labels": EVENT_TYPE_LABELS,
             "current_timezone": get_timezone_name,
+            "upload_accept": ",".join(f".{ext}" for ext in sorted(app.config["ALLOWED_EXTENSIONS"])),
         }
 
     @app.cli.command("init-db")

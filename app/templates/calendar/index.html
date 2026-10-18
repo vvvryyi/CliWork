@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Календарь — Workspace{% endblock %}
+{% block title %}Календарь — WorkSpace{% endblock %}
 {% block content %}
 <div class="page-heading">
     <div>
@@ -61,8 +61,14 @@
         {% endif %}
         {% if view == "overdue" %}<h2>Просроченные дела</h2>{% endif %}
         {% if day_events %}
+            {% for show_all, editor_title, tasks in calendar_task_groups %}
+                {% with allow_create=false, calendar_editor=true, show_task_dates=(view == 'overdue') %}
+                    {% include "tasks/_editor.html" %}
+                {% endwith %}
+            {% endfor %}
+            {% if agenda_events %}
             <div class="agenda-list">
-                {% for event in day_events %}
+                {% for event in agenda_events %}
                     <div class="agenda-item {% if event.id in highlighted_event_ids %}event-important{% endif %}">
                         <time>{{ event.starts_at|local_datetime("%H:%M") }}</time>
                         <span class="event-dot event-{{ event.event_type }} {% if event.id in highlighted_event_ids %}event-dot-important{% endif %}"></span>
@@ -77,6 +83,7 @@
                     </div>
                 {% endfor %}
             </div>
+            {% endif %}
         {% else %}
             <div class="empty-state">{{ "Просроченных дел нет." if view == "overdue" else ("На этот день нет клиентов для связи." if day_tab == "contacts" else "На этот день дел нет.") }}</div>
         {% endif %}
