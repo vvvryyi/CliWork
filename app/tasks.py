@@ -103,7 +103,7 @@ def general_detail(task_id):
                     sync_event_from_general_task(task)
                     db.session.commit()
                     flash("Дело обновлено.", "success")
-                    return redirect(url_for("tasks.all_tasks"))
+                    return redirect(url_for("main.dashboard"))
     return render_template("tasks/detail.html", task=task, planning_end=date(PLANNING_END_YEAR, 12, 31))
 
 

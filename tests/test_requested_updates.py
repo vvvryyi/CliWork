@@ -30,6 +30,29 @@ def test_upload_requested_formats(app, auth_client, sample_client, filename):
     assert {".pptx", ".pdf", ".xlsx"} <= set(accept.split(","))
 
 
+def test_save_multiple_client_documents_without_text_returns_home(app, auth_client, sample_client):
+    documents = {"Договор.pdf": b"pdf content", "Презентация.pptx": b"pptx content"}
+    response = auth_client.post(
+        f"/clients/{sample_client}/history",
+        data={
+            "history_text": "",
+            "files": [(BytesIO(content), name) for name, content in documents.items()],
+        },
+        content_type="multipart/form-data",
+    )
+    assert response.status_code == 302
+    assert response.headers["Location"] == "/"
+    with app.app_context():
+        attachments = db.session.scalars(db.select(Attachment)).all()
+        assert len(attachments) == 2
+        for attachment in attachments:
+            assert attachment.client_id == sample_client
+            assert Path(attachment.file_path).read_bytes() == documents[attachment.original_name]
+    page = auth_client.get(f"/clients/{sample_client}").data.decode()
+    for name in documents:
+        assert name in page
+
+
 def test_work_space_brand_and_contacts(auth_client):
     home = auth_client.get("/").data.decode()
     assert "<title>WorkSpace</title>" in home

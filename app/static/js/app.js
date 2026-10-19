@@ -362,12 +362,33 @@ document.querySelectorAll("form[data-disable-on-submit]").forEach((form) => {
 });
 
 document.querySelectorAll("[data-file-input]").forEach((input) => {
-    input.addEventListener("change", () => {
-        const status = input.closest(".compact-upload")?.querySelector("[data-file-status]");
-        if (!status) return;
-        const count = input.files?.length || 0;
-        status.textContent = count ? `Выбрано: ${count} · До 20 МБ` : "До 20 МБ";
-    });
+    const upload = input.closest(".compact-upload");
+    if (!upload) return;
+    const status = upload.querySelector("[data-file-status]");
+    const selectedFiles = document.createElement("div");
+    selectedFiles.className = "attachment-list selected-file-list";
+    selectedFiles.setAttribute("aria-label", "Выбранные файлы");
+    selectedFiles.setAttribute("aria-live", "polite");
+    selectedFiles.hidden = true;
+    const compose = upload.closest(".client-history-compose");
+    if (compose) compose.prepend(selectedFiles);
+    else upload.insertAdjacentElement("afterend", selectedFiles);
+    const renderFiles = () => {
+        const files = Array.from(input.files || []);
+        const count = files.length;
+        if (status) {
+            status.textContent = count ? `Выбрано: ${count} · До 20 МБ` : "До 20 МБ";
+        }
+        selectedFiles.replaceChildren(...files.map((file) => {
+            const item = document.createElement("span");
+            item.className = "attachment";
+            item.textContent = `📎 ${file.name}`;
+            return item;
+        }));
+        selectedFiles.hidden = count === 0;
+    };
+    input.addEventListener("change", renderFiles);
+    renderFiles();
 });
 
 document.querySelectorAll("[data-task-editor]").forEach((taskEditor) => {

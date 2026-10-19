@@ -27,7 +27,7 @@ def test_general_task_arrow_opens_card_and_comment_is_saved(app, auth_client):
         data={"text": "Обновлённое дело", "comment": "Подробности", "important": "1"},
     )
     assert saved.status_code == 302
-    assert saved.headers["Location"].endswith("/tasks/all")
+    assert saved.headers["Location"] == "/"
     with app.app_context():
         task = db.session.get(GeneralTask, task_id)
         assert task.text == "Обновлённое дело"

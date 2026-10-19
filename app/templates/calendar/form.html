@@ -31,8 +31,8 @@
             </select>
         </label>
         <label>
-            <span class="sr-only">Дата дела (ГГДДММ)</span>
-            <input name="starts_at" type="text" inputmode="numeric" placeholder="ГГДДММ" pattern="[0-9]{6}" maxlength="6" title="Формат: ГГДДММ" aria-label="Дата дела в формате ГГДДММ" required value="{{ request.form.get('starts_at', (event.starts_at|local_datetime('%y%d%m')) if event.starts_at else preset_date.strftime('%y%d%m') if preset_date else '') }}">
+            <span class="sr-only">Дата дела (ГГММДД)</span>
+            <input name="starts_at" type="text" inputmode="numeric" placeholder="ГГММДД" pattern="[0-9]{6}" maxlength="6" title="Формат: ГГММДД" aria-label="Дата дела в формате ГГММДД" required value="{{ request.form.get('starts_at', (event.starts_at|local_datetime('%y%m%d')) if event.starts_at else preset_date.strftime('%y%m%d') if preset_date else '') }}">
         </label>
         <label>
             Комментарий

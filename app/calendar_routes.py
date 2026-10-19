@@ -200,7 +200,7 @@ def apply_event_form(event):
     try:
         raw_start = request.form.get("starts_at", "").strip()
         if re.fullmatch(r"\d{6}", raw_start):
-            selected_date = datetime.strptime(raw_start, "%y%d%m").date()
+            selected_date = datetime.strptime(raw_start, "%y%m%d").date()
             existing_time = (
                 utc_naive_to_local(event.starts_at).time()
                 if event.starts_at else datetime.min.time().replace(hour=9)
@@ -261,7 +261,7 @@ def create_event():
             sync_task_from_event(event)
             db.session.commit()
             flash("Дело создано.", "success")
-            return redirect(url_for("calendar.index"))
+            return redirect(url_for("main.dashboard"))
     return render_template(
         "calendar/form.html",
         event=event,
@@ -305,9 +305,7 @@ def edit_event(event_id):
             sync_task_from_event(event)
             db.session.commit()
             flash("Дело обновлено.", "success")
-            if event.daily_task is not None:
-                return redirect(url_for("tasks.index", date=utc_naive_to_local(event.starts_at).date().isoformat()))
-            return redirect(url_for("calendar.index"))
+            return redirect(url_for("main.dashboard"))
     return render_template(
         "calendar/form.html",
         event=event,

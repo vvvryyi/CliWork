@@ -342,6 +342,8 @@ legend { padding: 0 8px; font-weight: 750; }
 .attachment { display: inline-flex; padding: .4rem .65rem; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-soft); font-size: .83rem; }
 .attachment-row { display: flex; align-items: center; gap: 8px; }
 .attachment-row .attachment { overflow-wrap: anywhere; }
+.selected-file-list[hidden] { display: none; }
+.selected-file-list .attachment { max-width: 100%; overflow-wrap: anywhere; }
 
 .result-card { width: min(720px, 100%); margin: 6vh auto; text-align: center; }
 .result-icon { display: grid; width: 58px; height: 58px; margin: 0 auto 18px; place-items: center; border-radius: 50%; background: var(--success-soft); color: var(--success); font-size: 1.7rem; font-weight: 800; }

@@ -174,12 +174,12 @@ def test_calendar_event_has_back_button_before_calendar_link(auth_client):
     heading = page.split('class="calendar-form-heading"', 1)[1].split("</div>", 1)[0]
     assert heading.index("data-history-back") < heading.index(">Календарь</a>")
     assert 'name="starts_at" type="text"' in page
-    assert 'placeholder="ГГДДММ"' in page
+    assert 'placeholder="ГГММДД"' in page
     assert 'Начало <span class="required">' not in page
     assert 'name="ends_at"' not in page
 
 
-def test_calendar_date_field_uses_year_day_month_and_keeps_existing_time(
+def test_calendar_date_field_uses_year_month_day_and_keeps_existing_time(
     app, auth_client
 ):
     response = auth_client.post(
@@ -187,22 +187,39 @@ def test_calendar_date_field_uses_year_day_month_and_keeps_existing_time(
         data={"title": "Дело", "starts_at": "301202"},
     )
     assert response.status_code == 302
+    assert response.headers["Location"] == "/"
     with app.app_context():
         event = db.session.scalar(db.select(CalendarEvent))
-        assert utc_naive_to_local(event.starts_at).strftime("%Y-%m-%d %H:%M") == "2030-02-12 09:00"
+        assert utc_naive_to_local(event.starts_at).strftime("%Y-%m-%d %H:%M") == "2030-12-02 09:00"
         event_id = event.id
-        event.starts_at = local_to_utc_naive("2030-02-12T14:30")
+        event.starts_at = local_to_utc_naive("2030-12-02T14:30")
         db.session.commit()
 
     edit_page = auth_client.get(f"/calendar/events/{event_id}/edit").data.decode()
     assert 'value="301202"' in edit_page
-    auth_client.post(
+    saved = auth_client.post(
         f"/calendar/events/{event_id}/edit",
-        data={"title": "Дело", "starts_at": "301302"},
+        data={"title": "Дело", "starts_at": "301203"},
     )
+    assert saved.headers["Location"] == "/"
     with app.app_context():
         event = db.session.get(CalendarEvent, event_id)
-        assert utc_naive_to_local(event.starts_at).strftime("%Y-%m-%d %H:%M") == "2030-02-13 14:30"
+        assert utc_naive_to_local(event.starts_at).strftime("%Y-%m-%d %H:%M") == "2030-12-03 14:30"
+
+
+def test_calendar_preset_date_and_invalid_compact_dates(app, auth_client):
+    page = auth_client.get("/calendar/events/new?date=2030-12-02").data.decode()
+    assert 'value="301202"' in page
+    for invalid_date in ("301302", "300231", "301232"):
+        response = auth_client.post(
+            "/calendar/events/new",
+            data={"title": "Дело", "starts_at": invalid_date},
+        )
+        assert response.status_code == 200
+        assert "Укажите дату дела." in response.data.decode()
+        assert f'value="{invalid_date}"' in response.data.decode()
+        with app.app_context():
+            assert db.session.scalar(db.select(CalendarEvent)) is None
 
 
 def test_deleting_scheduled_general_task_removes_only_its_event(app, auth_client):
@@ -280,7 +297,7 @@ def test_calendar_client_comment_completes_selected_event_and_plans_next(
     assert "Иван Петров".encode() not in old_day.data
 
 
-def test_daily_task_comment_date_moves_task_and_returns_to_tasks(app, auth_client):
+def test_daily_task_comment_date_moves_task_and_returns_home(app, auth_client):
     created = auth_client.post(
         "/tasks/save",
         data={"task_scope": "daily", "text": "Позвонить", "due_date": "2030-12-01"},
@@ -296,7 +313,7 @@ def test_daily_task_comment_date_moves_task_and_returns_to_tasks(app, auth_clien
             "comment": "Перенести звонок 301202",
         },
     )
-    assert response.headers["Location"] == "/tasks/?date=2030-12-02"
+    assert response.headers["Location"] == "/"
     with app.app_context():
         task = db.session.get(DailyTask, created["task_id"])
         assert task.due_date.isoformat() == "2030-12-02"
