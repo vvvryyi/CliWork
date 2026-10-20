@@ -26,7 +26,10 @@
                 {% endfor %}
             </select>
         </form>
-        <a class="button button-primary" href="{{ url_for('messaging.compose', client_id=client.id) }}">Написать</a>
+        <a class="button" href="{{ url_for('calendar.create_event', client_id=client.id, event_type='call') }}">Звонок</a>
+        <a class="button" href="{{ url_for('calendar.create_event', client_id=client.id, event_type='meeting') }}">Встреча</a>
+        <a class="button" href="{{ url_for('calendar.create_event', client_id=client.id, event_type='mailing') }}">Рассылка</a>
+        <a class="button button-primary" href="#client-message">Написать</a>
         <a class="button" href="{{ url_for('clients.edit', client_id=client.id) }}">Редактировать</a>
         <form action="{{ url_for('clients.archive', client_id=client.id) }}" method="post" data-confirm="Переместить клиента в архив?">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -54,6 +57,15 @@
     </aside>
 
     <section>
+        <details class="panel" id="client-message">
+            <summary>Написать клиенту</summary>
+            <form class="form-stack" method="post" action="{{ url_for('messaging.compose') }}" enctype="multipart/form-data">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="client_id" value="{{ client.id }}">
+                {% include 'messaging/_message_fields.html' %}
+                <div><button class="button button-primary" type="submit">Подготовить сообщение</button></div>
+            </form>
+        </details>
         <form class="panel form-stack client-detail-form" method="post" action="{{ url_for('clients.save_history', client_id=client.id) }}" enctype="multipart/form-data" data-disable-on-submit>
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <input type="hidden" name="workflow_fields_present" value="1">
@@ -98,6 +110,13 @@
                     </div>
                 {% endif %}
                 <div class="client-history-compose">
+                    <label>Действие
+                        <select name="interaction_type">
+                            <option value="call">Звонок</option>
+                            <option value="meeting">Встреча</option>
+                            <option value="mailing">Рассылка</option>
+                        </select>
+                    </label>
                     <div class="client-history-compose-actions">
                         <div class="compact-upload">
                             <label class="button button-small">

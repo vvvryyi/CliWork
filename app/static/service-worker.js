@@ -1,4 +1,4 @@
-const STATIC_CACHE = "workspace-static-v13";
+const STATIC_CACHE = "workspace-static-v14";
 const STATIC_FILES = [
   "/static/css/style.css",
   "/static/js/app.js",

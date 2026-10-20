@@ -42,8 +42,8 @@
         <legend>Контакты каналов связи</legend>
         <div class="form-grid">
             <label>WhatsApp<input name="whatsapp" value="{{ client.whatsapp or '' }}" placeholder="+7 999 000-00-00"></label>
-            <label>Telegram<input name="telegram" value="{{ client.telegram or '' }}" placeholder="@username"></label>
-            <label>MAX<input name="max_contact" value="{{ client.max_contact or '' }}" placeholder="Ссылка на контакт"></label>
+            <label>Telegram<input name="telegram" value="{{ client.telegram or '' }}" placeholder="@username, t.me/username или +7…"></label>
+            <label>MAX<input name="max_contact" value="{{ client.max_contact or '' }}" placeholder="https://max.ru/u/…"><small>Скопируйте ссылку на профиль из MAX.</small></label>
             <label>Instagram<input name="instagram" value="{{ client.instagram or '' }}" placeholder="@username"></label>
             <label class="span-2">Facebook<input name="facebook" value="{{ client.facebook or '' }}" placeholder="Ссылка на профиль"></label>
         </div>

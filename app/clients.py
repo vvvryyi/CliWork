@@ -39,7 +39,7 @@ from .utils import (
 
 bp = Blueprint("clients", __name__, url_prefix="/clients")
 
-INTERACTION_TYPES = {"call", "meeting", "message", "documents"}
+INTERACTION_TYPES = {"call", "meeting", "mailing", "message", "documents"}
 CLIENT_GROUP_LABELS = {
     "d": "Д",
     "v": "Б",
@@ -577,6 +577,10 @@ def save_history(client_id):
             interaction, _, _, _ = add_interaction(
                 client,
                 new_text,
+                interaction_type=(
+                    request.form.get("interaction_type", "call")
+                    if request.form.get("interaction_type", "call") in INTERACTION_TYPES else "call"
+                ),
                 submission_token=submission_token,
                 show_history_date=new_show_date,
             )

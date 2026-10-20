@@ -10,7 +10,8 @@
     <div class="heading-actions centered">
         <button class="button" type="button" data-copy-target="#prepared-message">Копировать текст</button>
         {% if external_url %}
-            <a class="button button-primary" href="{{ external_url }}" target="_blank" rel="noopener">Открыть {{ channel_label }}</a>
+            <a class="button button-primary" href="{{ external_url }}"{% if external_url.startswith('https://') %} target="_blank" rel="noopener"{% endif %}>Открыть {{ channel_label }}</a>
+            {% if web_url %}<a class="button" href="{{ web_url }}" target="_blank" rel="noopener">Открыть через сайт</a>{% endif %}
         {% else %}
             <span class="notice">Для этого канала не указан корректный контакт или ссылка.</span>
         {% endif %}

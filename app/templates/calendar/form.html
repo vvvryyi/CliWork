@@ -16,18 +16,18 @@
             <select name="client_id">
                 <option value="">Личное дело</option>
                 {% for client in clients %}
-                    <option value="{{ client.id }}" {% if event.client_id == client.id %}selected{% endif %}>{{ client.full_name }}</option>
+                    <option value="{{ client.id }}" {% if request.form.get('client_id', event.client_id|string) == client.id|string %}selected{% endif %}>{{ client.full_name }}</option>
                 {% endfor %}
             </select>
         </label>
         <label>
             Название дела
-            <input name="title" maxlength="250" value="{{ event.title or '' }}" placeholder="Обязательно, если клиент не выбран">
+            <input name="title" maxlength="250" value="{{ request.form.get('title', event.title or '') }}" placeholder="Обязательно, если клиент не выбран">
         </label>
         <label>
             Вид дела
             <select name="event_type">
-                {% for value, label in event_types.items() %}<option value="{{ value }}" {% if event.event_type == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+                {% for value, label in event_types.items() %}<option value="{{ value }}" {% if request.form.get('event_type', event.event_type) == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
             </select>
         </label>
         <label>
@@ -36,7 +36,7 @@
         </label>
         <label>
             Комментарий
-            <textarea name="comment" rows="5">{{ event.comment or "" }}</textarea>
+            <textarea name="comment" rows="5">{{ request.form.get('comment', event.comment or '') }}</textarea>
         </label>
     </div>
     <div class="form-actions">

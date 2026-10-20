@@ -1,4 +1,4 @@
-from flask import Blueprint, flash, redirect, render_template, request, url_for
+from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
 from flask_login import login_required
 
 from .extensions import db
@@ -23,16 +23,21 @@ def compose():
         .where(Client.archived_at.is_(None))
         .order_by(Client.full_name)
     ).all()
-    selected_client_id = request.args.get("client_id", type=int)
+    selected_client_id = request.values.get("client_id", type=int)
+    selected_channel = request.values.get("channel", "")
+    message = request.form.get("message", "").strip()
 
     if request.method == "POST":
         client = db.get_or_404(Client, request.form.get("client_id", type=int))
+        if client.is_archived:
+            abort(404)
         channel = request.form.get("channel", "")
-        message = request.form.get("message", "").strip()
         if channel not in CHANNEL_LABELS:
             flash("Выберите канал связи.", "error")
         elif not message:
             flash("Введите сообщение.", "error")
+        elif not build_channel_url(client, channel, message):
+            flash("Укажите корректный контакт выбранного канала в карточке клиента.", "error")
         else:
             interaction = Interaction(
                 client_id=client.id,
@@ -52,22 +57,25 @@ def compose():
             except ValueError as error:
                 db.session.rollback()
                 flash(str(error), "error")
-                return redirect(request.url)
-
-            return render_template(
-                "messaging/prepared.html",
-                client=client,
-                interaction=interaction,
-                message=message,
-                channel_label=CHANNEL_LABELS[channel],
-                external_url=build_channel_url(client, channel, message),
-            )
+            else:
+                return render_template(
+                    "messaging/prepared.html",
+                    client=client,
+                    interaction=interaction,
+                    message=message,
+                    channel_label=CHANNEL_LABELS[channel],
+                    external_url=build_channel_url(client, channel, message),
+                    web_url=build_channel_url(client, channel, message, web=True)
+                    if channel in {"telegram", "whatsapp"} else "",
+                )
 
     return render_template(
         "messaging/compose.html",
         clients=clients,
         channels=CHANNEL_LABELS,
         selected_client_id=selected_client_id,
+        selected_channel=selected_channel,
+        message=message,
     )
 
 

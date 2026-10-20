@@ -126,6 +126,8 @@ h3 { margin-top: 1.5rem; margin-bottom: .4rem; font-size: .95rem; }
 button:disabled { cursor: wait; opacity: .65; }
 
 .form-stack { display: grid; gap: 20px; }
+#client-message { margin-bottom: 16px; }
+#client-message[open] > summary { margin-bottom: 16px; }
 .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
 .span-2 { grid-column: span 2; }
 label, .field-label { display: grid; gap: 7px; color: #34414d; font-size: .9rem; font-weight: 700; }

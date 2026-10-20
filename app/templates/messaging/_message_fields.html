@@ -1,0 +1,18 @@
+<label>
+    <span>Канал <span class="required">*</span></span>
+    <select name="channel" required>
+        <option value="">Выберите канал</option>
+        {% for value, label in channel_labels.items() %}
+            <option value="{{ value }}" {% if (selected_channel if selected_channel is defined else client.preferred_channel) == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+    </select>
+</label>
+<label>
+    <span>Сообщение <span class="required">*</span></span>
+    <textarea name="message" rows="6" required placeholder="Введите текст для клиента">{{ message|default('') }}</textarea>
+</label>
+<div class="compact-upload">
+    <label class="button button-small">📎 Выбрать файлы<input name="files" type="file" accept="{{ upload_accept }}" multiple data-file-input></label>
+    <small data-file-status>До 20 МБ</small>
+</div>
+<small class="muted">Файлы сохранятся в истории. Прикрепите их к сообщению в выбранном приложении.</small>

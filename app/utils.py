@@ -2,7 +2,7 @@ import calendar
 import re
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
-from urllib.parse import quote
+from urllib.parse import parse_qs, quote, urlsplit
 from uuid import uuid4
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -32,6 +32,7 @@ STATUS_LABELS = {
 EVENT_TYPE_LABELS = {
     "call": "Звонок",
     "meeting": "Встреча",
+    "mailing": "Рассылка",
     "task": "Дело",
     "documents": "Документы",
     "other": "Другое",
@@ -314,16 +315,44 @@ def save_uploads(files, client_id, interaction_id=None):
     return saved
 
 
-def build_channel_url(client, channel, message):
-    contact = client.channel_contact(channel).strip()
-    encoded = quote(message)
+def normalize_phone(contact):
+    if not re.fullmatch(r"[+0-9()\s.-]+", contact):
+        return ""
+    digits = re.sub(r"\D", "", contact)
+    if len(digits) == 11 and digits.startswith("8"):
+        digits = "7" + digits[1:]
+    return digits if 7 <= len(digits) <= 15 else ""
+
+
+def build_channel_url(client, channel, message, *, web=False):
+    contact = (client.channel_contact(channel) or "").strip()
+    encoded = quote(message, safe="")
 
     if channel == "whatsapp":
-        digits = "".join(character for character in contact if character.isdigit())
-        return f"https://wa.me/{digits}?text={encoded}" if digits else ""
+        if contact.startswith(("https://wa.me/", "http://wa.me/", "wa.me/")):
+            contact = urlsplit(contact if "://" in contact else "https://" + contact).path.strip("/")
+        digits = normalize_phone(contact)
+        if not digits:
+            return ""
+        return (f"https://wa.me/{digits}?text={encoded}" if web
+                else f"whatsapp://send?phone={digits}&text={encoded}")
     if channel == "telegram":
-        username = contact.lstrip("@").strip()
-        return f"https://t.me/{username}" if username else ""
+        if contact.startswith(("tg://resolve?", "https://t.me/", "http://t.me/", "t.me/", "https://telegram.me/")):
+            parsed = urlsplit(contact if "://" in contact else "https://" + contact)
+            if parsed.scheme == "tg":
+                query = parse_qs(parsed.query)
+                contact = query.get("domain", query.get("phone", [""]))[0]
+            else:
+                contact = parsed.path.strip("/")
+        phone = normalize_phone(contact)
+        if phone:
+            return (f"https://t.me/+{phone}?text={encoded}" if web
+                    else f"tg://resolve?phone={phone}&text={encoded}")
+        username = contact.lstrip("@")
+        if not re.fullmatch(r"[A-Za-z][A-Za-z0-9_]{3,31}", username):
+            return ""
+        return (f"https://t.me/{username}?text={encoded}" if web
+                else f"tg://resolve?domain={username}&text={encoded}")
     if channel == "instagram":
         username = contact.lstrip("@").strip().rstrip("/")
         if username.startswith("http"):
@@ -332,7 +361,17 @@ def build_channel_url(client, channel, message):
     if channel == "facebook":
         return contact if contact.startswith("http") else ""
     if channel == "max":
-        return contact if contact.startswith(("http://", "https://")) else ""
+        if contact.startswith(("max.ru/", "www.max.ru/")):
+            contact = "https://" + contact
+        try:
+            parsed = urlsplit(contact)
+        except ValueError:
+            return ""
+        if (parsed.scheme in {"http", "https"}
+                and parsed.netloc.lower() in {"max.ru", "www.max.ru"}
+                and re.fullmatch(r"/(?:u/)?[A-Za-z0-9_-]+/?", parsed.path)):
+            return "https://max.ru" + parsed.path
+        return ""
     return ""
 
 

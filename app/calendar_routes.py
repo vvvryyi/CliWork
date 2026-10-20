@@ -239,10 +239,12 @@ def validate_event(event):
 @bp.route("/events/new", methods=["GET", "POST"])
 @login_required
 def create_event():
+    event_type = request.args.get("event_type", "other")
     event = CalendarEvent(
         client_id=request.args.get("client_id", type=int),
         origin="manual",
         status="planned",
+        event_type=event_type if event_type in EVENT_TYPE_LABELS else "other",
     )
     clients = db.session.scalars(
         db.select(Client)
@@ -285,21 +287,24 @@ def edit_event(event_id):
         .order_by(Client.full_name)
     ).all()
     if request.method == "POST":
-        apply_event_form(event)
-        comment_date = None
-        invalid_comment_date = False
-        if event.daily_task is not None and event.client_id is None:
-            comment_date, date_found, _ = parse_planning_details(event.comment)
-            invalid_comment_date = date_found and comment_date is None
-            if comment_date:
-                original_start = event.starts_at
-                event.starts_at = local_to_utc_naive(
-                    comment_date.isoformat(timespec="minutes")
-                )
-                if event.ends_at and original_start:
-                    event.ends_at += event.starts_at - original_start
-        error = "Проверьте дату ГГММДД в комментарии." if invalid_comment_date else validate_event(event)
+        # Lazy relationship reads must not flush an invalid date to a NOT NULL column.
+        with db.session.no_autoflush:
+            apply_event_form(event)
+            comment_date = None
+            invalid_comment_date = False
+            if event.daily_task is not None and event.client_id is None:
+                comment_date, date_found, _ = parse_planning_details(event.comment)
+                invalid_comment_date = date_found and comment_date is None
+                if comment_date:
+                    original_start = event.starts_at
+                    event.starts_at = local_to_utc_naive(
+                        comment_date.isoformat(timespec="minutes")
+                    )
+                    if event.ends_at and original_start:
+                        event.ends_at += event.starts_at - original_start
+            error = "Проверьте дату ГГММДД в комментарии." if invalid_comment_date else validate_event(event)
         if error:
+            db.session.rollback()
             flash(error, "error")
         else:
             sync_task_from_event(event)

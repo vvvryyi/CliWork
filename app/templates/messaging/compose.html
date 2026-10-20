@@ -21,25 +21,8 @@
                 {% endfor %}
             </select>
         </label>
-        <label>
-            Канал <span class="required">*</span>
-            <select name="channel" required>
-                <option value="">Выберите канал</option>
-                {% for value, label in channels.items() %}
-                    <option value="{{ value }}">{{ label }}</option>
-                {% endfor %}
-            </select>
-        </label>
     </div>
-    <label>
-        Сообщение <span class="required">*</span>
-        <textarea id="message-text" name="message" rows="9" required placeholder="Введите текст для клиента"></textarea>
-    </label>
-    <label class="file-field">
-        <span>Прикрепить файлы</span>
-        <input name="files" type="file" accept="{{ upload_accept }}" multiple>
-        <small>Внешнее приложение может не принять вложения автоматически. WorkSpace сохранит их в истории.</small>
-    </label>
+    {% include 'messaging/_message_fields.html' %}
     <div><button class="button button-primary" type="submit">Подготовить и продолжить</button></div>
 </form>
 {% endblock %}

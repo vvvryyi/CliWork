@@ -73,7 +73,7 @@ def test_client_history_is_one_editor_and_saves_old_and_new_entries(
 
     detail = auth_client.get(f"/clients/{sample_client}")
     assert b'class="timeline client-history"' in detail.data
-    assert detail.data.count(b"<textarea") == 1
+    assert detail.data.count(b'name="history_text"') == 1
     assert b'name="history_text"' in detail.data
     assert b"data-history-editor" in detail.data
     assert b"data-dated-interaction" not in detail.data
