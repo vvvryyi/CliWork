@@ -20,9 +20,15 @@
         <div class="agenda-list">
             {% for event in contact_events %}
                 {% set event_date = (event.starts_at|local_datetime('%d.%m.%Y')) %}
-                <div class="agenda-item">
+                <div class="agenda-item contact-agenda-item{% if event.is_important %} event-important{% endif %}">
                     <time>{{ event.starts_at|local_datetime('%H:%M') }}</time>
-                    <span class="event-dot event-{{ event.event_type }}"></span>
+                    <form data-contact-importance action="{{ url_for('clients.save_contact_importance', event_id=event.id) }}" method="post">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <label class="task-line-important" title="Важно">
+                            <input type="checkbox" name="important" value="1" aria-label="Важно: {{ event.client.full_name }}" {% if event.is_important %}checked{% endif %}>
+                            <span aria-hidden="true">★</span>
+                        </label>
+                    </form>
                     <span>
                         <strong><a href="{{ url_for('clients.detail', client_id=event.client_id, event_id=event.id) }}">{{ event.client.full_name }}</a></strong>
                         <small>{% if event.starts_at|local_datetime('%Y-%m-%d') < today.isoformat() %}{{ event_date }} · Просрочено{% elif selected_date == today %}Сегодня{% else %}{{ event_date }}{% endif %}{% if event.title %} · {{ event.title }}{% endif %}</small>
@@ -30,6 +36,7 @@
                 </div>
             {% endfor %}
         </div>
+        <small class="task-save-status" data-contact-importance-status aria-live="polite"></small>
     {% else %}
         <div class="empty-state">{{ 'На сегодня нет клиентов, с которыми нужно связаться.' if selected_date == today else 'На выбранный день нет клиентов для связи.' }}</div>
     {% endif %}

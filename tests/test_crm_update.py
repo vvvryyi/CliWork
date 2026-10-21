@@ -1,5 +1,6 @@
 from datetime import date, datetime, timezone
 
+import pytest
 from icalendar import Event
 
 from app.calendar_sync import sync_icloud_calendar
@@ -77,11 +78,11 @@ def test_client_flags_and_compact_upload_are_saved(app, auth_client, sample_clie
     assert "До 20 МБ".encode() in detail.data
 
 
-def test_quarterly_reminders_fill_calendar_for_active_client(app, auth_client, sample_client, monkeypatch):
+def test_quarterly_reminders_fill_calendar_for_group_d_client(app, auth_client, sample_client, monkeypatch):
     import app.utils as utils_module
 
     monkeypatch.setattr(utils_module, "utcnow", lambda: datetime(2026, 9, 18, 9))
-    auth_client.post(f"/clients/{sample_client}/group", data={"group": "a"})
+    auth_client.post(f"/clients/{sample_client}/group", data={"group": "d"})
     auth_client.post(
         f"/clients/{sample_client}/interactions",
         data={
@@ -104,6 +105,42 @@ def test_quarterly_reminders_fill_calendar_for_active_client(app, auth_client, s
 def test_quarterly_dates_keep_original_day_after_short_month():
     assert add_months(date(2027, 11, 30), 3, 30) == date(2028, 2, 29)
     assert add_months(date(2028, 2, 29), 3, 30) == date(2028, 5, 30)
+
+
+@pytest.mark.parametrize("group", ["none", "d", "v", "b", "r", "m", "p", "a", "k"])
+def test_quarterly_field_and_scheduling_are_only_available_in_group_d(app, auth_client, sample_client, group):
+    auth_client.post(f"/clients/{sample_client}/group", data={"group": group})
+    page = auth_client.get(f"/clients/{sample_client}").data.decode()
+    assert ('name="quarterly_reminder_mmdd"' in page) is (group == "d")
+    response = auth_client.post(
+        f"/clients/{sample_client}/history",
+        data={"history_text": "", "quarterly_reminder_mmdd": "0918"},
+    )
+    assert response.status_code == 302
+    with app.app_context():
+        client = db.session.get(Client, sample_client)
+        assert client.quarterly_reminder_mmdd == ("0918" if group == "d" else "")
+        events = db.session.scalars(
+            db.select(CalendarEvent).where(CalendarEvent.origin == "quarterly")
+        ).all()
+        assert bool(events) is (group == "d")
+
+
+def test_leaving_group_d_removes_open_reminders_and_preserves_anchor(app, auth_client, sample_client):
+    auth_client.post(f"/clients/{sample_client}/group", data={"group": "d"})
+    auth_client.post(
+        f"/clients/{sample_client}/history",
+        data={"history_text": "", "quarterly_reminder_mmdd": "0918"},
+    )
+    auth_client.post(f"/clients/{sample_client}/group", data={"group": "a"})
+    # The hidden field is absent when saving another group's card.
+    auth_client.post(f"/clients/{sample_client}/history", data={"history_text": ""})
+    with app.app_context():
+        assert db.session.get(Client, sample_client).quarterly_reminder_mmdd == "0918"
+        assert db.session.scalar(db.select(CalendarEvent).where(CalendarEvent.origin == "quarterly")) is None
+    auth_client.post(f"/clients/{sample_client}/group", data={"group": "d"})
+    with app.app_context():
+        assert db.session.scalar(db.select(CalendarEvent).where(CalendarEvent.origin == "quarterly")) is not None
 
 
 def test_rescheduling_clears_dashboard_overdue_contact_alert(app, auth_client, sample_client):

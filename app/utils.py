@@ -158,7 +158,7 @@ def regenerate_quarterly_events(client, after_date=None):
 
     if (
         client.is_archived
-        or client.client_group != "a"
+        or client.client_group != "d"
         or not client.quarterly_reminder_mmdd
     ):
         return 0

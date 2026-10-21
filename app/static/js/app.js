@@ -71,6 +71,45 @@ document.querySelectorAll("[data-auto-submit]").forEach((field) => {
     field.addEventListener("change", () => field.form?.submit());
 });
 
+document.querySelectorAll("[data-contact-importance]").forEach((form) => {
+    const checkbox = form.querySelector('[name="important"]');
+    const row = form.closest(".agenda-item");
+    const status = document.querySelector("[data-contact-importance-status]");
+    form.addEventListener("submit", (event) => event.preventDefault());
+    checkbox.addEventListener("change", async () => {
+        const previous = !checkbox.checked;
+        const data = new FormData(form);
+        data.set("important", checkbox.checked ? "1" : "0");
+        checkbox.disabled = true;
+        if (status) {
+            status.textContent = "Сохраняем…";
+            status.classList.remove("is-error");
+        }
+        try {
+            const response = await fetch(form.action, {
+                method: "POST",
+                body: data,
+                headers: { "Accept": "application/json" },
+            });
+            const result = await response.json().catch(() => ({}));
+            if (!response.ok || typeof result.important !== "boolean") {
+                throw new Error(result.error || "Не удалось сохранить важность.");
+            }
+            checkbox.checked = result.important;
+            row.classList.toggle("event-important", result.important);
+            if (status) status.textContent = "Сохранено";
+        } catch (error) {
+            checkbox.checked = previous;
+            if (status) {
+                status.textContent = error.message || "Не удалось сохранить важность.";
+                status.classList.add("is-error");
+            }
+        } finally {
+            checkbox.disabled = false;
+        }
+    });
+});
+
 document.querySelectorAll("[data-client-segment-open]").forEach((button) => {
     button.addEventListener("click", () => {
         const dialog = document.getElementById(button.dataset.clientSegmentOpen);
@@ -483,7 +522,6 @@ document.querySelectorAll("[data-task-editor]").forEach((taskEditor) => {
         input.rows = 1;
         input.value = task.text || "";
         input.dataset.taskText = "";
-        input.placeholder = task.id ? "" : "Введите дело и нажмите Enter";
         input.setAttribute("aria-label", task.id ? "Текст дела" : "Новое дело");
         content.append(input);
         const calendarLink = document.createElement("a");

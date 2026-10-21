@@ -394,6 +394,8 @@ legend { padding: 0 8px; font-weight: 750; }
 .agenda-item:last-child { border: 0; }
 .agenda-item > span:last-child { display: grid; }
 .agenda-item small { color: var(--muted); }
+.contact-agenda-item { grid-template-columns: 65px 24px minmax(0, 1fr); }
+.contact-agenda-item .task-line-important { min-height: 36px; }
 .search-dialog { width: min(760px, calc(100% - 24px)); max-height: min(760px, calc(100vh - 48px)); padding: 0; overflow: hidden; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); color: var(--text); box-shadow: 0 24px 80px rgba(23, 33, 43, .25); }
 .search-dialog::backdrop { background: rgba(23, 33, 43, .45); backdrop-filter: blur(2px); }
 .search-dialog-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; padding: 22px 24px 12px; }
@@ -464,6 +466,7 @@ legend { padding: 0 8px; font-weight: 750; }
     .calendar-count { margin-top: 5px; padding: .18rem .3rem; font-size: .65rem; }
     .calendar-week .calendar-weekdays, .calendar-week .calendar-row { min-width: 700px; }
     .agenda-item { grid-template-columns: 48px 10px 1fr; gap: 8px; }
+    .contact-agenda-item { grid-template-columns: 48px 24px minmax(0, 1fr); }
     .search-modal-form { flex-direction: column; }
     .client-workflow { grid-template-columns: 1fr; }
     .compact-upload { align-items: flex-start; flex-direction: column; }

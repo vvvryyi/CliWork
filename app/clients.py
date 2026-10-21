@@ -97,9 +97,10 @@ def apply_client_workflow_form(client):
     else:
         client.percent_value = None
         client.flag_percent = False
-    client.quarterly_reminder_mmdd = validate_mmdd(
-        request.form.get("quarterly_reminder_mmdd", "")
-    )
+    if client.client_group == "d":
+        client.quarterly_reminder_mmdd = validate_mmdd(
+            request.form.get("quarterly_reminder_mmdd", "")
+        )
 
 
 def add_interaction(
@@ -314,6 +315,21 @@ def contacts_today():
         previous_date=selected_date - timedelta(days=1),
         next_date=selected_date + timedelta(days=1),
     )
+
+
+@bp.post("/contacts-today/events/<int:event_id>/importance")
+@login_required
+def save_contact_importance(event_id):
+    event = db.get_or_404(CalendarEvent, event_id)
+    if event.client_id is None:
+        abort(404)
+    get_client_or_404(event.client_id)
+    important = request.form.get("important")
+    if important not in {"0", "1"}:
+        return jsonify({"error": "Укажите важность события."}), 400
+    event.is_important = important == "1"
+    db.session.commit()
+    return jsonify({"important": event.is_important})
 
 
 @bp.route("/new", methods=["GET", "POST"])

@@ -88,10 +88,12 @@
                         {% endfor %}
                     </div>
                 </div>
+                {% if client.client_group == 'd' %}
                 <label class="quarterly-field">
                     Каждые 3 месяца
                     <input name="quarterly_reminder_mmdd" value="{{ client.quarterly_reminder_mmdd }}" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" placeholder="ММДД">
                 </label>
+                {% endif %}
             </div>
             <div class="timeline client-history">
                 <label class="sr-only" for="history-editor">История клиента</label>
