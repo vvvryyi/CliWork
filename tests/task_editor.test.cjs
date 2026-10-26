@@ -84,3 +84,81 @@ for (const calendar of [false, true]) {
         assert.equal(requests.length, 2);
     });
 }
+
+for (const scope of ["daily", "general"]) {
+    test(`calendar completion stays at the bottom through undo and redo (${scope})`, async () => {
+        const item = editor(scope, true);
+        item.dataset.hideCompleted = "0";
+        const row = item.row;
+        row.dataset.savedText = item.input.value = "Альфа";
+        const classes = new Set();
+        row.classList.toggle = (name, enabled) => enabled ? classes.add(name) : classes.delete(name);
+        const link = { classList: { toggle() {} } };
+        const controls = {
+            "[data-task-text]": item.input,
+            "[data-task-check]": { checked: false, closest: () => row },
+            "[data-task-important]": { checked: false },
+            "[data-task-calendar]": link,
+        };
+        row.querySelector = (selector) => controls[selector];
+        const pending = { dataset: { taskId: "2", savedText: "Ясень", savedCompleted: "0" } };
+        const rows = [row, pending];
+        const list = item.querySelector("[data-task-list]");
+        list.querySelectorAll = () => rows.filter((entry) => !entry.removed);
+        list.querySelector = (selector) => selector.includes('data-task-id="1"') ? row : null;
+        list.insertBefore = (entry, anchor) => {
+            rows.splice(rows.indexOf(entry), 1);
+            const index = anchor ? rows.indexOf(anchor) : rows.length;
+            rows.splice(index, 0, entry);
+        };
+        const historyListeners = {};
+        item.addEventListener = (name, callback) => { historyListeners[name] = callback; };
+        const requests = [];
+        vm.runInNewContext(script, {
+            document: {
+                querySelectorAll: (selector) => selector === "[data-task-editor]" ? [item] : [],
+                querySelector: () => null,
+                addEventListener() {},
+            },
+            navigator: {},
+            FormData,
+            fetch: async (url, options) => {
+                const payload = Object.fromEntries(options.body.entries());
+                requests.push(payload);
+                return { ok: true, json: async () => ({
+                    task_id: 1, text: payload.text, due_date: payload.due_date,
+                    comment: "", completed: payload.completed === "1",
+                    important: false, calendar_url: "/calendar/events/1/edit", has_comment: false,
+                }) };
+            },
+        });
+
+        controls["[data-task-check]"].checked = true;
+        item.listeners.change({ target: { closest: () => controls["[data-task-check]"] } });
+        await new Promise(setImmediate);
+        assert.equal(requests.at(-1).task_scope, scope);
+        assert.equal(requests.at(-1).completed, "1");
+        assert.equal(row.removed, undefined);
+        assert.equal(classes.has("is-completed"), true);
+        assert.deepEqual(rows, [pending, row]);
+
+        historyListeners.keydown({ key: "z", ctrlKey: true, preventDefault() {} });
+        await new Promise(setImmediate);
+        assert.equal(requests.at(-1).completed, "0");
+        assert.equal(controls["[data-task-check]"].checked, false);
+        assert.deepEqual(rows, [row, pending]);
+
+        historyListeners.keydown({ key: "y", ctrlKey: true, preventDefault() {} });
+        await new Promise(setImmediate);
+        assert.equal(requests.at(-1).completed, "1");
+        assert.equal(row.removed, undefined);
+        assert.equal(controls["[data-task-check]"].checked, true);
+        assert.deepEqual(rows, [pending, row]);
+
+        controls["[data-task-check]"].checked = false;
+        item.listeners.change({ target: { closest: () => controls["[data-task-check]"] } });
+        await new Promise(setImmediate);
+        assert.equal(classes.has("is-completed"), false);
+        assert.deepEqual(rows, [row, pending]);
+    });
+}

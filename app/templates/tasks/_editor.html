@@ -1,4 +1,4 @@
-<section class="panel task-panel{% if show_all %} task-panel-general{% endif %}" data-task-editor data-allow-create="{{ '1' if allow_create|default(true) else '0' }}" data-hide-completed="{{ '1' if calendar_editor|default(false) else '0' }}" data-save-url="{{ url_for('tasks.save') }}" data-selected-date="{{ selected_date.isoformat() }}" data-task-scope="{{ 'general' if show_all else 'daily' }}">
+<section class="panel task-panel{% if show_all %} task-panel-general{% endif %}" data-task-editor data-allow-create="{{ '1' if allow_create|default(true) else '0' }}" data-hide-completed="{{ '1' if hide_completed|default(show_all) else '0' }}" data-save-url="{{ url_for('tasks.save') }}" data-selected-date="{{ selected_date.isoformat() }}" data-task-scope="{{ 'general' if show_all else 'daily' }}">
     {% if editor_title|default('') %}<h2>{{ editor_title }}</h2>{% endif %}
     <input type="hidden" data-task-csrf value="{{ csrf_token() }}">
     <div class="task-sheet" data-task-list>

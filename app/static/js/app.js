@@ -438,7 +438,8 @@ document.querySelectorAll("[data-task-editor]").forEach((taskEditor) => {
     const taskScope = taskEditor.dataset.taskScope || "daily";
     const isGeneralTasks = taskScope === "general";
     const allowCreate = taskEditor.dataset.allowCreate !== "0";
-    const hideCompleted = taskEditor.dataset.hideCompleted === "1";
+    const hideCompleted = taskEditor.dataset.hideCompleted === undefined
+        ? isGeneralTasks : taskEditor.dataset.hideCompleted === "1";
     const undoStack = [];
     const redoStack = [];
     let taskHistoryBusy = false;
@@ -644,7 +645,7 @@ document.querySelectorAll("[data-task-editor]").forEach((taskEditor) => {
             if (remember && JSON.stringify(before) !== JSON.stringify(after)) {
                 rememberTaskChange(before, after);
             }
-            if ((isGeneralTasks || hideCompleted) && result.completed) {
+            if (hideCompleted && result.completed) {
                 row.remove();
                 ensureBlankTaskRow();
             } else if (!isGeneralTasks && result.completed && row.dataset.dueDate !== selectedTaskDate) {
@@ -729,7 +730,7 @@ document.querySelectorAll("[data-task-editor]").forEach((taskEditor) => {
             calendarLink.classList.toggle("has-comment", result.has_comment);
             row.classList.toggle("is-completed", result.completed);
         }
-        if ((isGeneralTasks || hideCompleted) && result.completed) {
+        if (hideCompleted && result.completed) {
             row.remove();
             ensureBlankTaskRow();
         }

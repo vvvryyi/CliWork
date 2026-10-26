@@ -100,7 +100,13 @@ def index():
             .where(
                 CalendarEvent.starts_at >= query_start,
                 CalendarEvent.starts_at < query_end,
-                CalendarEvent.status.in_(("planned", "overdue")),
+                db.or_(
+                    CalendarEvent.status.in_(("planned", "overdue")),
+                    db.and_(
+                        CalendarEvent.client_id.is_(None),
+                        CalendarEvent.status == "completed",
+                    ),
+                ),
             )
             .order_by(CalendarEvent.starts_at)
         ).all()

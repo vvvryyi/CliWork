@@ -88,7 +88,8 @@ def test_calendar_reuses_daily_and_general_editors(app, auth_client):
     )
     assert completed.get_json()["completed"] is True
     page = auth_client.get("/calendar/?view=day&date=2030-12-05").data.decode()
-    assert "Дело дня" not in page
+    assert "Дело дня" in page
+    assert 'data-hide-completed="0"' in page
     assert "Общее дело" in page
     with app.app_context():
         assert db.session.get(DailyTask, daily["task_id"]).is_completed

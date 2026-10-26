@@ -112,6 +112,12 @@ def test_contact_importance_is_saved_and_shared_with_calendar(app, auth_client, 
         assert ('contact-agenda-item event-important' in page) is important
         calendar = auth_client.get("/calendar/?view=day&date=2026-09-24&tab=contacts").data.decode()
         assert ('agenda-item event-important' in calendar) is important
+        assert f'action="{url}"' in calendar
+        assert 'data-contact-importance-status' in calendar
+        assert 'aria-label="Важно: Иван Петров"' in calendar
+        importance_form = calendar.split(f'action="{url}"', 1)[1].split('</form>', 1)[0]
+        assert 'name="csrf_token"' in importance_form
+        assert (' checked' in importance_form) is important
 
     assert auth_client.post(url, data={"important": "invalid"}).status_code == 400
     assert auth_client.post(url, data={}).status_code == 400
