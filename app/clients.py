@@ -216,6 +216,8 @@ def remove_interaction(interaction):
 
 
 def reschedule_interaction_event(client, interaction):
+    if interaction.history_kind != "general":
+        return None, False
     planned_local, date_suffix_found, is_important = parse_planning_details(
         interaction.text
     )
@@ -378,6 +380,33 @@ def create():
     )
 
 
+def client_history(client, history_kind="general"):
+    return db.session.scalars(
+        db.select(Interaction)
+        .where(Interaction.client_id == client.id, Interaction.history_kind == history_kind)
+        .order_by(Interaction.created_at, Interaction.id)
+    ).all()
+
+
+def render_client_detail(client, selected_event=None, **overrides):
+    interactions = client_history(client)
+    d_comments = client_history(client, "d")
+    now = utcnow()
+    context = dict(
+        client=client,
+        interactions=interactions,
+        history_text=build_history_text(interactions, now),
+        interaction_token=uuid4().hex,
+        d_comments=d_comments,
+        d_history_text=build_history_text(d_comments, now),
+        d_interaction_token=uuid4().hex,
+        client_categories=CLIENT_GROUP_LABELS,
+        selected_event_id=selected_event.id if selected_event else None,
+    )
+    context.update(overrides)
+    return render_template("clients/detail.html", **context)
+
+
 @bp.get("/<int:client_id>")
 @login_required
 def detail(client_id):
@@ -386,21 +415,7 @@ def detail(client_id):
     selected_event = db.session.get(CalendarEvent, event_id) if event_id else None
     if selected_event is None or selected_event.client_id != client.id:
         selected_event = None
-    interactions = db.session.scalars(
-        db.select(Interaction)
-        .where(Interaction.client_id == client.id)
-        .order_by(Interaction.created_at)
-    ).all()
-    now = utcnow()
-    return render_template(
-        "clients/detail.html",
-        client=client,
-        interactions=interactions,
-        history_text=build_history_text(interactions, now),
-        interaction_token=uuid4().hex,
-        client_categories=CLIENT_GROUP_LABELS,
-        selected_event_id=selected_event.id if selected_event else None,
-    )
+    return render_client_detail(client, selected_event)
 
 
 @bp.post("/<int:client_id>/group")
@@ -550,17 +565,17 @@ def delete_permanently(client_id):
 
 
 @bp.post("/<int:client_id>/history")
+@bp.post("/<int:client_id>/d-comments", defaults={"history_kind": "d"}, endpoint="save_d_comments")
 @login_required
-def save_history(client_id):
+def save_history(client_id, history_kind="general"):
     client = get_client_or_404(client_id)
-    interactions = db.session.scalars(
-        db.select(Interaction)
-        .where(Interaction.client_id == client.id)
-        .order_by(Interaction.created_at)
-    ).all()
+    interactions = client_history(client, history_kind)
+    is_general = history_kind == "general"
+    if not is_general and client.client_group != "d" and not interactions:
+        abort(404)
     submitted_text = request.form.get("history_text", "")
     files = request.files.getlist("files")
-    event_id = request.form.get("event_id", type=int)
+    event_id = request.form.get("event_id", type=int) if is_general else None
     selected_event = db.session.get(CalendarEvent, event_id) if event_id else None
     if selected_event is None or selected_event.client_id != client.id:
         selected_event = None
@@ -572,7 +587,8 @@ def save_history(client_id):
         updates, new_text, new_show_date = parse_history_text(
             submitted_text, interactions, utcnow()
         )
-        apply_client_workflow_form(client)
+        if is_general:
+            apply_client_workflow_form(client)
         deleted_paths = []
         for interaction, update in zip(interactions, updates):
             if update is None:
@@ -590,40 +606,56 @@ def save_history(client_id):
         if (interaction_text_body(new_text) or any(item.filename for item in files)) and not already_saved:
             if not re.fullmatch(r"[A-Za-z0-9_-]{16,64}", submission_token):
                 submission_token = uuid4().hex
-            interaction, _, _, _ = add_interaction(
-                client,
-                new_text,
-                interaction_type=(
-                    request.form.get("interaction_type", "call")
-                    if request.form.get("interaction_type", "call") in INTERACTION_TYPES else "call"
-                ),
-                submission_token=submission_token,
-                show_history_date=new_show_date,
-            )
+            if is_general:
+                interaction, _, _, _ = add_interaction(
+                    client,
+                    new_text,
+                    interaction_type=(
+                        request.form.get("interaction_type", "call")
+                        if request.form.get("interaction_type", "call") in INTERACTION_TYPES else "call"
+                    ),
+                    submission_token=submission_token,
+                    show_history_date=new_show_date,
+                )
+            else:
+                interaction = Interaction(
+                    client_id=client.id,
+                    history_kind="d",
+                    text=new_text if interaction_text_body(new_text) else "",
+                    interaction_type="documents",
+                    submission_token=submission_token,
+                    show_history_date=new_show_date or not interaction_text_body(new_text),
+                )
+                db.session.add(interaction)
+                db.session.flush()
             save_uploads(files, client.id, interaction.id)
             if selected_event is not None and selected_event.status in OPEN_EVENT_STATUSES:
                 selected_event.status = "completed"
                 selected_event.completed_at = interaction.created_at
                 selected_event.completed_by_interaction_id = interaction.id
-        complete_due_quarterly_events(client.id)
-        regenerate_quarterly_events(
-            client, after_date=utc_naive_to_local(utcnow()).date()
-        )
+        if is_general:
+            complete_due_quarterly_events(client.id)
+            regenerate_quarterly_events(
+                client, after_date=utc_naive_to_local(utcnow()).date()
+            )
         db.session.commit()
         for path in deleted_paths:
             path.unlink(missing_ok=True)
     except ValueError as error:
         db.session.rollback()
         flash(str(error), "error")
-        return render_template(
-            "clients/detail.html",
-            client=client,
-            interactions=interactions,
-            history_text=submitted_text,
-            interaction_token=request.form.get("submission_token", uuid4().hex),
-            client_categories=CLIENT_GROUP_LABELS,
-            selected_event_id=selected_event.id if selected_event else None,
+        return render_client_detail(
+            client,
+            selected_event,
+            **{
+                "history_text" if is_general else "d_history_text": submitted_text,
+                "interaction_token" if is_general else "d_interaction_token":
+                    request.form.get("submission_token", uuid4().hex),
+            },
         ), 400
+    if not is_general:
+        flash("Комментарии Д сохранены.", "success")
+        return redirect(url_for("clients.detail", client_id=client.id, _anchor="d-comments"))
     flash("История клиента сохранена.", "success")
     return redirect(url_for("main.dashboard"))
 

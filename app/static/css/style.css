@@ -300,11 +300,8 @@ legend { padding: 0 8px; font-weight: 750; }
 .client-detail-heading { gap: 14px; margin-bottom: 16px; }
 .client-detail-heading .back-link { margin-bottom: .35rem; }
 .client-detail-heading .title-with-avatar { gap: 12px; }
-.detail-grid { display: grid; grid-template-columns: minmax(250px, 330px) 1fr; align-items: start; gap: 14px; }
+.detail-grid { display: grid; grid-template-columns: minmax(0, 1fr); align-items: start; gap: 14px; }
 .detail-grid .panel { padding: 16px; }
-.contact-panel { position: sticky; top: 92px; }
-.contact-panel h2 { margin-bottom: 10px; }
-.contact-panel .definition-list { gap: 5px 10px; line-height: 1.3; }
 .client-detail-form { gap: 10px; }
 .client-detail-form .client-workflow-panel { gap: 10px; padding: 8px 10px; }
 .client-detail-form .flag-grid { gap: 5px; margin-top: 4px; }
@@ -438,7 +435,6 @@ legend { padding: 0 8px; font-weight: 750; }
     .client-segments { grid-template-columns: repeat(4, minmax(70px, 1fr)); }
     .dashboard-grid, .detail-grid { grid-template-columns: 1fr; }
     .year-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .contact-panel { position: static; }
     .calendar-grid { overflow-x: auto; }
     .calendar-weekdays, .calendar-row { min-width: 780px; }
 }

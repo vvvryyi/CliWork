@@ -86,6 +86,7 @@ class Interaction(TimestampMixin, db.Model):
         db.Integer, db.ForeignKey("clients.id"), nullable=False, index=True
     )
     text = db.Column(db.Text, nullable=False, default="")
+    history_kind = db.Column(db.String(20), nullable=False, default="general", index=True)
     show_history_date = db.Column(db.Boolean, nullable=False, default=True)
     interaction_type = db.Column(db.String(30), nullable=False, default="call")
     channel = db.Column(db.String(30), nullable=False, default="")
