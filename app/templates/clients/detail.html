@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from 'clients/_color_labels.html' import color_options, color_badge, history_colors with context %}
 {% block title %}{{ client.full_name }} — WorkSpace{% endblock %}
 {% block content %}
 <div class="page-heading client-detail-heading">
@@ -8,6 +9,7 @@
             <span class="avatar avatar-large">{{ client.full_name[:1]|upper }}</span>
             <div>
                 <h1>{{ client.full_name }}</h1>
+                {{ color_badge(client.color_label) }}
                 {% if client.client_group in client_categories %}<span class="tag tag-success">Группа {{ client_categories[client.client_group] }}</span>{% endif %}
                 {% if client.preferred_channel %}
                     <span class="tag">Предпочитает {{ channel_labels.get(client.preferred_channel, client.preferred_channel) }}</span>
@@ -56,6 +58,11 @@
             <input type="hidden" name="history_ids" value="{{ interactions|map(attribute='id')|join(',') }}">
             {% if selected_event_id %}<input type="hidden" name="event_id" value="{{ selected_event_id }}">{% endif %}
             <div class="client-workflow client-workflow-panel">
+                <label>Метка контакта
+                    <select class="color-label-select" name="client_color_label" data-color="{{ client.color_label }}" data-color-select>
+                        {{ color_options(client.color_label) }}
+                    </select>
+                </label>
                 <div>
                     <span class="field-label">Отметки</span>
                     <div class="flag-grid">
@@ -79,12 +86,12 @@
                 {% endif %}
             </div>
             <div class="timeline client-history">
+                {{ history_colors(interactions, 'general') }}
                 <label class="sr-only" for="history-editor">История клиента</label>
                 <div class="client-history-editor">
                     <div class="client-history-dots" aria-hidden="true"></div>
                     <textarea id="history-editor" class="client-history-items" name="history_text" aria-label="История клиента" data-history-editor>{{ history_text }}</textarea>
                 </div>
-                <small class="muted">Введите текст сразу после даты в той же строке. Чтобы убрать дату из истории, удалите дату и сохраните.</small>
                 {% if interactions|selectattr('attachments')|list %}
                     <div class="attachment-list">
                         {% for interaction in interactions %}
@@ -126,6 +133,7 @@
             <input type="hidden" name="submission_token" value="{{ d_interaction_token }}">
             <input type="hidden" name="history_ids" value="{{ d_comments|map(attribute='id')|join(',') }}">
             <div class="timeline client-history">
+                {{ history_colors(d_comments, 'd') }}
                 <label class="sr-only" for="d-history-editor">Комментарии Д</label>
                 <div class="client-history-editor">
                     <div class="client-history-dots" aria-hidden="true"></div>

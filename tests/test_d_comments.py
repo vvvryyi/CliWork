@@ -198,6 +198,8 @@ def test_migration_preserves_existing_history_and_attachments(tmp_path):
         upgrade()
         record = db.session.get(Interaction, 1)
         assert record.history_kind == "general"
+        assert record.color_label == ""
+        assert record.client.color_label == ""
         assert record.text == "250101 Original"
         assert record.attachments[0].original_name == "old.pdf"
         db.session.remove()

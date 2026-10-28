@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from 'clients/_color_labels.html' import color_options with context %}
 {% block title %}{{ title }} — WorkSpace{% endblock %}
 {% block content %}
 <div class="page-heading">
@@ -30,6 +31,11 @@
                 {% for value, label in channels.items() %}
                     <option value="{{ value }}" {% if client.preferred_channel == value %}selected{% endif %}>{{ label }}</option>
                 {% endfor %}
+            </select>
+        </label>
+        <label>Метка контакта
+            <select class="color-label-select" name="color_label" data-color="{{ client.color_label or '' }}" data-color-select>
+                {{ color_options(client.color_label) }}
             </select>
         </label>
         <label class="span-2">

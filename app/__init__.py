@@ -80,7 +80,10 @@ def create_app(test_config=None):
 
     @app.context_processor
     def template_globals():
+        from .color_labels import COLOR_LABELS
+
         return {
+            "color_labels": COLOR_LABELS,
             "channel_labels": CHANNEL_LABELS,
             "status_labels": STATUS_LABELS,
             "event_type_labels": EVENT_TYPE_LABELS,

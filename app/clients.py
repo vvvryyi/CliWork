@@ -19,6 +19,7 @@ from flask_login import login_required
 from sqlalchemy import or_
 
 from .extensions import db
+from .color_labels import COLOR_LABELS, validate_color_label
 from .models import Attachment, CalendarEvent, Client, Interaction, utcnow
 from .utils import (
     CHANNEL_LABELS,
@@ -73,6 +74,11 @@ def get_client_or_404(client_id, include_archived=False):
 
 
 def apply_client_form(client):
+    if "color_label" in request.form:
+        try:
+            client.color_label = validate_color_label(request.form["color_label"])
+        except ValueError as error:
+            abort(400, description=str(error))
     client.full_name = request.form.get("full_name", "").strip()
     client.phone = request.form.get("phone", "").strip()
     client.email = request.form.get("email", "").strip()
@@ -86,6 +92,8 @@ def apply_client_form(client):
 
 
 def apply_client_workflow_form(client):
+    if "client_color_label" in request.form:
+        client.color_label = validate_color_label(request.form["client_color_label"])
     for field in CLIENT_FLAG_FIELDS:
         setattr(client, field, field in request.form)
     percent_value = request.form.get("percent_value", "").strip()
@@ -251,6 +259,9 @@ def reschedule_interaction_event(client, interaction):
 def index():
     query_text = request.args.get("q", "").strip()
     channel = request.args.get("channel", "").strip()
+    color_label = request.args.get("color_label", "").strip()
+    if color_label not in {"", "unlabeled", *COLOR_LABELS}:
+        abort(400)
     show_archived = request.args.get("archived") == "1"
 
     statement = db.select(Client)
@@ -270,6 +281,8 @@ def index():
         )
     if channel:
         statement = statement.where(Client.preferred_channel == channel)
+    if color_label:
+        statement = statement.where(Client.color_label == ("" if color_label == "unlabeled" else color_label))
     clients = db.session.scalars(statement.order_by(Client.full_name)).all()
     clients.sort(key=lambda item: item.full_name.casefold())
     grouped_by_category = {key: [] for key in CLIENT_GROUP_LABELS}
@@ -295,6 +308,7 @@ def index():
         client_groups=client_groups,
         query_text=query_text,
         selected_channel=channel,
+        selected_color_label=color_label,
         show_archived=show_archived,
         channels=CHANNEL_LABELS,
     )
@@ -587,6 +601,14 @@ def save_history(client_id, history_kind="general"):
         updates, new_text, new_show_date = parse_history_text(
             submitted_text, interactions, utcnow()
         )
+        color_fields = {f"comment_color_{item.id}" for item in interactions}
+        if any(key.startswith("comment_color_") and key not in color_fields for key in request.form):
+            raise ValueError("Комментарий не принадлежит этой истории. Обновите страницу.")
+        comment_colors = {
+            item.id: validate_color_label(request.form.get(f"comment_color_{item.id}", item.color_label))
+            for item in interactions
+        }
+        new_color = validate_color_label(request.form.get("new_comment_color", ""))
         if is_general:
             apply_client_workflow_form(client)
         deleted_paths = []
@@ -595,6 +617,7 @@ def save_history(client_id, history_kind="general"):
                 deleted_paths.extend(remove_interaction(interaction))
                 continue
             updated_text, show_date = update
+            interaction.color_label = comment_colors[interaction.id]
             interaction.show_history_date = show_date
             if interaction.text != updated_text:
                 interaction.text = updated_text
@@ -628,6 +651,7 @@ def save_history(client_id, history_kind="general"):
                 )
                 db.session.add(interaction)
                 db.session.flush()
+            interaction.color_label = new_color
             save_uploads(files, client.id, interaction.id)
             if selected_event is not None and selected_event.status in OPEN_EVENT_STATUSES:
                 selected_event.status = "completed"
@@ -648,6 +672,7 @@ def save_history(client_id, history_kind="general"):
             client,
             selected_event,
             **{
+                "submitted_history_kind": history_kind,
                 "history_text" if is_general else "d_history_text": submitted_text,
                 "interaction_token" if is_general else "d_interaction_token":
                     request.form.get("submission_token", uuid4().hex),
@@ -667,6 +692,7 @@ def create_interaction(client_id):
     text = normalize_interaction_text(request.form.get("text", ""), utcnow())
     files = request.files.getlist("files")
     try:
+        comment_color = validate_color_label(request.form.get("color_label", ""))
         apply_client_workflow_form(client)
     except ValueError as error:
         flash(str(error), "error")
@@ -692,6 +718,7 @@ def create_interaction(client_id):
     interaction, calendar_event, planned_local, date_suffix_found = add_interaction(
         client, text, interaction_type, submission_token
     )
+    interaction.color_label = comment_color
     complete_due_quarterly_events(client.id)
     regenerate_quarterly_events(
         client, after_date=utc_naive_to_local(utcnow()).date()
@@ -726,6 +753,10 @@ def edit_interaction(client_id, interaction_id):
     if interaction.client_id != client.id:
         abort(404)
     if request.method == "POST":
+        try:
+            comment_color = validate_color_label(request.form.get("color_label", interaction.color_label))
+        except ValueError as error:
+            abort(400, description=str(error))
         if request.form.get("workflow_fields_present"):
             try:
                 apply_client_workflow_form(client)
@@ -736,6 +767,7 @@ def edit_interaction(client_id, interaction_id):
         if not interaction_text_body(text) and not interaction.attachments:
             flash("Запись не может быть пустой.", "error")
         else:
+            interaction.color_label = comment_color
             interaction.text = text if interaction_text_body(text) else ""
             interaction_type = request.form.get("interaction_type", "call")
             interaction.interaction_type = (

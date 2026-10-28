@@ -19,6 +19,7 @@ class Client(TimestampMixin, db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     full_name = db.Column(db.String(200), nullable=False, index=True)
+    color_label = db.Column(db.String(20), nullable=False, default="", server_default="", index=True)
     phone = db.Column(db.String(50), nullable=False, default="", index=True)
     email = db.Column(db.String(200), nullable=False, default="", index=True)
     additional_contacts = db.Column(db.Text, nullable=False, default="")
@@ -87,6 +88,7 @@ class Interaction(TimestampMixin, db.Model):
     )
     text = db.Column(db.Text, nullable=False, default="")
     history_kind = db.Column(db.String(20), nullable=False, default="general", index=True)
+    color_label = db.Column(db.String(20), nullable=False, default="", server_default="")
     show_history_date = db.Column(db.Boolean, nullable=False, default=True)
     interaction_type = db.Column(db.String(30), nullable=False, default="call")
     channel = db.Column(db.String(30), nullable=False, default="")

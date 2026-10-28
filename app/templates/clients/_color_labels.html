@@ -1,0 +1,34 @@
+{% macro color_options(selected) -%}
+    <option value="" {% if not selected %}selected{% endif %}>Без метки</option>
+    {% for value, label in color_labels.items() %}
+        <option value="{{ value }}" {% if selected == value %}selected{% endif %}>{{ label }}</option>
+    {% endfor %}
+{%- endmacro %}
+
+{% macro color_badge(value) -%}
+    {% if value in color_labels %}<span class="color-label-badge" data-color="{{ value }}"><span class="color-label-dot" aria-hidden="true"></span>{{ color_labels[value] }}</span>{% endif %}
+{%- endmacro %}
+
+{% macro history_colors(items, kind) -%}
+    <div class="history-color-controls" data-history-colors>
+        <label>Комментарий
+            <select data-history-record aria-label="Комментарий для цветовой метки">
+                {% for item in items %}
+                    <option value="{{ loop.index0 }}">{{ loop.index }}. {{ item.text|interaction_body|truncate(65, true) or 'Прикреплённые файлы' }}</option>
+                {% endfor %}
+                <option value="{{ items|length }}" selected>Новый комментарий</option>
+            </select>
+        </label>
+        <label>Цвет комментария
+            <select class="color-label-select" data-history-color aria-label="Цвет комментария">
+                {{ color_options('') }}
+            </select>
+        </label>
+        {% for item in items %}
+            {% set value = request.form.get('comment_color_' ~ item.id, item.color_label) if submitted_history_kind|default('') == kind else item.color_label %}
+            <input type="hidden" name="comment_color_{{ item.id }}" value="{{ value if value in color_labels else '' }}" data-comment-color>
+        {% endfor %}
+        {% set new_value = request.form.get('new_comment_color', '') if submitted_history_kind|default('') == kind else '' %}
+        <input type="hidden" name="new_comment_color" value="{{ new_value if new_value in color_labels else '' }}" data-comment-color>
+    </div>
+{%- endmacro %}

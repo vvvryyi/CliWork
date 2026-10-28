@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from 'clients/_color_labels.html' import color_badge with context %}
 {% block title %}{{ "Архив контактов" if show_archived else "Контакты" }} — WorkSpace{% endblock %}
 {% block content %}
 <div class="page-heading">
@@ -24,6 +25,16 @@
         <input name="q" type="search" value="{{ query_text }}" placeholder="ФИО, телефон или e-mail">
     </label>
     <label>
+        <span class="sr-only">Цветовая метка контакта</span>
+        <select name="color_label" aria-label="Цветовая метка контакта" class="color-label-select" data-color="{{ selected_color_label }}" data-color-select>
+            <option value="">Все метки</option>
+            <option value="unlabeled" {% if selected_color_label == 'unlabeled' %}selected{% endif %}>Без метки</option>
+            {% for value, label in color_labels.items() %}
+                <option value="{{ value }}" {% if selected_color_label == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+        </select>
+    </label>
+    <label>
         <span class="sr-only">Канал</span>
         <select name="channel">
             <option value="">Все каналы</option>
@@ -33,7 +44,7 @@
         </select>
     </label>
     <button class="button" type="submit">Найти</button>
-    {% if query_text or selected_channel %}
+    {% if query_text or selected_channel or selected_color_label %}
         <a class="button button-ghost" href="{{ url_for('clients.index', archived=1 if show_archived else None) }}">Сбросить</a>
     {% endif %}
 </form>
@@ -56,7 +67,7 @@
                 <div class="client-segment-dialog-list">
                     {% for client in grouped_clients %}
                         <div class="alphabet-client">
-                            <a href="{{ url_for('clients.detail', client_id=client.id) }}">{{ client.full_name }}</a>
+                            <a href="{{ url_for('clients.detail', client_id=client.id) }}">{{ client.full_name }} {{ color_badge(client.color_label) }}</a>
                         </div>
                     {% else %}
                         <p class="muted segment-empty">В этой группе пока нет клиентов.</p>
@@ -70,12 +81,12 @@
 {% if client_groups %}
     <div class="alphabet-list">
         {% for letter, grouped_clients in client_groups.items() %}
-            <details class="alphabet-group" {% if query_text %}open{% endif %}>
+            <details class="alphabet-group" {% if query_text or selected_color_label %}open{% endif %}>
                 <summary><span>{{ letter }}</span><small>{{ grouped_clients|length }}</small></summary>
                 <div class="alphabet-names">
                     {% for client in grouped_clients %}
                         <div class="alphabet-client">
-                            <a href="{{ url_for('clients.detail', client_id=client.id) }}">{{ client.full_name }}</a>
+                            <a href="{{ url_for('clients.detail', client_id=client.id) }}">{{ client.full_name }} {{ color_badge(client.color_label) }}</a>
                             {% if show_archived %}
                                 <div class="archive-actions">
                                     <form action="{{ url_for('clients.restore', client_id=client.id) }}" method="post">

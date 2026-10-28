@@ -71,6 +71,10 @@ document.querySelectorAll("[data-auto-submit]").forEach((field) => {
     field.addEventListener("change", () => field.form?.submit());
 });
 
+document.querySelectorAll("[data-color-select]").forEach((field) => {
+    field.addEventListener("change", () => { field.dataset.color = field.value; });
+});
+
 document.querySelectorAll("[data-contact-importance]").forEach((form) => {
     const checkbox = form.querySelector('[name="important"]');
     const row = form.closest(".agenda-item");
@@ -200,6 +204,10 @@ document.querySelectorAll("textarea[data-dated-interaction]").forEach((source) =
 
 document.querySelectorAll("textarea[data-history-editor]").forEach((editor) => {
     const divider = "\n\u2063";
+    const controls = editor.form?.querySelector("[data-history-colors]");
+    const recordSelect = controls?.querySelector("[data-history-record]");
+    const colorSelect = controls?.querySelector("[data-history-color]");
+    const colorInputs = Array.from(controls?.querySelectorAll("[data-comment-color]") || []);
     const dots = editor.parentElement.querySelector(".client-history-dots");
     const mirror = document.createElement("div");
     mirror.className = "client-history-mirror";
@@ -207,9 +215,10 @@ document.querySelectorAll("textarea[data-history-editor]").forEach((editor) => {
     let datePositions = [];
 
     const paintDots = () => {
-        const visibleDots = datePositions.map((position) => {
+        const visibleDots = datePositions.map(({ position, recordIndex }) => {
             const dot = document.createElement("span");
             dot.className = "client-history-dot";
+            dot.dataset.color = colorInputs[recordIndex]?.value || "";
             dot.style.top = `${position - editor.scrollTop}px`;
             return dot;
         });
@@ -235,17 +244,20 @@ document.querySelectorAll("textarea[data-history-editor]").forEach((editor) => {
         if (content) {
             const range = document.createRange();
             let offset = 0;
-            editor.value.split("\n").forEach((line) => {
-                for (const match of line.matchAll(/\d{6}/g)) {
-                    range.setStart(content, offset + match.index);
-                    range.setEnd(content, offset + match.index + 1);
+            editor.value.split(divider).forEach((section, recordIndex) => {
+                const firstVisible = section.search(/\S/);
+                const markers = firstVisible < 0 ? [] : [firstVisible];
+                for (const match of section.matchAll(/\d{6}/g)) markers.push(match.index);
+                for (const marker of markers) {
+                    range.setStart(content, offset + marker);
+                    range.setEnd(content, offset + marker + 1);
                     const rect = range.getBoundingClientRect();
                     const position = rect.top - mirrorTop + rect.height / 2;
-                    if (!datePositions.some((existing) => Math.abs(existing - position) < 2)) {
-                        datePositions.push(position);
+                    if (!datePositions.some((existing) => existing.recordIndex === recordIndex && Math.abs(existing.position - position) < 2)) {
+                        datePositions.push({ position, recordIndex });
                     }
                 }
-                offset += line.length + 1;
+                offset += section.length + divider.length;
             });
         }
         paintDots();
@@ -253,6 +265,24 @@ document.querySelectorAll("textarea[data-history-editor]").forEach((editor) => {
 
     const historyIds = editor.form?.elements.namedItem("history_ids")?.value || "";
     const expectedSections = historyIds ? historyIds.split(",").length + 1 : 1;
+    const syncColorPicker = () => {
+        if (!colorSelect || !recordSelect) return;
+        colorSelect.value = colorInputs[Number(recordSelect.value)]?.value || "";
+        colorSelect.dataset.color = colorSelect.value;
+    };
+    const selectCaretRecord = () => {
+        if (!recordSelect) return;
+        recordSelect.value = String(editor.value.slice(0, editor.selectionStart).split(divider).length - 1);
+        syncColorPicker();
+    };
+    colorSelect?.addEventListener("change", () => {
+        const field = colorInputs[Number(recordSelect.value)];
+        if (field) field.value = colorSelect.value;
+        colorSelect.dataset.color = colorSelect.value;
+        paintDots();
+    });
+    ["click", "keyup", "select"].forEach((event) => editor.addEventListener(event, selectCaretRecord));
+    syncColorPicker();
     let validValue = editor.value;
     let previousCaret = editor.selectionStart;
     editor.addEventListener("beforeinput", () => { previousCaret = editor.selectionStart; });
@@ -263,6 +293,7 @@ document.querySelectorAll("textarea[data-history-editor]").forEach((editor) => {
         } else {
             validValue = editor.value;
         }
+        selectCaretRecord();
         layoutDots();
     });
     editor.addEventListener("scroll", paintDots);
@@ -270,9 +301,7 @@ document.querySelectorAll("textarea[data-history-editor]").forEach((editor) => {
     window.addEventListener("resize", layoutDots);
     layoutDots();
 
-    const focusRecord = (id) => {
-        const ids = historyIds ? historyIds.split(",") : [];
-        const index = ids.indexOf(id);
+    const focusSection = (index) => {
         if (index < 0) return;
         const sections = editor.value.split(divider);
         const section = sections[index];
@@ -286,14 +315,20 @@ document.querySelectorAll("textarea[data-history-editor]").forEach((editor) => {
             ? start + bodyStart : start;
         editor.focus();
         editor.setSelectionRange(selectionStart, start + section.length);
+        selectCaretRecord();
     };
+    recordSelect?.addEventListener("change", () => {
+        focusSection(Number(recordSelect.value));
+        syncColorPicker();
+    });
     editor.form?.querySelector("[data-history-edit]")?.addEventListener("click", () => {
         editor.focus();
         editor.setSelectionRange(editor.value.length, editor.value.length);
     });
     const focusLinkedRecord = () => {
         const match = window.location.hash.match(/^#interaction-(\d+)$/);
-        if (match) focusRecord(match[1]);
+        const ids = historyIds ? historyIds.split(",") : [];
+        if (match) focusSection(ids.indexOf(match[1]));
     };
     window.addEventListener("hashchange", focusLinkedRecord);
     focusLinkedRecord();
