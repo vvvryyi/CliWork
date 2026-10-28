@@ -111,8 +111,8 @@
                     <div class="calendar-day {% if day == today %}is-today{% endif %} {% if day.month != first_day.month %}outside{% endif %} {% if day_events|selectattr('id', 'in', highlighted_event_ids)|list %}has-important{% endif %}">
                         <span class="calendar-day-header"><a href="{{ url_for('calendar.index', view='day', date=day.isoformat()) }}" aria-label="{{ day.strftime('%d.%m.%Y') }}">{{ day.day }}</a></span>
                         <div class="calendar-day-counts">
-                            {% if task_events_by_date.get(day) %}<a class="calendar-count{% if task_events_by_date[day]|selectattr('id', 'in', highlighted_event_ids)|list %} calendar-count-important{% endif %}" href="{{ url_for('calendar.index', view='day', date=day.isoformat(), tab='tasks') }}" aria-label="Дела: {{ task_events_by_date[day]|length }}">{{ task_events_by_date[day]|length }}</a>{% endif %}
-                            {% if contact_events_by_date.get(day) %}<a class="calendar-count calendar-count-contact{% if contact_events_by_date[day]|selectattr('id', 'in', highlighted_event_ids)|list %} calendar-count-important{% endif %}" href="{{ url_for('calendar.index', view='day', date=day.isoformat(), tab='contacts') }}" aria-label="Связаться сегодня: {{ contact_events_by_date[day]|length }}">{{ contact_events_by_date[day]|length }}</a>{% endif %}
+                            {% if task_events_by_date.get(day) %}<a class="calendar-count{% if not task_events_by_date[day]|rejectattr('status', 'equalto', 'completed')|list %} is-completed{% endif %}{% if task_events_by_date[day]|selectattr('id', 'in', highlighted_event_ids)|list %} calendar-count-important{% endif %}" href="{{ url_for('calendar.index', view='day', date=day.isoformat(), tab='tasks') }}" aria-label="Дела: {{ task_events_by_date[day]|length }}">{{ task_events_by_date[day]|length }}</a>{% endif %}
+                            {% if contact_events_by_date.get(day) %}<a class="calendar-count calendar-count-contact{% if not contact_events_by_date[day]|rejectattr('status', 'equalto', 'completed')|list %} is-completed{% endif %}{% if contact_events_by_date[day]|selectattr('id', 'in', highlighted_event_ids)|list %} calendar-count-important{% endif %}" href="{{ url_for('calendar.index', view='day', date=day.isoformat(), tab='contacts') }}" aria-label="Связаться сегодня: {{ contact_events_by_date[day]|length }}">{{ contact_events_by_date[day]|length }}</a>{% endif %}
                         </div>
                     </div>
                 {% endfor %}
@@ -153,7 +153,7 @@
                     {% for week in month_weeks %}
                         {% for day in week %}
                             {% set mini_day_events = events_by_date.get(day, []) %}
-                            <a class="mini-day {% if day.month != month_first.month %}outside{% endif %} {% if day == today %}is-today{% endif %} {% if mini_day_events %}has-events{% endif %} {% if mini_day_events|selectattr('id', 'in', highlighted_event_ids)|list %}has-important{% endif %}"
+                            <a class="mini-day {% if mini_day_events and not mini_day_events|rejectattr('status', 'equalto', 'completed')|list %}is-completed{% endif %} {% if day.month != month_first.month %}outside{% endif %} {% if day == today %}is-today{% endif %} {% if mini_day_events %}has-events{% endif %} {% if mini_day_events|selectattr('id', 'in', highlighted_event_ids)|list %}has-important{% endif %}"
                                href="{{ url_for('calendar.index', view='day', date=day.isoformat()) }}"
                                {% if events_by_date.get(day) %}title="Дел: {{ events_by_date.get(day)|length }}"{% endif %}>{{ day.day }}</a>
                         {% endfor %}

@@ -9,8 +9,31 @@
     {% if value in color_labels %}<span class="color-label-badge" data-color="{{ value }}"><span class="color-label-dot" aria-hidden="true"></span>{{ color_labels[value] }}</span>{% endif %}
 {%- endmacro %}
 
-{% macro history_colors(items, kind) -%}
-    <div class="history-color-controls" data-history-colors>
+{% macro color_picker(name, selected='', placeholder='Метки', filter=false, history=false) -%}
+    <details class="color-picker" data-color-picker>
+        <summary aria-label="{{ placeholder }}" title="{{ color_labels.get(selected, placeholder) }}">
+            <span class="color-label-dot" data-color-preview data-color="{{ selected }}" {% if not selected or selected == 'unlabeled' %}hidden{% endif %}></span>
+            <span data-color-placeholder {% if selected and selected != 'unlabeled' %}hidden{% endif %}>{{ 'Без метки' if selected == 'unlabeled' else placeholder }}</span>
+            <span aria-hidden="true">⌄</span>
+        </summary>
+        <div class="color-picker-menu" role="group" aria-label="{{ placeholder }}">
+            <button type="button" class="color-swatch" data-color-option="" aria-label="{{ 'Все метки' if filter else 'Без метки' }}" title="{{ 'Все метки' if filter else 'Без метки' }}"><span aria-hidden="true">×</span></button>
+            {% if filter %}<button type="button" class="color-swatch" data-color-option="unlabeled" aria-label="Без метки" title="Без метки"><span class="color-label-dot color-label-empty" aria-hidden="true"></span></button>{% endif %}
+            {% for value, label in color_labels.items() %}
+                <button type="button" class="color-swatch" data-color-option="{{ value }}" aria-label="{{ label }}" title="{{ label }}"><span class="color-label-dot" data-color="{{ value }}" aria-hidden="true"></span></button>
+            {% endfor %}
+        </div>
+        <select hidden name="{{ name }}" data-palette-field {% if history %}data-history-color{% endif %} aria-label="{{ placeholder }}">
+            <option value="" {% if not selected %}selected{% endif %}>{{ placeholder }}</option>
+            {% if filter %}<option value="unlabeled" {% if selected == 'unlabeled' %}selected{% endif %}>Без метки</option>{% endif %}
+            {% for value, label in color_labels.items() %}<option value="{{ value }}" {% if selected == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select>
+    </details>
+{%- endmacro %}
+
+{% macro history_colors(items, kind, show_controls=true) -%}
+    <div class="history-color-controls" data-history-colors {% if not show_controls %}hidden{% endif %}>
+        {% if show_controls %}
         <label>Комментарий
             <select data-history-record aria-label="Комментарий для цветовой метки">
                 {% for item in items %}
@@ -19,11 +42,8 @@
                 <option value="{{ items|length }}" selected>Новый комментарий</option>
             </select>
         </label>
-        <label>Цвет комментария
-            <select class="color-label-select" data-history-color aria-label="Цвет комментария">
-                {{ color_options('') }}
-            </select>
-        </label>
+        {{ color_picker('', placeholder='Цвет комментария', history=true) }}
+        {% endif %}
         {% for item in items %}
             {% set value = request.form.get('comment_color_' ~ item.id, item.color_label) if submitted_history_kind|default('') == kind else item.color_label %}
             <input type="hidden" name="comment_color_{{ item.id }}" value="{{ value if value in color_labels else '' }}" data-comment-color>

@@ -679,7 +679,7 @@ def save_history(client_id, history_kind="general"):
             },
         ), 400
     if not is_general:
-        flash("Комментарии Д сохранены.", "success")
+        flash("Торговля сохранена.", "success")
         return redirect(url_for("clients.detail", client_id=client.id, _anchor="d-comments"))
     flash("История клиента сохранена.", "success")
     return redirect(url_for("main.dashboard"))

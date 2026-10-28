@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from 'clients/_color_labels.html' import color_badge with context %}
+{% from 'clients/_color_labels.html' import color_badge, color_picker with context %}
 {% block title %}{{ "Архив контактов" if show_archived else "Контакты" }} — WorkSpace{% endblock %}
 {% block content %}
 <div class="page-heading">
@@ -22,22 +22,13 @@
     {% if show_archived %}<input type="hidden" name="archived" value="1">{% endif %}
     <label class="grow">
         <span class="sr-only">Поиск</span>
-        <input name="q" type="search" value="{{ query_text }}" placeholder="ФИО, телефон или e-mail">
+        <input name="q" type="search" value="{{ query_text }}" placeholder="ФИО">
     </label>
-    <label>
-        <span class="sr-only">Цветовая метка контакта</span>
-        <select name="color_label" aria-label="Цветовая метка контакта" class="color-label-select" data-color="{{ selected_color_label }}" data-color-select>
-            <option value="">Все метки</option>
-            <option value="unlabeled" {% if selected_color_label == 'unlabeled' %}selected{% endif %}>Без метки</option>
-            {% for value, label in color_labels.items() %}
-                <option value="{{ value }}" {% if selected_color_label == value %}selected{% endif %}>{{ label }}</option>
-            {% endfor %}
-        </select>
-    </label>
+    {{ color_picker('color_label', selected_color_label, filter=true) }}
     <label>
         <span class="sr-only">Канал</span>
         <select name="channel">
-            <option value="">Все каналы</option>
+            <option value="">Каналы</option>
             {% for value, label in channels.items() %}
                 <option value="{{ value }}" {% if selected_channel == value %}selected{% endif %}>{{ label }}</option>
             {% endfor %}

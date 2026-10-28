@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from 'clients/_color_labels.html' import color_options, color_badge, history_colors with context %}
+{% from 'clients/_color_labels.html' import color_picker, color_badge, history_colors with context %}
 {% block title %}{{ client.full_name }} — WorkSpace{% endblock %}
 {% block content %}
 <div class="page-heading client-detail-heading">
@@ -31,7 +31,7 @@
         <a class="button" href="{{ url_for('calendar.create_event', client_id=client.id, event_type='call') }}">Звонок</a>
         <a class="button" href="{{ url_for('calendar.create_event', client_id=client.id, event_type='meeting') }}">Встреча</a>
         <a class="button" href="{{ url_for('calendar.create_event', client_id=client.id, event_type='mailing') }}">Рассылка</a>
-        <a class="button button-primary" href="#client-message">Написать</a>
+        <a class="button" href="#client-message">Написать</a>
         <a class="button" href="{{ url_for('clients.edit', client_id=client.id) }}">Редактировать</a>
         <form action="{{ url_for('clients.archive', client_id=client.id) }}" method="post" data-confirm="Переместить клиента в архив?">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -40,7 +40,7 @@
     </div>
 </div>
 
-<div class="detail-grid">
+<div class="detail-grid{% if client.client_group == 'd' %} client-detail-compact{% endif %}">
     <section>
         <details class="panel" id="client-message">
             <summary>Написать клиенту</summary>
@@ -58,11 +58,7 @@
             <input type="hidden" name="history_ids" value="{{ interactions|map(attribute='id')|join(',') }}">
             {% if selected_event_id %}<input type="hidden" name="event_id" value="{{ selected_event_id }}">{% endif %}
             <div class="client-workflow client-workflow-panel">
-                <label>Метка контакта
-                    <select class="color-label-select" name="client_color_label" data-color="{{ client.color_label }}" data-color-select>
-                        {{ color_options(client.color_label) }}
-                    </select>
-                </label>
+                {{ color_picker('client_color_label', client.color_label) }}
                 <div>
                     <span class="field-label">Отметки</span>
                     <div class="flag-grid">
@@ -86,7 +82,7 @@
                 {% endif %}
             </div>
             <div class="timeline client-history">
-                {{ history_colors(interactions, 'general') }}
+                {{ history_colors(interactions, 'general', show_controls=(client.client_group != 'd')) }}
                 <label class="sr-only" for="history-editor">История клиента</label>
                 <div class="client-history-editor">
                     <div class="client-history-dots" aria-hidden="true"></div>
@@ -128,16 +124,16 @@
         {% endfor %}{% endfor %}
         {% if client.client_group == 'd' or d_comments %}
         <form id="d-comments" class="panel form-stack client-detail-form" method="post" action="{{ url_for('clients.save_d_comments', client_id=client.id) }}" enctype="multipart/form-data" data-disable-on-submit>
-            <h2>Комментарии Д</h2>
+            <h2>Торговля</h2>
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <input type="hidden" name="submission_token" value="{{ d_interaction_token }}">
             <input type="hidden" name="history_ids" value="{{ d_comments|map(attribute='id')|join(',') }}">
             <div class="timeline client-history">
-                {{ history_colors(d_comments, 'd') }}
-                <label class="sr-only" for="d-history-editor">Комментарии Д</label>
+                {{ history_colors(d_comments, 'd', show_controls=false) }}
+                <label class="sr-only" for="d-history-editor">Торговля</label>
                 <div class="client-history-editor">
                     <div class="client-history-dots" aria-hidden="true"></div>
-                    <textarea id="d-history-editor" class="client-history-items" name="history_text" aria-label="Комментарии Д" data-history-editor>{{ d_history_text }}</textarea>
+                    <textarea id="d-history-editor" class="client-history-items" name="history_text" aria-label="Торговля" data-history-editor>{{ d_history_text }}</textarea>
                 </div>
                 <small class="muted">Введите комментарий сразу после даты ГГММДД. Чтобы убрать дату, удалите её и сохраните.</small>
                 {% if d_comments|selectattr('attachments')|list %}

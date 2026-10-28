@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from 'clients/_color_labels.html' import color_options with context %}
+{% from 'clients/_color_labels.html' import color_picker with context %}
 {% block title %}Редактирование записи — WorkSpace{% endblock %}
 {% block content %}
 <div class="page-heading">
@@ -11,11 +11,7 @@
 </div>
 <form class="panel form-stack" method="post" enctype="multipart/form-data">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-    <label>Цвет комментария
-        <select class="color-label-select" name="color_label" data-color="{{ interaction.color_label }}" data-color-select>
-            {{ color_options(interaction.color_label) }}
-        </select>
-    </label>
+    {{ color_picker('color_label', interaction.color_label, placeholder='Цвет комментария') }}
     <label>
         Тип взаимодействия
         <select name="interaction_type">

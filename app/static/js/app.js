@@ -75,6 +75,47 @@ document.querySelectorAll("[data-color-select]").forEach((field) => {
     field.addEventListener("change", () => { field.dataset.color = field.value; });
 });
 
+function updateColorPicker(field) {
+    const picker = field?.closest?.("[data-color-picker]");
+    if (!picker) return;
+    const preview = picker.querySelector("[data-color-preview]");
+    const placeholder = picker.querySelector("[data-color-placeholder]");
+    const summary = picker.querySelector("summary");
+    preview.dataset.color = field.value;
+    preview.hidden = !field.value || field.value === "unlabeled";
+    placeholder.hidden = !preview.hidden;
+    placeholder.textContent = field.value === "unlabeled" ? "Без метки" : summary.dataset.placeholder;
+    summary.title = field.selectedOptions[0]?.textContent || summary.dataset.placeholder;
+    picker.querySelectorAll("[data-color-option]").forEach((button) => {
+        button.setAttribute("aria-pressed", String(button.dataset.colorOption === field.value));
+    });
+}
+
+document.querySelectorAll("[data-color-picker]").forEach((picker) => {
+    const field = picker.querySelector("[data-palette-field]");
+    const summary = picker.querySelector("summary");
+    summary.dataset.placeholder = summary.getAttribute("aria-label");
+    field.addEventListener("change", () => updateColorPicker(field));
+    picker.querySelectorAll("[data-color-option]").forEach((button) => {
+        button.addEventListener("click", () => {
+            field.value = button.dataset.colorOption;
+            field.dispatchEvent(new Event("change", { bubbles: true }));
+            picker.open = false;
+            summary.focus();
+        });
+    });
+    picker.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") { picker.open = false; summary.focus(); }
+    });
+    updateColorPicker(field);
+});
+
+document.addEventListener("click", (event) => {
+    document.querySelectorAll("[data-color-picker][open]").forEach((picker) => {
+        if (!picker.contains(event.target)) picker.open = false;
+    });
+});
+
 document.querySelectorAll("[data-contact-importance]").forEach((form) => {
     const checkbox = form.querySelector('[name="important"]');
     const row = form.closest(".agenda-item");
@@ -269,6 +310,7 @@ document.querySelectorAll("textarea[data-history-editor]").forEach((editor) => {
         if (!colorSelect || !recordSelect) return;
         colorSelect.value = colorInputs[Number(recordSelect.value)]?.value || "";
         colorSelect.dataset.color = colorSelect.value;
+        updateColorPicker(colorSelect);
     };
     const selectCaretRecord = () => {
         if (!recordSelect) return;

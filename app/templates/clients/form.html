@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from 'clients/_color_labels.html' import color_options with context %}
+{% from 'clients/_color_labels.html' import color_picker with context %}
 {% block title %}{{ title }} — WorkSpace{% endblock %}
 {% block content %}
 <div class="page-heading">
@@ -33,11 +33,7 @@
                 {% endfor %}
             </select>
         </label>
-        <label>Метка контакта
-            <select class="color-label-select" name="color_label" data-color="{{ client.color_label or '' }}" data-color-select>
-                {{ color_options(client.color_label) }}
-            </select>
-        </label>
+        {{ color_picker('color_label', client.color_label or '') }}
         <label class="span-2">
             Дополнительные контакты
             <textarea name="additional_contacts" rows="3" placeholder="Другие телефоны, e-mail или пояснения">{{ client.additional_contacts or '' }}</textarea>
