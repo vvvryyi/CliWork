@@ -6,8 +6,9 @@ from urllib.parse import parse_qs, quote, urlsplit
 from uuid import uuid4
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from flask import current_app
+from flask import current_app, has_request_context, request
 from sqlalchemy import or_
+from sqlalchemy.orm import contains_eager, joinedload
 
 from .extensions import db
 from .models import AppSetting, Attachment, CalendarEvent, Client, Interaction, utcnow
@@ -47,10 +48,15 @@ def due_client_contact_events(now, selected_date=None):
     """Return one earliest due open event per active client, in local date order."""
     local_today = utc_naive_to_local(now).date()
     selected_date = selected_date or local_today
+    start = local_to_utc_naive(f"{selected_date.isoformat()}T00:00")
+    end = local_to_utc_naive(f"{(selected_date + timedelta(days=1)).isoformat()}T00:00")
     events = db.session.scalars(
         db.select(CalendarEvent)
         .join(Client, CalendarEvent.client_id == Client.id)
+        .options(contains_eager(CalendarEvent.client), joinedload(CalendarEvent.source_interaction).load_only(Interaction.id, Interaction.history_kind).lazyload(Interaction.attachments))
         .where(
+            CalendarEvent.starts_at < end,
+            db.true() if selected_date == local_today else CalendarEvent.starts_at >= start,
             or_(CalendarEvent.status.in_(OPEN_EVENT_STATUSES), db.and_(CalendarEvent.is_starred.is_(True), CalendarEvent.status == "completed")),
             Client.archived_at.is_(None),
         )
@@ -84,7 +90,9 @@ INTERACTION_LEADING_DATE = re.compile(r"^(?P<date>\d{6})(?:\s+|$)")
 
 def parse_planning_details(text):
     """Return (local datetime, suffix_found, important) for a trailing date."""
-    match = PLANNING_SUFFIX.search(text or "")
+    # Each line may end with a next-action date; the last such line wins.
+    matches = [PLANNING_SUFFIX.search(line) for line in (text or "").splitlines()]
+    match = next((item for item in reversed(matches) if item), None)
     if not match:
         return None, False, False
     try:
@@ -210,8 +218,13 @@ def complete_due_quarterly_events(client_id, now=None):
 
 
 def get_timezone_name():
+    if has_request_context() and "crm.timezone" in request.environ:
+        return request.environ["crm.timezone"]
     setting = db.session.get(AppSetting, "timezone")
-    return setting.value if setting else current_app.config["CRM_TIMEZONE"]
+    name = setting.value if setting else current_app.config["CRM_TIMEZONE"]
+    if has_request_context():
+        request.environ["crm.timezone"] = name
+    return name
 
 
 def get_timezone():

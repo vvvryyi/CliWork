@@ -3,6 +3,7 @@ import re
 
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 from flask_login import login_required
+from sqlalchemy.orm import joinedload
 
 from .extensions import db
 from .models import CalendarEvent, Client, utcnow
@@ -87,6 +88,7 @@ def index():
     if view == "overdue":
         events = db.session.scalars(
             db.select(CalendarEvent)
+            .options(joinedload(CalendarEvent.client), joinedload(CalendarEvent.daily_task), joinedload(CalendarEvent.general_task))
             .where(
                 CalendarEvent.status == "overdue",
             )
@@ -97,6 +99,7 @@ def index():
         _, query_end = local_day_bounds(last_day)
         events = db.session.scalars(
             db.select(CalendarEvent)
+            .options(joinedload(CalendarEvent.client), joinedload(CalendarEvent.daily_task), joinedload(CalendarEvent.general_task))
             .where(
                 CalendarEvent.starts_at >= query_start,
                 CalendarEvent.starts_at < query_end,

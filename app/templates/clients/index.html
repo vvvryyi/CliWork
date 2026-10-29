@@ -7,13 +7,13 @@
         <button class="back-link back-button" type="button" data-history-back data-fallback-url="{{ url_for('main.dashboard') }}">← Назад</button>
         <h1>{{ "Архив контактов" if show_archived else "Контакты" }}</h1>
     </div>
-    <div class="heading-actions">
+    <div class="heading-actions contacts-list-actions">
         {% if show_archived %}
             <a class="button" href="{{ url_for('clients.index') }}">Активные контакты</a>
         {% else %}
-            <button class="button" type="button" data-search-open>Поиск по запискам</button>
+            <button class="button" type="button" data-search-open>Поиск</button>
             <a class="button" href="{{ url_for('clients.index', archived=1) }}">Архив</a>
-            <a class="button button-primary" href="{{ url_for('clients.create') }}">+ Новый клиент</a>
+            <a class="button" href="{{ url_for('clients.create') }}">+ Новый клиент</a>
         {% endif %}
     </div>
 </div>

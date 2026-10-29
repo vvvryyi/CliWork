@@ -98,7 +98,7 @@ def test_client_history_is_one_editor_and_saves_old_and_new_entries(
         data={"history_ids": "1", "history_text": history_text},
     )
     assert response.status_code == 302
-    assert response.headers["Location"] == "/"
+    assert response.headers["Location"] == "/clients/"
     with app.app_context():
         interactions = db.session.scalars(
             db.select(Interaction).order_by(Interaction.id)

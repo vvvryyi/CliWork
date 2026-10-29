@@ -55,7 +55,7 @@ def test_d_comments_are_independent_dated_and_idempotent(app, auth_client, d_cli
     assert page.count('<form') == page.count('</form>')
     payload = {"history_text": "261027 Документы на согласовании 301202", "submission_token": "d-comment-token-1234"}
     response = auth_client.post(f"/clients/{d_client}/d-comments", data=payload)
-    assert response.headers["Location"] == f"/clients/{d_client}#d-comments"
+    assert response.headers["Location"] == "/clients/"
     # An immediate duplicate from an old page cannot create a second comment.
     assert auth_client.post(f"/clients/{d_client}/d-comments", data=payload).status_code == 400
     with app.app_context():

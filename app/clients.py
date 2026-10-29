@@ -129,7 +129,7 @@ def add_interaction(
     db.session.flush()
     complete_client_events(client.id, interaction)
 
-    planned_local, date_suffix_found, is_important = parse_planning_details(text)
+    planned_local, date_suffix_found, is_important = parse_planning_details(interaction_text_body(text))
     calendar_event = None
     if planned_local:
         starts_at = local_to_utc_naive(planned_local.isoformat(timespec="minutes"))
@@ -201,6 +201,9 @@ def parse_history_text(value, interactions, now):
                 (f"{history_entry_date(interaction)} {body}" if body else "", show_date)
             )
     new_section = sections[-1].strip()
+    today_prefix = normalize_interaction_text("", now).strip()
+    if re.fullmatch(r"\d{6}(?:\s+(?:в\s*)?\d{2}:\d{2})?!?", new_section) and (new_section != today_prefix or not sections[-1].rstrip("\r\n").endswith(" ")):
+        new_section = f"{today_prefix} {new_section}"
     new_show_date = bool(re.match(r"^\d{6}(?:\s|$)", new_section))
     return updates, normalize_interaction_text(new_section, now), new_show_date
 
@@ -226,7 +229,7 @@ def remove_interaction(interaction):
 
 def reschedule_interaction_event(client, interaction):
     planned_local, date_suffix_found, is_important = parse_planning_details(
-        interaction.text
+        interaction_text_body(interaction.text)
     )
     calendar_event = interaction.calendar_event
     if planned_local:
@@ -633,7 +636,7 @@ def save_history(client_id, history_kind="general"):
             updated_text, show_date = update
             interaction.color_label = comment_colors[interaction.id]
             interaction.show_history_date = show_date
-            if interaction.text != updated_text or (interaction.history_kind == "d" and interaction.calendar_event is None):
+            if interaction.text != updated_text or (interaction is interactions[-1] and interaction.calendar_event is None):
                 interaction.text = updated_text
                 reschedule_interaction_event(client, interaction)
         submission_token = request.form.get("submission_token", "").strip()
@@ -696,9 +699,9 @@ def save_history(client_id, history_kind="general"):
         ), 400
     if not is_general:
         flash("Торговля сохранена.", "success")
-        return redirect(url_for("clients.detail", client_id=client.id, _anchor="d-comments"))
+        return redirect(url_for("clients.index"))
     flash("История клиента сохранена.", "success")
-    return redirect(url_for("main.dashboard"))
+    return redirect(url_for("clients.index"))
 
 
 @bp.post("/<int:client_id>/interactions")

@@ -316,7 +316,8 @@ document.querySelectorAll("textarea[data-history-editor]").forEach((editor) => {
                     range.setEnd(content, offset + marker + 1);
                     const rect = range.getBoundingClientRect();
                     const position = rect.top - mirrorTop + rect.height / 2;
-                    if (!datePositions.some((existing) => existing.recordIndex === recordIndex && Math.abs(existing.position - position) < 2)) {
+                    const previous = datePositions[datePositions.length - 1];
+                    if (!previous || previous.recordIndex !== recordIndex || Math.abs(previous.position - position) >= 2) {
                         datePositions.push({ position, recordIndex });
                     }
                 }
@@ -348,6 +349,17 @@ document.querySelectorAll("textarea[data-history-editor]").forEach((editor) => {
     ["click", "keyup", "select"].forEach((event) => editor.addEventListener(event, selectCaretRecord));
     syncColorPicker();
     let validValue = editor.value;
+    // Enter belongs to this multiline editor, never to a parent shortcut.
+    editor.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") event.stopPropagation();
+    });
+    let pendingLayout = false;
+    const scheduleLayout = () => {
+        if (!window.requestAnimationFrame) { layoutDots(); return; }
+        if (pendingLayout) return;
+        pendingLayout = true;
+        window.requestAnimationFrame(() => { pendingLayout = false; layoutDots(); });
+    };
     let previousCaret = editor.selectionStart;
     editor.addEventListener("beforeinput", () => { previousCaret = editor.selectionStart; });
     editor.addEventListener("input", () => {
@@ -358,11 +370,11 @@ document.querySelectorAll("textarea[data-history-editor]").forEach((editor) => {
             validValue = editor.value;
         }
         selectCaretRecord();
-        layoutDots();
+        scheduleLayout();
     });
     editor.addEventListener("scroll", paintDots);
-    if (window.ResizeObserver) new ResizeObserver(layoutDots).observe(editor);
-    window.addEventListener("resize", layoutDots);
+    if (window.ResizeObserver) new ResizeObserver(scheduleLayout).observe(editor);
+    window.addEventListener("resize", scheduleLayout);
     layoutDots();
 
     const focusSection = (index) => {

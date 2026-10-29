@@ -11,7 +11,7 @@ function element() {
     return {
         dataset: {}, style: {}, listeners: {}, children: [],
         addEventListener(name, listener) { (this.listeners[name] ||= []).push(listener); },
-        emit(name) { for (const listener of this.listeners[name] || []) listener(); },
+        emit(name, event = {}) { for (const listener of this.listeners[name] || []) listener(event); },
         append(child) { this.children.push(child); },
         replaceChildren(...children) { this.children = children; },
         getBoundingClientRect() { return { top: 0 }; },
@@ -110,4 +110,21 @@ test("caret selection and scrolling keep labels attached to the right multiline 
     history.editor.emit("input");
     assert.equal(history.editor.value, original);
     assert.deepEqual(history.fields.map((field) => field.value), ["yellow", "orange", "red"]);
+});
+
+
+test("Enter keeps a native newline in both contact history editors", () => {
+    for (const history of [historyEditor(["red", ""], ["261029 Старая запись", "261029 "], "1"), historyEditor([""], ["261029 "], "")]) {
+        initialize([history]);
+        let stopped = false;
+        let prevented = false;
+        history.editor.emit("keydown", { key: "Enter", stopPropagation() { stopped = true; }, preventDefault() { prevented = true; } });
+        assert.equal(stopped, true);
+        assert.equal(prevented, false);
+        history.editor.emit("beforeinput");
+        history.editor.value += "Первая строка\nВторая строка 301201";
+        const multiline = history.editor.value;
+        history.editor.emit("input");
+        assert.equal(history.editor.value, multiline);
+    }
 });

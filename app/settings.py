@@ -30,6 +30,7 @@ def index():
             else:
                 db.session.add(AppSetting(key="timezone", value=timezone_name))
             db.session.commit()
+            request.environ.pop("crm.timezone", None)
             flash("Настройки сохранены.", "success")
             return redirect(url_for("settings.index"))
     totp_secret = db.session.get(AppSetting, "totp_secret")

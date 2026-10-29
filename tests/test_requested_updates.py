@@ -41,7 +41,7 @@ def test_save_multiple_client_documents_without_text_returns_home(app, auth_clie
         content_type="multipart/form-data",
     )
     assert response.status_code == 302
-    assert response.headers["Location"] == "/"
+    assert response.headers["Location"] == "/clients/"
     with app.app_context():
         attachments = db.session.scalars(db.select(Attachment)).all()
         assert len(attachments) == 2

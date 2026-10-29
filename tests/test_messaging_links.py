@@ -85,6 +85,6 @@ def test_history_supports_mailing_action(app, auth_client, sample_client):
     saved = auth_client.post(f"/clients/{sample_client}/history", data={
         "history_text": "Проведена рассылка", "interaction_type": "mailing",
     })
-    assert saved.headers["Location"] == "/"
+    assert saved.headers["Location"] == "/clients/"
     with app.app_context():
         assert db.session.scalar(db.select(Interaction)).interaction_type == "mailing"

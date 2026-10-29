@@ -26,7 +26,7 @@ def test_workspace_navigation_and_client_date_redirect(auth_client, sample_clien
         data={"history_ids": "", "history_text": "Позвонить 301201"},
     )
     assert response.status_code == 302
-    assert response.headers["Location"] == "/"
+    assert response.headers["Location"] == "/clients/"
 
 
 def test_dashboard_sections_and_client_counter(app, auth_client, sample_client):
@@ -70,7 +70,7 @@ def test_history_save_keeps_previous_entry_and_date_on_same_line(
         f"/clients/{sample_client}/history",
         data={"history_ids": "1", "history_text": history_text + "Новая заметка"},
     )
-    assert saved.headers["Location"] == "/"
+    assert saved.headers["Location"] == "/clients/"
     with app.app_context():
         assert db.session.get(Interaction, 1).text == original_text
         assert db.session.get(Interaction, 2).show_history_date is True
@@ -283,7 +283,7 @@ def test_calendar_client_comment_completes_selected_event_and_plans_next(
             "event_id": event_id,
         },
     )
-    assert response.headers["Location"] == "/"
+    assert response.headers["Location"] == "/clients/"
     with app.app_context():
         completed = db.session.get(CalendarEvent, event_id)
         assert completed.status == "completed"
@@ -330,7 +330,7 @@ def test_cyrillic_xlsx_can_be_uploaded_and_deleted(app, auth_client, sample_clie
         },
         content_type="multipart/form-data",
     )
-    assert response.headers["Location"] == "/"
+    assert response.headers["Location"] == "/clients/"
     with app.app_context():
         attachment = db.session.scalar(db.select(Interaction)).attachments[0]
         attachment_id = attachment.id

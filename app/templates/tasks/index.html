@@ -19,7 +19,7 @@
 
 <form class="filter-bar" method="get">
     {% if not show_all %}<input type="hidden" name="date" value="{{ selected_date.isoformat() }}">{% endif %}
-    <label class="grow"><span class="sr-only">Поиск дел</span><input type="search" name="q" value="{{ query_text }}" minlength="3" maxlength="100" placeholder="Поиск по слову — от 3 букв"></label>
+    <label class="grow"><span class="sr-only">Поиск дел</span><input type="search" name="q" value="{{ query_text }}" minlength="3" maxlength="100"></label>
     <button class="button" type="submit">Найти</button>
     {% if query_text %}<a class="button" href="{{ url_for('tasks.all_tasks') if show_all else url_for('tasks.index', date=selected_date.isoformat()) }}">Сбросить</a>{% endif %}
 </form>
