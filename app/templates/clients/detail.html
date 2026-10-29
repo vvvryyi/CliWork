@@ -60,7 +60,7 @@
             <div class="client-workflow client-workflow-panel">
                 {{ color_picker('client_color_label', client.color_label) }}
                 <div>
-                    <span class="field-label">Отметки</span>
+
                     <div class="flag-grid">
                         {% for field, label in [("flag_f", "Ф"), ("flag_d", "Д"), ("flag_b", "Б"), ("flag_n", "Н"), ("flag_kr", "КР")] %}
                             <label class="flag-cell"><input name="{{ field }}" type="checkbox" {% if client|attr(field) %}checked{% endif %}><span>{{ label }}</span></label>
@@ -76,13 +76,13 @@
                 </div>
                 {% if client.client_group == 'd' %}
                 <label class="quarterly-field">
-                    Каждые 3 месяца
+                    <span class="sr-only">Квартальное напоминание</span>
                     <input name="quarterly_reminder_mmdd" value="{{ client.quarterly_reminder_mmdd }}" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" placeholder="ММДД">
                 </label>
                 {% endif %}
             </div>
             <div class="timeline client-history">
-                {{ history_colors(interactions, 'general', show_controls=(client.client_group != 'd')) }}
+                {{ history_colors(interactions, 'general', show_controls=false) }}
                 <label class="sr-only" for="history-editor">История клиента</label>
                 <div class="client-history-editor">
                     <div class="client-history-dots" aria-hidden="true"></div>
@@ -92,13 +92,13 @@
                     <div class="attachment-list">
                         {% for interaction in interactions %}
                             {% for attachment in interaction.attachments %}
-                                <span class="attachment-row"><a class="attachment" href="{{ url_for('clients.download_attachment', attachment_id=attachment.id) }}">📎 {{ attachment.original_name }}</a><button class="link-danger" type="submit" form="delete-attachment-{{ attachment.id }}" data-confirm-button="Удалить файл {{ attachment.original_name }}?" aria-label="Удалить файл {{ attachment.original_name }}">Удалить</button></span>
+                                <span class="attachment-row"><a class="attachment" href="{{ url_for('clients.preview_attachment', attachment_id=attachment.id) }}">📎 {{ attachment.original_name }}</a><a class="attachment-action" href="{{ url_for('clients.download_attachment', attachment_id=attachment.id) }}">Скачать</a><button class="link-danger" type="submit" form="delete-attachment-{{ attachment.id }}" data-confirm-button="Удалить файл {{ attachment.original_name }}?" aria-label="Удалить файл {{ attachment.original_name }}">Удалить</button></span>
                             {% endfor %}
                         {% endfor %}
                     </div>
                 {% endif %}
                 <div class="client-history-compose">
-                    <label>Действие
+                    <label><span class="sr-only">Тип взаимодействия</span>
                         <select name="interaction_type">
                             <option value="call">Звонок</option>
                             <option value="meeting">Встреча</option>
@@ -140,7 +140,7 @@
                     <div class="attachment-list">
                         {% for interaction in d_comments %}
                             {% for attachment in interaction.attachments %}
-                                <span class="attachment-row"><a class="attachment" href="{{ url_for('clients.download_attachment', attachment_id=attachment.id) }}">📎 {{ attachment.original_name }}</a><button class="link-danger" type="submit" form="delete-attachment-{{ attachment.id }}" data-confirm-button="Удалить файл {{ attachment.original_name }}?" aria-label="Удалить файл {{ attachment.original_name }}">Удалить</button></span>
+                                <span class="attachment-row"><a class="attachment" href="{{ url_for('clients.preview_attachment', attachment_id=attachment.id) }}">📎 {{ attachment.original_name }}</a><a class="attachment-action" href="{{ url_for('clients.download_attachment', attachment_id=attachment.id) }}">Скачать</a><button class="link-danger" type="submit" form="delete-attachment-{{ attachment.id }}" data-confirm-button="Удалить файл {{ attachment.original_name }}?" aria-label="Удалить файл {{ attachment.original_name }}">Удалить</button></span>
                             {% endfor %}
                         {% endfor %}
                     </div>

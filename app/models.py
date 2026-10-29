@@ -163,6 +163,7 @@ class CalendarEvent(TimestampMixin, db.Model):
     comment = db.Column(db.Text, nullable=False, default="")
     status = db.Column(db.String(30), nullable=False, default="planned")
     is_important = db.Column(db.Boolean, nullable=False, default=False)
+    is_starred = db.Column(db.Boolean, nullable=False, default=False, server_default="0")
     completed_at = db.Column(db.DateTime, nullable=True)
     meeting_format = db.Column(db.String(20), nullable=False, default="")
     location_or_url = db.Column(db.String(500), nullable=False, default="")

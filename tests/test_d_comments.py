@@ -67,7 +67,7 @@ def test_d_comments_are_independent_dated_and_idempotent(app, auth_client, d_cli
         assert contact.quarterly_reminder_mmdd == "1120"
         event = db.session.scalar(db.select(CalendarEvent))
         assert event.status == "planned"
-        assert db.session.scalar(db.select(db.func.count(CalendarEvent.id))) == 1
+        assert db.session.scalar(db.select(db.func.count(CalendarEvent.id))) == 2
     page = auth_client.get(f"/clients/{d_client}").data.decode()
     assert 'Документы на согласовании' not in editor_text(page, "history-editor")
     assert 'Основная история' not in editor_text(page, "d-history-editor")

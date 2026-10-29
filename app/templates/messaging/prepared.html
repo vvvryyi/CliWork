@@ -19,7 +19,7 @@
     {% if interaction.attachments %}
         <div class="attachment-list centered">
             {% for attachment in interaction.attachments %}
-                <a class="attachment" href="{{ url_for('clients.download_attachment', attachment_id=attachment.id) }}">📎 {{ attachment.original_name }}</a>
+                <a class="attachment" href="{{ url_for('clients.preview_attachment', attachment_id=attachment.id) }}">📎 {{ attachment.original_name }}</a><a class="attachment-action" href="{{ url_for('clients.download_attachment', attachment_id=attachment.id) }}">Скачать</a>
             {% endfor %}
         </div>
     {% endif %}

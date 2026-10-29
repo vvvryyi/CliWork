@@ -22,16 +22,20 @@
                 {% set event_date = (event.starts_at|local_datetime('%d.%m.%Y')) %}
                 <div class="agenda-item contact-agenda-item{% if event.is_important %} event-important{% endif %}">
                     <time>{{ event.starts_at|local_datetime('%H:%M') }}</time>
+                    <div class="contact-markers">
                     <form data-contact-importance action="{{ url_for('clients.save_contact_importance', event_id=event.id) }}" method="post">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <label class="task-line-important" title="Важно">
                             <input type="checkbox" name="important" value="1" aria-label="Важно: {{ event.client.full_name }}" {% if event.is_important %}checked{% endif %}>
                             <span aria-hidden="true">★</span>
                         </label>
-                    </form>
+                    </form><form data-contact-star action="{{ url_for('clients.save_contact_star', event_id=event.id) }}" method="post">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+<label class="task-line-important contact-retain-star" title="Сохранить встречу в календаре"><input type="checkbox" name="starred" aria-label="Сохранить встречу: {{ event.client.full_name }}" {% if event.is_starred %}checked{% endif %}><span aria-hidden="true">★</span></label>
+</form></div>
                     <span>
                         <strong><a href="{{ url_for('clients.detail', client_id=event.client_id, event_id=event.id) }}">{{ event.client.full_name }}</a></strong>
-                        <small>{% if event.starts_at|local_datetime('%Y-%m-%d') < today.isoformat() %}{{ event_date }} · Просрочено{% elif selected_date == today %}Сегодня{% else %}{{ event_date }}{% endif %}{% if event.title %} · {{ event.title }}{% endif %}</small>
+                        <small>{% if event.starts_at|local_datetime('%Y-%m-%d') < today.isoformat() %}{{ event_date }} · Просрочено{% elif selected_date == today %}Сегодня{% else %}{{ event_date }}{% endif %}{% if event.source_interaction %} · {{ 'Торговля' if event.source_interaction.history_kind == 'd' else 'Комментарий' }}{% elif event.title %} · {{ event.title }}{% endif %}{% if event.status == 'completed' %} · Сделано{% endif %}</small>
                     </span>
                 </div>
             {% endfor %}

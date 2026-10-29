@@ -103,7 +103,7 @@ def index():
                 db.or_(
                     CalendarEvent.status.in_(("planned", "overdue")),
                     db.and_(
-                        CalendarEvent.client_id.is_(None),
+                        db.or_(CalendarEvent.client_id.is_(None), CalendarEvent.is_starred.is_(True)),
                         CalendarEvent.status == "completed",
                     ),
                 ),

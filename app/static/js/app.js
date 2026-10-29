@@ -155,6 +155,28 @@ document.querySelectorAll("[data-contact-importance]").forEach((form) => {
     });
 });
 
+document.querySelectorAll("[data-contact-star]").forEach((form) => {
+    const checkbox = form.querySelector('[name="starred"]');
+    form.addEventListener("submit", (event) => event.preventDefault());
+    checkbox.addEventListener("change", async () => {
+        const previous = !checkbox.checked;
+        const data = new FormData(form);
+        data.set("starred", checkbox.checked ? "1" : "0");
+        checkbox.disabled = true;
+        const status = document.querySelector("[data-contact-importance-status]");
+        try {
+            const response = await fetch(form.action, { method: "POST", body: data, headers: { Accept: "application/json" } });
+            const result = await response.json();
+            if (!response.ok || typeof result.starred !== "boolean") throw new Error("Не удалось сохранить звёздочку.");
+            checkbox.checked = result.starred;
+            if (status) status.textContent = "Сохранено";
+        } catch (error) {
+            checkbox.checked = previous;
+            if (status) status.textContent = "Не удалось сохранить звёздочку. Повторите попытку.";
+        } finally { checkbox.disabled = false; }
+    });
+});
+
 document.querySelectorAll("[data-client-segment-open]").forEach((button) => {
     button.addEventListener("click", () => {
         const dialog = document.getElementById(button.dataset.clientSegmentOpen);

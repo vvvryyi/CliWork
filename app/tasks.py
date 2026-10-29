@@ -40,11 +40,14 @@ def parse_general_task_date(value):
 @login_required
 def index():
     selected_date = parse_date(request.args.get("date"))
+    query_text = request.args.get("q", "").strip()[:100]
     tasks = db.session.scalars(
         db.select(DailyTask)
-        .where(DailyTask.due_date == selected_date)
+        .where(db.true() if len(query_text) >= 3 else DailyTask.due_date == selected_date)
         .order_by(DailyTask.id)
     ).all()
+    if len(query_text) >= 3:
+        tasks = [task for task in tasks if query_text.casefold() in (task.text + " " + getattr(task, "comment", "")).casefold()]
     tasks.sort(key=daily_task_sort_key)
     return render_template(
         "tasks/index.html",
@@ -55,6 +58,10 @@ def index():
         next_date=selected_date + timedelta(days=1),
         today=utc_naive_to_local(utcnow()).date(),
         show_all=False,
+        query_text=query_text,
+        allow_create=len(query_text) < 3,
+        show_task_dates=len(query_text) >= 3,
+        hide_completed=False,
     )
 
 
@@ -62,11 +69,14 @@ def index():
 @login_required
 def all_tasks():
     today = utc_naive_to_local(utcnow()).date()
+    query_text = request.args.get("q", "").strip()[:100]
     tasks = db.session.scalars(
         db.select(GeneralTask)
-        .where(GeneralTask.completed_at.is_(None))
+        .where(db.true() if len(query_text) >= 3 else GeneralTask.completed_at.is_(None))
         .order_by(GeneralTask.id)
     ).all()
+    if len(query_text) >= 3:
+        tasks = [task for task in tasks if query_text.casefold() in (task.text + " " + getattr(task, "comment", "")).casefold()]
     tasks.sort(key=daily_task_sort_key)
     return render_template(
         "tasks/index.html",
@@ -74,6 +84,9 @@ def all_tasks():
         selected_date=today,
         today=today,
         show_all=True,
+        query_text=query_text,
+        allow_create=len(query_text) < 3,
+        hide_completed=len(query_text) < 3,
     )
 
 

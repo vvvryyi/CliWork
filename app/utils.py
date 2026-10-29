@@ -10,7 +10,7 @@ from flask import current_app
 from sqlalchemy import or_
 
 from .extensions import db
-from .models import AppSetting, Attachment, CalendarEvent, Client, utcnow
+from .models import AppSetting, Attachment, CalendarEvent, Client, Interaction, utcnow
 
 
 CHANNEL_LABELS = {
@@ -51,7 +51,7 @@ def due_client_contact_events(now, selected_date=None):
         db.select(CalendarEvent)
         .join(Client, CalendarEvent.client_id == Client.id)
         .where(
-            CalendarEvent.status.in_(OPEN_EVENT_STATUSES),
+            or_(CalendarEvent.status.in_(OPEN_EVENT_STATUSES), db.and_(CalendarEvent.is_starred.is_(True), CalendarEvent.status == "completed")),
             Client.archived_at.is_(None),
         )
         .order_by(CalendarEvent.starts_at, CalendarEvent.id)
@@ -60,12 +60,18 @@ def due_client_contact_events(now, selected_date=None):
     seen_client_ids = set()
     for event in events:
         event_date = utc_naive_to_local(event.starts_at).date()
-        if event.client_id in seen_client_ids or (
+        kind = event.source_interaction.history_kind if event.source_interaction else "general"
+        key = (event.client_id, kind) if event.client.client_group == "d" or kind == "d" else event.client_id
+        if event.is_starred and event.status == "completed":
+            key = ("retained", event.id)
+            if event_date != selected_date:
+                continue
+        if key in seen_client_ids or (
             event_date > selected_date if selected_date == local_today
             else event_date != selected_date
         ):
             continue
-        seen_client_ids.add(event.client_id)
+        seen_client_ids.add(key)
         due_events.append(event)
     return due_events
 
@@ -267,6 +273,7 @@ def complete_client_events(client_id, interaction):
         .where(
             CalendarEvent.client_id == client_id,
             CalendarEvent.status.in_(OPEN_EVENT_STATUSES),
+            (CalendarEvent.source_interaction_id.in_(db.select(Interaction.id).where(Interaction.history_kind == "d")) if interaction.history_kind == "d" else or_(CalendarEvent.source_interaction_id.is_(None), CalendarEvent.source_interaction_id.in_(db.select(Interaction.id).where(Interaction.history_kind == "general")))),
             or_(
                 CalendarEvent.origin == "interaction",
                 CalendarEvent.starts_at <= interaction.created_at,

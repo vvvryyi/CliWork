@@ -136,6 +136,7 @@ def add_interaction(
         calendar_event = CalendarEvent(
             client_id=client.id,
             source_interaction_id=interaction.id,
+            title="Комментарий",
             origin="interaction",
             event_type="task",
             starts_at=starts_at,
@@ -224,8 +225,6 @@ def remove_interaction(interaction):
 
 
 def reschedule_interaction_event(client, interaction):
-    if interaction.history_kind != "general":
-        return None, False
     planned_local, date_suffix_found, is_important = parse_planning_details(
         interaction.text
     )
@@ -238,6 +237,7 @@ def reschedule_interaction_event(client, interaction):
                 source_interaction_id=interaction.id,
                 origin="interaction",
                 event_type="task",
+                title="Торговля" if interaction.history_kind == "d" else "Комментарий",
                 status="overdue" if starts_at < utcnow() else "planned",
             )
             db.session.add(calendar_event)
@@ -346,6 +346,20 @@ def save_contact_importance(event_id):
     event.is_important = important == "1"
     db.session.commit()
     return jsonify({"important": event.is_important})
+
+
+@bp.post("/contacts-today/events/<int:event_id>/star")
+@login_required
+def save_contact_star(event_id):
+    event = db.get_or_404(CalendarEvent, event_id)
+    if event.client_id is None:
+        abort(404)
+    get_client_or_404(event.client_id)
+    if request.form.get("starred") not in {"0", "1"}:
+        return jsonify({"error": "Укажите отметку встречи."}), 400
+    event.is_starred = request.form["starred"] == "1"
+    db.session.commit()
+    return jsonify({"starred": event.is_starred})
 
 
 @bp.route("/new", methods=["GET", "POST"])
@@ -619,7 +633,7 @@ def save_history(client_id, history_kind="general"):
             updated_text, show_date = update
             interaction.color_label = comment_colors[interaction.id]
             interaction.show_history_date = show_date
-            if interaction.text != updated_text:
+            if interaction.text != updated_text or (interaction.history_kind == "d" and interaction.calendar_event is None):
                 interaction.text = updated_text
                 reschedule_interaction_event(client, interaction)
         submission_token = request.form.get("submission_token", "").strip()
@@ -651,9 +665,11 @@ def save_history(client_id, history_kind="general"):
                 )
                 db.session.add(interaction)
                 db.session.flush()
+                complete_client_events(client.id, interaction)
+                reschedule_interaction_event(client, interaction)
             interaction.color_label = new_color
             save_uploads(files, client.id, interaction.id)
-            if selected_event is not None and selected_event.status in OPEN_EVENT_STATUSES:
+            if selected_event is not None and selected_event.status in OPEN_EVENT_STATUSES and (selected_event.source_interaction is None or selected_event.source_interaction.history_kind == history_kind):
                 selected_event.status = "completed"
                 selected_event.completed_at = interaction.created_at
                 selected_event.completed_by_interaction_id = interaction.id
@@ -825,16 +841,81 @@ def delete_interaction(client_id, interaction_id):
     return redirect(url_for("clients.detail", client_id=client.id))
 
 
+def attachment_path(attachment):
+    path = Path(attachment.file_path).resolve()
+    root = Path(current_app.config["UPLOAD_FOLDER"]).resolve()
+    if Path(attachment.file_path).is_symlink() or not path.is_file():
+        abort(404)
+    if not path.is_relative_to(root):
+        abort(403)
+    return path
+
+
+@bp.get("/attachments/<int:attachment_id>/preview")
+@login_required
+def preview_attachment(attachment_id):
+    from zipfile import ZipFile, BadZipFile
+    from xml.etree import ElementTree
+
+    attachment = db.get_or_404(Attachment, attachment_id)
+    path = attachment_path(attachment)
+    extension = path.suffix.lower()
+    kind = "unsupported"
+    content = ""
+    if extension == ".pdf":
+        kind = "pdf"
+    elif extension in {".png", ".jpg", ".jpeg", ".webp"}:
+        kind = "image"
+    elif extension in {".txt", ".csv"}:
+        kind = "text"
+        raw = path.read_bytes()[:2_000_000]
+        try:
+            content = raw.decode("utf-8-sig")
+        except UnicodeDecodeError:
+            content = raw.decode("cp1251", errors="replace")
+    elif extension in {".docx", ".xlsx", ".pptx", ".zip"}:
+        try:
+            with ZipFile(path) as archive:
+                if extension == ".zip":
+                    content = "\n".join(archive.namelist()[:1000])
+                else:
+                    parts = []
+                    total = 0
+                    for info in sorted(archive.infolist(), key=lambda item: item.filename):
+                        name = info.filename
+                        if not (name == "word/document.xml" or name.startswith("ppt/slides/slide") and name.endswith(".xml") or name == "xl/sharedStrings.xml" or name.startswith("xl/worksheets/sheet") and name.endswith(".xml")):
+                            continue
+                        total += info.file_size
+                        if total > 5_000_000:
+                            break
+                        root = ElementTree.fromstring(archive.read(info))
+                        parts.extend(node.text for node in root.iter() if node.tag.rsplit("}", 1)[-1] in {"t", "v"} and node.text)
+                    content = "\n".join(parts)
+                kind = "text"
+        except (BadZipFile, ElementTree.ParseError, RuntimeError):
+            content = ""
+    return render_template("clients/attachment_preview.html", attachment=attachment, kind=kind, preview_text=content)
+
+
+@bp.get("/attachments/<int:attachment_id>/content")
+@login_required
+def attachment_content(attachment_id):
+    attachment = db.get_or_404(Attachment, attachment_id)
+    path = attachment_path(attachment)
+    types = {".pdf": "application/pdf", ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp"}
+    if path.suffix.lower() not in types:
+        abort(415)
+    response = send_file(path, mimetype=types[path.suffix.lower()], as_attachment=False)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["Content-Security-Policy"] = "sandbox"
+    return response
+
+
 @bp.get("/attachments/<int:attachment_id>")
 @login_required
 def download_attachment(attachment_id):
     attachment = db.get_or_404(Attachment, attachment_id)
-    path = Path(attachment.file_path).absolute()
-    upload_root = Path(current_app.config["UPLOAD_FOLDER"]).absolute()
-    if not path.exists() or path.is_symlink():
-        abort(404)
-    if not path.is_relative_to(upload_root):
-        abort(403)
+    path = attachment_path(attachment)
     return send_file(
         path,
         as_attachment=True,

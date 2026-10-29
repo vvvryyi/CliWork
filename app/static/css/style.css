@@ -508,3 +508,28 @@ legend { padding: 0 8px; font-weight: 750; }
     .client-segments { grid-template-columns: repeat(4, minmax(0, 1fr)); }
     .task-sheet-footer { flex-direction: column; gap: 3px; }
 }
+
+/* Contacts: retain desktop layout and use one full-width filter per mobile row. */
+.contact-filters .color-picker > summary { font: inherit; font-weight: 700; }
+.contact-filters select, .contact-filters .button { font: inherit; font-weight: 700; }
+.contact-markers { display: flex; gap: 4px; }
+.contact-agenda-item { grid-template-columns: 48px 56px minmax(0, 1fr); }
+.contact-retain-star input:checked + span { color: #b07700; }
+.attachment-action, .attachment-row .link-danger { display: inline-flex; align-items: center; justify-content: center; padding: 4px 8px; min-height: 30px; font: inherit; font-size: .83rem; border: 0; background: transparent; }
+.attachment-row { flex-wrap: wrap; }
+.document-preview iframe { width: 100%; height: 75vh; border: 0; }
+.document-preview img { display: block; max-width: 100%; max-height: 80vh; margin: auto; }
+.document-preview pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+@media (max-width: 650px) {
+    .contact-filters { display: flex; flex-direction: column; align-items: stretch; }
+    .contact-filters > label, .contact-filters > .color-picker, .contact-filters > .button { width: 100%; flex: none; align-self: stretch; }
+    .contact-filters > .grow { order: 0; }
+    .contact-filters > button[type="submit"] { order: 1; }
+    .contact-filters > .color-picker { order: 2; }
+    .contact-filters > label:not(.grow) { order: 3; }
+    .contact-filters > a { order: 4; }
+    .contact-filters input, .contact-filters select, .contact-filters .color-picker > summary, .contact-filters > .button { width: 100%; height: 42px; min-height: 42px; }
+    .client-detail-heading .heading-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); width: 100%; gap: 8px; }
+    .client-detail-heading .heading-actions form { margin: 0; min-width: 0; }
+    .client-detail-heading .heading-actions .button, .client-detail-heading .heading-actions select { width: 100%; min-width: 0; height: 42px; min-height: 42px; padding: 6px; font: inherit; font-size: .88rem; font-weight: 700; color: var(--text); background: white; }
+}

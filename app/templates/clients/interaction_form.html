@@ -30,7 +30,7 @@
             <div class="attachment-list">
                 {% for attachment in interaction.attachments %}
                     <div class="attachment-row">
-                        <a class="attachment" href="{{ url_for('clients.download_attachment', attachment_id=attachment.id) }}">📎 {{ attachment.original_name }}</a>
+                        <a class="attachment" href="{{ url_for('clients.preview_attachment', attachment_id=attachment.id) }}">📎 {{ attachment.original_name }}</a><a class="attachment-action" href="{{ url_for('clients.download_attachment', attachment_id=attachment.id) }}">Скачать</a>
                         <button class="link-danger" type="submit" formmethod="post" formaction="{{ url_for('clients.delete_attachment', attachment_id=attachment.id) }}" data-confirm-button="Удалить файл?">Удалить</button>
                     </div>
                 {% endfor %}

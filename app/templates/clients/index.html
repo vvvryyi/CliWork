@@ -18,13 +18,15 @@
     </div>
 </div>
 
-<form class="filter-bar" method="get">
+<form class="filter-bar contact-filters" method="get">
     {% if show_archived %}<input type="hidden" name="archived" value="1">{% endif %}
     <label class="grow">
         <span class="sr-only">Поиск</span>
         <input name="q" type="search" value="{{ query_text }}" placeholder="ФИО">
     </label>
     {{ color_picker('color_label', selected_color_label, filter=true) }}
+
+    <button class="button" type="submit">Найти</button>
     <label>
         <span class="sr-only">Канал</span>
         <select name="channel">
@@ -34,7 +36,6 @@
             {% endfor %}
         </select>
     </label>
-    <button class="button" type="submit">Найти</button>
     {% if query_text or selected_channel or selected_color_label %}
         <a class="button button-ghost" href="{{ url_for('clients.index', archived=1 if show_archived else None) }}">Сбросить</a>
     {% endif %}
