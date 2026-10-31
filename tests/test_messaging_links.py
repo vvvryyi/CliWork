@@ -53,7 +53,7 @@ def test_message_can_be_prepared_from_client_card(app, auth_client, sample_clien
     assert 'action="/messages/compose"' in page
     assert '<option value="mailing">Рассылка</option>' in page
     for event_type in ("call", "meeting", "mailing"):
-        assert f"event_type={event_type}" in unescape(page)
+        assert f"event_type={event_type}" not in unescape(page)
         event_form = auth_client.get(f"/calendar/events/new?client_id={sample_client}&event_type={event_type}").data.decode()
         assert f'<option value="{event_type}" selected>' in event_form
     prepared = auth_client.post("/messages/compose", data={

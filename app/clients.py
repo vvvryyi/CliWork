@@ -459,6 +459,8 @@ def toggle_group(client_id):
     client.client_group = requested_group
     regenerate_quarterly_events(client)
     db.session.commit()
+    if request.accept_mimetypes.best == "application/json":
+        return jsonify({"group": requested_group, "url": url_for("clients.detail", client_id=client.id)})
     if requested_group == "none":
         flash("Клиент удалён из группы.", "success")
     else:

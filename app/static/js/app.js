@@ -71,6 +71,29 @@ document.querySelectorAll("[data-auto-submit]").forEach((field) => {
     field.addEventListener("change", () => field.form?.submit());
 });
 
+document.querySelectorAll("[data-client-group]").forEach((form) => {
+    const field = form.querySelector('[name="group"]');
+    const status = document.querySelector("[data-client-group-status]");
+    const saveGroup = async () => {
+        const previous = field.dataset.savedGroup;
+        const data = new FormData(form);
+        field.disabled = true;
+        if (status) { status.hidden = false; status.textContent = "Сохраняем группу…"; }
+        try {
+            const response = await fetch(form.action, { method: "POST", body: data, headers: { Accept: "application/json" } });
+            const result = await response.json();
+            if (!response.ok || typeof result.group !== "string" || typeof result.url !== "string") throw new Error("Не удалось сохранить группу.");
+            field.dataset.savedGroup = result.group;
+            window.location.assign(result.url);
+        } catch (error) {
+            field.value = previous;
+            if (status) status.textContent = "Не удалось сохранить группу. Повторите выбор.";
+        } finally { field.disabled = false; }
+    };
+    field.addEventListener("change", saveGroup);
+    form.addEventListener("submit", (event) => { event.preventDefault(); if (!field.disabled) saveGroup(); });
+});
+
 document.querySelectorAll("[data-color-select]").forEach((field) => {
     field.addEventListener("change", () => { field.dataset.color = field.value; });
 });

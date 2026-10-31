@@ -17,20 +17,18 @@
             </div>
         </div>
     </div>
-    <div class="heading-actions">
-        <form action="{{ url_for('clients.toggle_group', client_id=client.id) }}" method="post" class="client-group-form">
+    <div class="heading-actions client-card-actions">
+        <form action="{{ url_for('clients.toggle_group', client_id=client.id) }}" method="post" class="client-group-form" data-client-group>
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <label class="sr-only" for="client-group">Группа клиента</label>
-            <select id="client-group" name="group" data-auto-submit>
+            <select id="client-group" name="group" data-saved-group="{{ client.client_group if client.client_group in client_categories else 'none' }}">
                 <option value="none" {% if client.client_group not in client_categories %}selected{% endif %}>Без группы</option>
                 {% for value, label in client_categories.items() %}
                     <option value="{{ value }}" {% if client.client_group == value %}selected{% endif %}>{{ label }}</option>
                 {% endfor %}
             </select>
+            <noscript><button class="button" type="submit">Сохранить группу</button></noscript>
         </form>
-        <a class="button" href="{{ url_for('calendar.create_event', client_id=client.id, event_type='call') }}">Звонок</a>
-        <a class="button" href="{{ url_for('calendar.create_event', client_id=client.id, event_type='meeting') }}">Встреча</a>
-        <a class="button" href="{{ url_for('calendar.create_event', client_id=client.id, event_type='mailing') }}">Рассылка</a>
         <a class="button" href="#client-message">Написать</a>
         <a class="button" href="{{ url_for('clients.edit', client_id=client.id) }}">Редактировать</a>
         <form action="{{ url_for('clients.archive', client_id=client.id) }}" method="post" data-confirm="Переместить клиента в архив?">
@@ -39,6 +37,7 @@
         </form>
     </div>
 </div>
+<p class="group-save-status" role="status" data-client-group-status hidden></p>
 
 <div class="detail-grid{% if client.client_group == 'd' %} client-detail-compact{% endif %}">
     <section>

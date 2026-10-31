@@ -529,15 +529,31 @@ legend { padding: 0 8px; font-weight: 750; }
     .contact-filters > label:not(.grow) { order: 3; }
     .contact-filters > a { order: 4; }
     .contact-filters input, .contact-filters select, .contact-filters .color-picker > summary, .contact-filters > .button { width: 100%; height: 42px; min-height: 42px; }
-    .client-detail-heading .heading-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); width: 100%; gap: 8px; }
+    .client-detail-heading .heading-actions { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); width: 100%; gap: 8px; }
     .client-detail-heading .heading-actions form { margin: 0; min-width: 0; }
     .client-detail-heading .heading-actions .button, .client-detail-heading .heading-actions select { width: 100%; min-width: 0; height: 42px; min-height: 42px; padding: 6px; font: inherit; font-size: .88rem; font-weight: 700; color: var(--text); background: white; }
 }
 
 @media (max-width: 650px) {
-    .contact-filters > .button, .contact-filters select, .contact-filters input, .contact-filters .color-picker > summary { font: inherit; font-weight: 700; text-align: center; text-align-last: center; }
-    .contact-filters .color-picker > summary { justify-content: center; }
+    .contact-filters > .button, .contact-filters select, .contact-filters input, .contact-filters .color-picker > summary { font: inherit; font-weight: 700; text-align: left; text-align-last: left; padding-inline-start: 5mm; }
+    .contact-filters > .button { justify-content: flex-start; }
+    .contact-filters input::placeholder { font: inherit; color: var(--text); opacity: 1; }
+    .contact-filters .color-picker > summary { justify-content: flex-start; }
+    .contact-filters .color-picker > summary > span:last-child { margin-inline-start: auto; }
     .contacts-list-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; width: 100%; }
     .contacts-list-actions .button { width: 100%; min-width: 0; min-height: 44px; padding: 6px 3px; font: inherit; font-size: .8rem; font-weight: 700; text-align: center; color: var(--text); background: white; }
     .client-detail-heading #client-group { text-align: center; text-align-last: center; }
+}
+
+.client-card-actions { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; width: min(100%, 640px); }
+.client-card-actions form { min-width: 0; margin: 0; }
+.client-detail-heading .client-card-actions .button, .client-detail-heading .client-card-actions select { width: 100%; min-width: 0; height: 44px; min-height: 44px; padding: 6px; font: inherit; font-weight: 700; color: var(--text); background-color: white; }
+.group-save-status { color: var(--danger); }
+@media (max-width: 650px) {
+    .client-detail-heading .client-card-actions { width: 100%; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; }
+    .client-detail-heading .client-card-actions .button, .client-detail-heading .client-card-actions select { height: 44px; min-height: 44px; padding: 4px 2px; font-size: .72rem; text-align: center; }
+    .client-detail-heading .client-card-actions .button { overflow-wrap: anywhere; }
+}
+@media (max-width: 360px) {
+    .client-detail-heading .client-card-actions .button, .client-detail-heading .client-card-actions select { font-size: .65rem; }
 }
