@@ -303,6 +303,7 @@ legend { padding: 0 8px; font-weight: 750; }
 [data-color="orange"] { --label-color: #ffad63; }
 [data-color="red"] { --label-color: #f39191; }
 [data-color="light_green"] { --label-color: #b3e59a; }
+[data-color="light_lilac"] { --label-color: #dfc9f2; }
 [data-color="gray"] { --label-color: #cbd0d7; }
 .color-label-badge { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; padding: 3px 8px; border: 1px solid rgba(23, 33, 43, .12); border-radius: 999px; background: var(--label-color, var(--surface-soft)); color: #17212b; font-size: .75rem; font-weight: 700; vertical-align: middle; }
 .color-label-dot { flex: 0 0 9px; width: 9px; height: 9px; border: 1px solid rgba(23, 33, 43, .3); border-radius: 50%; background: var(--label-color, var(--primary)); }
@@ -325,7 +326,9 @@ legend { padding: 0 8px; font-weight: 750; }
 .color-label-empty { background: white; }
 .client-detail-compact .panel { padding: 12px; }
 .client-detail-compact .client-detail-form { gap: 8px; }
-.client-detail-compact .client-history-items { min-height: 140px; height: min(180px, 30vh); }
+.client-detail-compact { --trade-editor-height: clamp(100px, 20vh, 140px); }
+.client-detail-compact #history-editor { min-height: 0; height: calc(2 * var(--trade-editor-height)); }
+.client-detail-compact #d-history-editor { min-height: 0; height: var(--trade-editor-height); }
 .client-detail-compact .client-history-compose { gap: 8px; }
 .client-detail-compact h2 { margin-bottom: 4px; }
 .client-detail-form .client-workflow { display: flex; flex-wrap: wrap; align-items: end; }
@@ -549,6 +552,9 @@ legend { padding: 0 8px; font-weight: 750; }
 .client-card-actions form { min-width: 0; margin: 0; }
 .client-detail-heading .client-card-actions .button, .client-detail-heading .client-card-actions select { width: 100%; min-width: 0; height: 44px; min-height: 44px; padding: 6px; font: inherit; font-weight: 700; color: var(--text); background-color: white; }
 .group-save-status { color: var(--danger); }
+@media (min-width: 651px) and (display-mode: browser) {
+    body.workspace-body { padding-top: 15mm; }
+}
 @media (max-width: 650px) {
     .client-detail-heading .client-card-actions { width: 100%; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; }
     .client-detail-heading .client-card-actions .button, .client-detail-heading .client-card-actions select { height: 44px; min-height: 44px; padding: 4px 2px; font-size: .72rem; text-align: center; }

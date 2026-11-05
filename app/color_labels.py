@@ -4,6 +4,7 @@ COLOR_LABELS = {
     "orange": "Оранжевый",
     "red": "Красный",
     "light_green": "Светло-зелёный",
+    "light_lilac": "Светло-сиреневый",
     "gray": "Серый",
 }
 
