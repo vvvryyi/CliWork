@@ -299,6 +299,25 @@ document.querySelectorAll("textarea[data-history-editor]").forEach((editor) => {
     mirror.className = "client-history-mirror";
     editor.parentElement.append(mirror);
     let datePositions = [];
+    // Track each character's original record through native edits. Empty records
+    // remain in the payload so deleting a boundary never shifts record identities.
+    const originalSections = editor.value.split(divider);
+    let owners = originalSections.flatMap((section, index) =>
+        Array(section.length + (index < originalSections.length - 1 ? divider.length : 0)).fill(index));
+    let previousValue = editor.value;
+    let editSelection = null;
+    const sectionField = document.createElement("input");
+    sectionField.type = "hidden";
+    sectionField.name = "history_sections";
+    editor.parentElement.append(sectionField);
+    const syncSections = () => {
+        const sections = originalSections.map(() => "");
+        for (let index = 0; index < editor.value.length; index++) {
+            sections[owners[index]] += editor.value[index];
+        }
+        sectionField.value = JSON.stringify(sections);
+    };
+    syncSections();
 
     const paintDots = () => {
         const visibleDots = datePositions.map(({ position, recordIndex }) => {
@@ -335,13 +354,14 @@ document.querySelectorAll("textarea[data-history-editor]").forEach((editor) => {
                 const markers = firstVisible < 0 ? [] : [firstVisible];
                 for (const match of section.matchAll(/\d{6}/g)) markers.push(match.index);
                 for (const marker of markers) {
+                    const owner = owners[offset + marker] ?? originalSections.length - 1;
                     range.setStart(content, offset + marker);
                     range.setEnd(content, offset + marker + 1);
                     const rect = range.getBoundingClientRect();
                     const position = rect.top - mirrorTop + rect.height / 2;
                     const previous = datePositions[datePositions.length - 1];
-                    if (!previous || previous.recordIndex !== recordIndex || Math.abs(previous.position - position) >= 2) {
-                        datePositions.push({ position, recordIndex });
+                    if (!previous || previous.recordIndex !== owner || Math.abs(previous.position - position) >= 2) {
+                        datePositions.push({ position, recordIndex: owner });
                     }
                 }
                 offset += section.length + divider.length;
@@ -351,7 +371,6 @@ document.querySelectorAll("textarea[data-history-editor]").forEach((editor) => {
     };
 
     const historyIds = editor.form?.elements.namedItem("history_ids")?.value || "";
-    const expectedSections = historyIds ? historyIds.split(",").length + 1 : 1;
     const syncColorPicker = () => {
         if (!colorSelect || !recordSelect) return;
         colorSelect.value = colorInputs[Number(recordSelect.value)]?.value || "";
@@ -360,7 +379,7 @@ document.querySelectorAll("textarea[data-history-editor]").forEach((editor) => {
     };
     const selectCaretRecord = () => {
         if (!recordSelect) return;
-        recordSelect.value = String(editor.value.slice(0, editor.selectionStart).split(divider).length - 1);
+        recordSelect.value = String(owners[editor.selectionStart] ?? owners.at(-1) ?? originalSections.length - 1);
         syncColorPicker();
     };
     colorSelect?.addEventListener("change", () => {
@@ -371,7 +390,6 @@ document.querySelectorAll("textarea[data-history-editor]").forEach((editor) => {
     });
     ["click", "keyup", "select"].forEach((event) => editor.addEventListener(event, selectCaretRecord));
     syncColorPicker();
-    let validValue = editor.value;
     // Enter belongs to this multiline editor, never to a parent shortcut.
     editor.addEventListener("keydown", (event) => {
         if (event.key === "Enter") event.stopPropagation();
@@ -383,15 +401,26 @@ document.querySelectorAll("textarea[data-history-editor]").forEach((editor) => {
         pendingLayout = true;
         window.requestAnimationFrame(() => { pendingLayout = false; layoutDots(); });
     };
-    let previousCaret = editor.selectionStart;
-    editor.addEventListener("beforeinput", () => { previousCaret = editor.selectionStart; });
+    editor.addEventListener("beforeinput", () => {
+        editSelection = [editor.selectionStart, editor.selectionEnd ?? editor.selectionStart];
+    });
     editor.addEventListener("input", () => {
-        if (editor.value.split(divider).length !== expectedSections) {
-            editor.value = validValue;
-            editor.setSelectionRange(previousCaret, previousCaret);
-        } else {
-            validValue = editor.value;
+        let start = 0;
+        const prefixLimit = editSelection ? editSelection[0] : previousValue.length;
+        while (start < prefixLimit && start < editor.value.length && previousValue[start] === editor.value[start]) start++;
+        let oldEnd = previousValue.length;
+        let newEnd = editor.value.length;
+        const suffixLimit = editSelection ? editSelection[1] : start;
+        while (oldEnd > Math.max(start, suffixLimit) && newEnd > start && previousValue[oldEnd - 1] === editor.value[newEnd - 1]) {
+            oldEnd--; newEnd--;
         }
+        const owner = start === 0 && oldEnd === previousValue.length
+            ? originalSections.length - 1
+            : owners[start] ?? owners.at(-1) ?? originalSections.length - 1;
+        owners = owners.slice(0, start).concat(Array(newEnd - start).fill(owner), owners.slice(oldEnd));
+        previousValue = editor.value;
+        editSelection = null;
+        syncSections();
         selectCaretRecord();
         scheduleLayout();
     });
@@ -402,12 +431,11 @@ document.querySelectorAll("textarea[data-history-editor]").forEach((editor) => {
 
     const focusSection = (index) => {
         if (index < 0) return;
-        const sections = editor.value.split(divider);
-        const section = sections[index];
+        const start = owners.indexOf(index);
+        if (start < 0) return;
+        const end = owners.lastIndexOf(index) + 1;
+        const section = editor.value.slice(start, end).replace(/[\n\u2063]+$/, "");
         if (!section) return;
-        const start = sections.slice(0, index).reduce(
-            (offset, section) => offset + section.length + divider.length, 0,
-        );
         const datePrefix = section.match(/^\d{6} /);
         const bodyStart = datePrefix ? datePrefix[0].length : 0;
         const selectionStart = bodyStart && section.slice(bodyStart).trim()

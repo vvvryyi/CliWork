@@ -260,20 +260,19 @@ def test_inline_history_edit_keeps_record_date_and_updates_its_event(
         event = db.session.get(CalendarEvent, event_id)
         assert interaction.created_at == created_at
         assert interaction.text == f"{original_prefix} Исправленный шаг 301202 14:00!"
-        saved_text = interaction.text
         assert utc_naive_to_local(event.starts_at).strftime("%y%m%d %H:%M") == "301202 14:00"
         assert event.is_important is True
 
     saved_page = auth_client.get(f"/clients/{sample_client}").data.decode()
     assert f"{original_prefix} Исправленный шаг 301202 14:00!" in saved_page
 
-    invalid = auth_client.post(
+    edited = auth_client.post(
         f"/clients/{sample_client}/history",
         data={"history_ids": "1", "history_text": "260101\nПовреждённая история"},
     )
-    assert invalid.status_code == 400
+    assert edited.status_code == 302
     with app.app_context():
-        assert db.session.get(Interaction, 1).text == saved_text
+        assert "Повреждённая история" in db.session.get(Interaction, 1).text
 
 
 def test_history_date_can_be_removed_without_deleting_record_or_event(
@@ -483,7 +482,7 @@ def test_editing_interaction_reschedules_without_duplicate(
 def test_deleting_interaction_deletes_generated_event(app, auth_client, sample_client):
     auth_client.post(
         f"/clients/{sample_client}/interactions",
-        data={"text": "Созвон 260911"},
+        data={"text": "Созвон 301211"},
     )
     auth_client.post(f"/clients/{sample_client}/interactions/1/delete")
     with app.app_context():

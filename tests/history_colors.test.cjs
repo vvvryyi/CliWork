@@ -103,12 +103,12 @@ test("caret selection and scrolling keep labels attached to the right multiline 
     history.editor.emit("scroll");
     assert.deepEqual(history.dots.children.map((dot) => dot.dataset.color), ["yellow", "yellow", "orange", "red"]);
     assert.equal(history.dots.children[0].style.top, "-14px");
-    // A removed boundary is rejected while existing labels stay mapped to the same records.
+    // Native deletions are accepted while colors retain original record ownership.
     const original = history.editor.value;
     history.editor.emit("beforeinput");
     history.editor.value = original.replace(divider, "\n");
     history.editor.emit("input");
-    assert.equal(history.editor.value, original);
+    assert.equal(history.editor.value, original.replace(divider, "\n"));
     assert.deepEqual(history.fields.map((field) => field.value), ["yellow", "orange", "red"]);
 });
 
@@ -127,4 +127,34 @@ test("Enter keeps a native newline in both contact history editors", () => {
         history.editor.emit("input");
         assert.equal(history.editor.value, multiline);
     }
+});
+
+test("selection deletion keeps original record identities and the new entry slot", () => {
+    const history = historyEditor(["red", "orange", ""], ["261030 Первый", "261030 Второй", "261105 "]);
+    initialize([history]);
+    const original = history.editor.value;
+    const end = original.indexOf("261105");
+    history.editor.setSelectionRange(0, end);
+    history.editor.emit("beforeinput");
+    history.editor.value = original.slice(end);
+    history.editor.emit("input");
+    const field = history.editor.parentElement.children.find((child) => child.name === "history_sections");
+    assert.deepEqual(JSON.parse(field.value), ["", "", "261105 "]);
+    history.editor.setSelectionRange(history.editor.value.length, history.editor.value.length);
+    history.editor.emit("beforeinput");
+    history.editor.value += "Новый звонок 270831";
+    history.editor.emit("input");
+    assert.deepEqual(JSON.parse(field.value), ["", "", "261105 Новый звонок 270831"]);
+    assert.equal(history.recordSelect.value, "2");
+});
+
+test("replacing all history puts new text in a new record", () => {
+    const history = historyEditor(["red", ""], ["261030 Старый звонок", "261105 "], "1");
+    initialize([history]);
+    history.editor.setSelectionRange(0, history.editor.value.length);
+    history.editor.emit("beforeinput");
+    history.editor.value = "261105 Новый звонок 270831";
+    history.editor.emit("input");
+    const field = history.editor.parentElement.children.find((child) => child.name === "history_sections");
+    assert.deepEqual(JSON.parse(field.value), ["", "261105 Новый звонок 270831"]);
 });

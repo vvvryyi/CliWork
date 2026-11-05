@@ -1,5 +1,8 @@
+import json
 import re
+from bisect import bisect_right
 from datetime import date, timedelta
+from difflib import SequenceMatcher
 from pathlib import Path
 from uuid import uuid4
 
@@ -168,10 +171,39 @@ def build_history_text(interactions, now):
     return HISTORY_DIVIDER.join(entries)
 
 
-def parse_history_text(value, interactions, now):
-    sections = value.replace("\r\n", "\n").split(HISTORY_DIVIDER)
+def parse_history_text(value, interactions, now, edited_sections=None):
+    value = value.replace("\r\n", "\n")
+    if edited_sections is not None:
+        try:
+            sections = json.loads(edited_sections)
+        except (ValueError, TypeError):
+            raise ValueError("Не удалось прочитать изменения истории. Обновите страницу.")
+        if (not isinstance(sections, list) or len(sections) != len(interactions) + 1
+                or not all(isinstance(section, str) for section in sections)
+                or "".join(sections) != value):
+            raise ValueError("Текст истории не совпадает с изменениями. Обновите страницу.")
+        sections = [section.replace("\u2063", "").strip("\n") for section in sections]
+    else:
+        sections = value.split(HISTORY_DIVIDER)
     if len(sections) != len(interactions) + 1:
-        raise ValueError("Граница между записями была удалена. Обновите страницу и повторите правку.")
+        # Recover record ownership after native text selections remove boundaries.
+        # Equal text keeps its original record, including colors and attachments.
+        original = build_history_text(interactions, now)
+        starts = [0]
+        for section in original.split(HISTORY_DIVIDER)[:-1]:
+            starts.append(starts[-1] + len(section) + len(HISTORY_DIVIDER))
+        sections = [""] * (len(interactions) + 1)
+        for tag, old_start, old_end, new_start, new_end in SequenceMatcher(
+            None, original, value, autojunk=False
+        ).get_opcodes():
+            if tag == "equal":
+                for offset in range(old_end - old_start):
+                    owner = bisect_right(starts, old_start + offset) - 1
+                    sections[owner] += original[old_start + offset]
+            elif tag in {"insert", "replace"}:
+                owner = bisect_right(starts, old_start) - 1
+                sections[owner] += value[new_start:new_end]
+        sections = [section.replace("\u2063", "").strip("\n") for section in sections]
     updates = []
     for interaction, section in zip(interactions, sections):
         if section == rendered_history_entry(interaction):
@@ -182,15 +214,14 @@ def parse_history_text(value, interactions, now):
             continue
         dated_section = section.lstrip("\n")
         first_line, separator, remainder = dated_section.partition("\n")
-        expected_date = history_entry_date(interaction)
+        date_match = re.match(r"^\d{6}(?=\s|$)", dated_section)
+        expected_date = date_match.group() if date_match else history_entry_date(interaction)
         show_date = first_line.strip() == expected_date or first_line.startswith(expected_date + " ")
         if show_date:
             body = (
                 remainder if first_line.strip() == expected_date
                 else dated_section[len(expected_date):].lstrip(" \t")
             )
-        elif re.match(r"^\d{6}(?:\s|$)", dated_section):
-            raise ValueError("Чтобы убрать дату записи, удалите её целиком.")
         else:
             body = section
         body = body.strip()
@@ -198,7 +229,7 @@ def parse_history_text(value, interactions, now):
             updates.append(None)
         else:
             updates.append(
-                (f"{history_entry_date(interaction)} {body}" if body else "", show_date)
+                (f"{expected_date} {body}" if body else "", show_date)
             )
     new_section = sections[-1].strip()
     today_prefix = normalize_interaction_text("", now).strip()
@@ -206,6 +237,21 @@ def parse_history_text(value, interactions, now):
         new_section = f"{today_prefix} {new_section}"
     new_show_date = bool(re.match(r"^\d{6}(?:\s|$)", new_section))
     return updates, normalize_interaction_text(new_section, now), new_show_date
+
+
+def detach_history_event(interaction, previous_text=None):
+    """Keep elapsed/completed events with a snapshot of their deleted source."""
+    event = interaction.calendar_event
+    if event is None:
+        return
+    if event.starts_at <= utcnow() or event.status == "completed":
+        event.comment = interaction_text_body(previous_text if previous_text is not None else interaction.text) or event.comment
+        event.source_interaction = None
+    elif event.external_uid:
+        event.source_interaction = None
+        event.status = "cancelled"
+    else:
+        db.session.delete(event)
 
 
 def remove_interaction(interaction):
@@ -217,17 +263,12 @@ def remove_interaction(interaction):
     ).all()
     for event in completed_events:
         event.completed_by_interaction_id = None
-    if interaction.calendar_event is not None:
-        if interaction.calendar_event.external_uid:
-            interaction.calendar_event.source_interaction_id = None
-            interaction.calendar_event.status = "cancelled"
-        else:
-            db.session.delete(interaction.calendar_event)
+    detach_history_event(interaction)
     db.session.delete(interaction)
     return paths
 
 
-def reschedule_interaction_event(client, interaction):
+def reschedule_interaction_event(client, interaction, previous_text=None):
     planned_local, date_suffix_found, is_important = parse_planning_details(
         interaction_text_body(interaction.text)
     )
@@ -250,10 +291,7 @@ def reschedule_interaction_event(client, interaction):
         if calendar_event.status != "completed":
             calendar_event.status = "overdue" if starts_at < utcnow() else "planned"
     elif calendar_event is not None:
-        if calendar_event.external_uid:
-            calendar_event.status = "cancelled"
-        else:
-            db.session.delete(calendar_event)
+        detach_history_event(interaction, previous_text)
     return planned_local, date_suffix_found
 
 
@@ -618,7 +656,7 @@ def save_history(client_id, history_kind="general"):
         ):
             raise ValueError("История изменилась. Обновите страницу перед сохранением.")
         updates, new_text, new_show_date = parse_history_text(
-            submitted_text, interactions, utcnow()
+            submitted_text, interactions, utcnow(), request.form.get("history_sections")
         )
         color_fields = {f"comment_color_{item.id}" for item in interactions}
         if any(key.startswith("comment_color_") and key not in color_fields for key in request.form):
@@ -639,8 +677,9 @@ def save_history(client_id, history_kind="general"):
             interaction.color_label = comment_colors[interaction.id]
             interaction.show_history_date = show_date
             if interaction.text != updated_text or (interaction is interactions[-1] and interaction.calendar_event is None):
+                previous_text = interaction.text
                 interaction.text = updated_text
-                reschedule_interaction_event(client, interaction)
+                reschedule_interaction_event(client, interaction, previous_text)
         submission_token = request.form.get("submission_token", "").strip()
         already_saved = submission_token and db.session.scalar(
             db.select(Interaction).where(Interaction.submission_token == submission_token)
