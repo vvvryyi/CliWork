@@ -108,8 +108,8 @@
 <dialog class="search-dialog" data-search-dialog data-search-url="{{ url_for('clients.search_interactions') }}">
     <div class="search-dialog-header">
         <div>
-            <h2>Поиск по запискам клиентов</h2>
-            <p class="muted">Поиск выполняется по истории всех незархивированных клиентов.</p>
+            <h2>Поиск контактов</h2>
+            <p class="muted">Поиск по имени и комментариям всех активных контактов — от 4 символов.</p>
         </div>
         <button class="dialog-close" type="button" aria-label="Закрыть поиск" data-search-close>×</button>
     </div>
@@ -121,7 +121,7 @@
         <button class="button button-primary" type="submit">Найти</button>
     </form>
     <div class="search-results" data-search-results aria-live="polite">
-        <div class="empty-state">Введите слово, которое нужно найти в записках.</div>
+        <div class="empty-state">Введите не менее 4 символов для поиска.</div>
     </div>
 </dialog>
 {% endif %}

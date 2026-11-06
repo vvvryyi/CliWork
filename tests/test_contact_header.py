@@ -16,8 +16,8 @@ def test_card_header_has_four_controls(auth_client, sample_client):
     assert re.search(r'<select[^>]*name="group"', actions)
     assert 'data-client-group' in actions
     assert 'data-client-group-status' in page
-    assert '/static/css/style.css?v=23' in page
-    assert '/static/js/app.js?v=23' in page
+    assert '/static/css/style.css?v=24' in page
+    assert '/static/js/app.js?v=24' in page
 
 
 @pytest.mark.parametrize('group', ['none', 'd', 'v', 'b', 'r', 'm', 'p', 'a', 'k'])

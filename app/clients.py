@@ -311,20 +311,27 @@ def index():
         if show_archived
         else Client.archived_at.is_(None)
     )
-    if query_text:
-        pattern = f"%{query_text}%"
-        statement = statement.where(
-            or_(
-                Client.full_name.ilike(pattern),
-                Client.phone.ilike(pattern),
-                Client.email.ilike(pattern),
-            )
-        )
     if channel:
         statement = statement.where(Client.preferred_channel == channel)
     if color_label:
         statement = statement.where(Client.color_label == ("" if color_label == "unlabeled" else color_label))
     clients = db.session.scalars(statement.order_by(Client.full_name)).all()
+    if query_text:
+        # SQLite's LOWER/ILIKE does not fold Cyrillic. Compare Unicode text
+        # explicitly, and fetch comments as scalar columns without attachments.
+        needle = query_text.casefold()
+        comment_matches = set()
+        if len(query_text) >= 4 and clients:
+            rows = db.session.execute(
+                db.select(Interaction.client_id, Interaction.text).where(
+                    Interaction.client_id.in_(statement.with_only_columns(Client.id))
+                )
+            )
+            comment_matches = {client_id for client_id, text in rows if needle in (text or "").casefold()}
+        clients = [item for item in clients if (
+            any(needle in (value or "").casefold() for value in (item.full_name, item.phone, item.email))
+            or len(query_text) >= 4 and (item.id in comment_matches or needle in (item.notes or "").casefold())
+        )]
     clients.sort(key=lambda item: item.full_name.casefold())
     grouped_by_category = {key: [] for key in CLIENT_GROUP_LABELS}
     alphabetical_clients = clients
@@ -527,33 +534,30 @@ def search_excerpt(text, query, context=70):
 @login_required
 def search_interactions():
     query_text = request.args.get("q", "").strip()[:100]
-    if not query_text:
-        return jsonify({"query": "", "results": []})
+    if len(query_text) < 4:
+        return jsonify({"query": query_text, "results": []})
 
+    results = []
+    seen = set()
+    clients = db.session.execute(db.select(Client.id, Client.full_name, Client.notes).where(Client.archived_at.is_(None)).order_by(Client.full_name))
+    for client_id, full_name, notes in clients:
+        excerpt = search_excerpt(full_name, query_text) or search_excerpt(notes, query_text)
+        if excerpt:
+            results.append({"client_name": full_name, "url": url_for("clients.detail", client_id=client_id), **excerpt})
+            seen.add(client_id)
     rows = db.session.execute(
-        db.select(Interaction, Client)
+        db.select(Interaction.id, Interaction.client_id, Interaction.text, Client.full_name)
         .join(Client, Interaction.client_id == Client.id)
         .where(Client.archived_at.is_(None))
-        .order_by(Interaction.created_at.desc())
-    ).all()
-    results = []
-    for interaction, client in rows:
-        excerpt = search_excerpt(interaction.text, query_text)
-        if not excerpt:
+        .order_by(Interaction.created_at.desc(), Interaction.id.desc())
+    )
+    for interaction_id, client_id, text, full_name in rows:
+        if client_id in seen:
             continue
-        results.append(
-            {
-                "client_name": client.full_name,
-                "url": url_for(
-                    "clients.detail",
-                    client_id=client.id,
-                    _anchor=f"interaction-{interaction.id}",
-                ),
-                **excerpt,
-            }
-        )
-        if len(results) >= 50:
-            break
+        excerpt = search_excerpt(text, query_text)
+        if excerpt:
+            results.append({"client_name": full_name, "url": url_for("clients.detail", client_id=client_id, _anchor=f"interaction-{interaction_id}"), **excerpt})
+            seen.add(client_id)
     return jsonify({"query": query_text, "results": results})
 
 
@@ -740,7 +744,7 @@ def save_history(client_id, history_kind="general"):
         ), 400
     if not is_general:
         flash("Торговля сохранена.", "success")
-        return redirect(url_for("clients.index"))
+        return redirect(url_for("clients.detail", client_id=client.id, _anchor="d-comments"))
     flash("История клиента сохранена.", "success")
     return redirect(url_for("clients.index"))
 

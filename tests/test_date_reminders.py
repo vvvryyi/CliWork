@@ -16,7 +16,7 @@ def test_date_only_and_multiline_reminders(app, auth_client, sample_client, kind
         db.session.commit()
     result = auth_client.post(f'/clients/{sample_client}/{endpoint}', data={'history_text': text})
     assert result.status_code == 302
-    assert result.headers['Location'] == '/clients/'
+    assert result.headers['Location'] == (f'/clients/{sample_client}#d-comments' if kind == 'd' else '/clients/')
     with app.app_context():
         item = db.session.scalar(db.select(Interaction))
         assert item.history_kind == kind

@@ -504,9 +504,9 @@ function renderSearchResults(items) {
 
 async function runInteractionSearch() {
     const query = searchInput?.value.trim() || "";
-    if (!query) {
+    if (query.length < 4) {
         searchRequest?.abort();
-        setSearchMessage("Введите слово, которое нужно найти в записках.");
+        setSearchMessage("Введите не менее 4 символов для поиска.");
         return;
     }
     searchRequest?.abort();
