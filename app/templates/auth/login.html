@@ -7,11 +7,11 @@
         <span>WorkSpace</span>
     </div>
     <h1>Вход</h1>
-    <p class="muted">Введите данные из локального файла .env</p>
+    <p class="muted">Войдите в свой аккаунт</p>
     <form method="post" class="form-stack">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <label>
-            Логин
+            Логин или email
             <input name="username" type="text" autocomplete="username" required autofocus>
         </label>
         <label>
@@ -20,6 +20,7 @@
         </label>
         <button class="button button-primary button-wide" type="submit">Войти</button>
     </form>
+    <p><a href="{{ url_for('auth.register') }}">Создать аккаунт</a></p>
 </section>
 {% endblock %}
 

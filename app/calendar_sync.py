@@ -1,3 +1,4 @@
+from .ownership import get_setting, make_setting
 import hashlib
 from datetime import date, datetime, time, timezone
 from uuid import uuid4
@@ -11,6 +12,9 @@ from .utils import get_timezone, local_to_utc_naive
 
 
 def is_configured():
+    from .ownership import owner_id
+    if owner_id() != "local-user":
+        return False
     return all(
         current_app.config.get(key)
         for key in ("ICLOUD_USERNAME", "ICLOUD_APP_PASSWORD", "ICLOUD_CALENDAR_NAME")
@@ -207,11 +211,11 @@ def sync_icloud_calendar():
             remote_by_uid[local_event.external_uid] = remote
             pushed += 1
 
-    setting = db.session.get(AppSetting, "icloud_last_sync")
+    setting = get_setting("icloud_last_sync")
     value = synced_at.isoformat(timespec="seconds")
     if setting:
         setting.value = value
     else:
-        db.session.add(AppSetting(key="icloud_last_sync", value=value))
+        db.session.add(make_setting(key="icloud_last_sync", value=value))
     db.session.commit()
     return {"pulled": pulled, "pushed": pushed, "deleted": deleted}

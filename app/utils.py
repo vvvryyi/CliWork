@@ -1,3 +1,4 @@
+from .ownership import get_setting, make_setting
 import calendar
 import re
 from datetime import date, datetime, timedelta, timezone
@@ -220,7 +221,7 @@ def complete_due_quarterly_events(client_id, now=None):
 def get_timezone_name():
     if has_request_context() and "crm.timezone" in request.environ:
         return request.environ["crm.timezone"]
-    setting = db.session.get(AppSetting, "timezone")
+    setting = get_setting("timezone")
     name = setting.value if setting else current_app.config["CRM_TIMEZONE"]
     if has_request_context():
         request.environ["crm.timezone"] = name

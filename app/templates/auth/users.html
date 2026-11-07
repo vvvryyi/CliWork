@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Пользователи — WorkSpace{% endblock %}
+{% block content %}
+<h1>Зарегистрированные пользователи</h1>
+<section class="card">
+<table><thead><tr><th>Логин / email</th><th>Дата регистрации</th><th>Роль</th></tr></thead>
+<tbody>
+{% if legacy_username %}<tr><td>{{ legacy_username }}</td><td>Существующий аккаунт</td><td>{% if legacy_username|lower == 'da332381@gmail.com' %}Администратор{% else %}Пользователь{% endif %}</td></tr>{% endif %}
+{% for user in users %}<tr><td>{{ user.email }}</td><td>{{ user.created_at|local_datetime }}</td><td>{{ 'Администратор' if user.is_admin else 'Пользователь' }}</td></tr>{% endfor %}
+</tbody></table>
+</section>
+{% endblock %}

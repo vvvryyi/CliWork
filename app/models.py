@@ -14,7 +14,11 @@ class TimestampMixin:
     )
 
 
-class Client(TimestampMixin, db.Model):
+class OwnedMixin:
+    owner_id = db.Column(db.String(64), nullable=False, default="local-user", server_default="local-user", index=True)
+
+
+class Client(OwnedMixin, TimestampMixin, db.Model):
     __tablename__ = "clients"
 
     id = db.Column(db.Integer, primary_key=True)
@@ -79,7 +83,7 @@ class Client(TimestampMixin, db.Model):
         return contacts.get(channel, "")
 
 
-class Interaction(TimestampMixin, db.Model):
+class Interaction(OwnedMixin, TimestampMixin, db.Model):
     __tablename__ = "interactions"
 
     id = db.Column(db.Integer, primary_key=True)
@@ -115,7 +119,7 @@ class Interaction(TimestampMixin, db.Model):
     )
 
 
-class Attachment(TimestampMixin, db.Model):
+class Attachment(OwnedMixin, TimestampMixin, db.Model):
     __tablename__ = "attachments"
 
     id = db.Column(db.Integer, primary_key=True)
@@ -135,7 +139,7 @@ class Attachment(TimestampMixin, db.Model):
     interaction = db.relationship("Interaction", back_populates="attachments")
 
 
-class CalendarEvent(TimestampMixin, db.Model):
+class CalendarEvent(OwnedMixin, TimestampMixin, db.Model):
     __tablename__ = "calendar_events"
 
     id = db.Column(db.Integer, primary_key=True)
@@ -205,7 +209,7 @@ class AppSetting(db.Model):
     value = db.Column(db.String(500), nullable=False)
 
 
-class DailyTask(TimestampMixin, db.Model):
+class DailyTask(OwnedMixin, TimestampMixin, db.Model):
     __tablename__ = "daily_tasks"
 
     id = db.Column(db.Integer, primary_key=True)
@@ -232,7 +236,7 @@ class DailyTask(TimestampMixin, db.Model):
         return self.completed_at is not None
 
 
-class GeneralTask(TimestampMixin, db.Model):
+class GeneralTask(OwnedMixin, TimestampMixin, db.Model):
     """A standalone task from the separate "Все дела" list."""
 
     __tablename__ = "general_tasks"
@@ -257,3 +261,18 @@ class GeneralTask(TimestampMixin, db.Model):
     @property
     def is_completed(self):
         return self.completed_at is not None
+
+
+from flask_login import UserMixin
+from werkzeug.security import check_password_hash
+
+
+class User(UserMixin, TimestampMixin, db.Model):
+    __tablename__ = "users"
+    id = db.Column(db.String(64), primary_key=True)
+    email = db.Column(db.String(200), nullable=False, unique=True)
+    password_hash = db.Column(db.String(255), nullable=False)
+    is_admin = db.Column(db.Boolean, nullable=False, default=False)
+
+    def check_password(self, password):
+        return check_password_hash(self.password_hash, password)

@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Регистрация — WorkSpace{% endblock %}
+{% block content %}
+<section class="login-card">
+<h1>Создать аккаунт</h1>
+<form method="post" class="form-stack">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+<label>Email<input name="email" type="email" maxlength="200" autocomplete="username" value="{{ request.form.get('email', '') }}" required autofocus></label>
+<label>Пароль<input name="password" type="password" minlength="8" maxlength="256" autocomplete="new-password" required></label>
+<label>Повторите пароль<input name="password_confirm" type="password" minlength="8" maxlength="256" autocomplete="new-password" required></label>
+<button class="button button-primary button-wide" type="submit">Зарегистрироваться</button>
+</form>
+<p><a href="{{ url_for('auth.login') }}">Уже есть аккаунт? Войти</a></p>
+</section>
+{% endblock %}

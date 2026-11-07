@@ -1,8 +1,9 @@
+from .ownership import get_setting, make_setting
 import time
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from flask import Blueprint, current_app, flash, redirect, render_template, request, url_for
-from flask_login import login_required
+from flask_login import login_required, current_user
 
 from .calendar_sync import is_configured, sync_icloud_calendar
 from .extensions import db
@@ -24,17 +25,17 @@ def index():
         except ZoneInfoNotFoundError:
             flash("Укажите корректный часовой пояс, например Europe/Moscow.", "error")
         else:
-            setting = db.session.get(AppSetting, "timezone")
+            setting = get_setting("timezone")
             if setting:
                 setting.value = timezone_name
             else:
-                db.session.add(AppSetting(key="timezone", value=timezone_name))
+                db.session.add(make_setting(key="timezone", value=timezone_name))
             db.session.commit()
             request.environ.pop("crm.timezone", None)
             flash("Настройки сохранены.", "success")
             return redirect(url_for("settings.index"))
-    totp_secret = db.session.get(AppSetting, "totp_secret")
-    last_sync = db.session.get(AppSetting, "icloud_last_sync")
+    totp_secret = get_setting("totp_secret")
+    last_sync = get_setting("icloud_last_sync")
     icloud_fields = {
         "ICLOUD_USERNAME": "Apple ID",
         "ICLOUD_APP_PASSWORD": "пароль приложения",
@@ -77,23 +78,23 @@ def sync_icloud():
 @bp.route("/2fa/setup", methods=["GET", "POST"])
 @login_required
 def setup_2fa():
-    if db.session.get(AppSetting, "totp_secret"):
+    if get_setting("totp_secret"):
         flash("Двухфакторная аутентификация уже включена.", "error")
         return redirect(url_for("settings.index"))
 
-    pending = db.session.get(AppSetting, "totp_pending_secret")
-    created = db.session.get(AppSetting, "totp_pending_created")
+    pending = get_setting("totp_pending_secret")
+    created = get_setting("totp_pending_created")
     if not pending or not created or time.time() - float(created.value) > 600:
         secret = generate_secret()
         if pending:
             pending.value = secret
         else:
-            pending = AppSetting(key="totp_pending_secret", value=secret)
+            pending = make_setting(key="totp_pending_secret", value=secret)
             db.session.add(pending)
         if created:
             created.value = str(time.time())
         else:
-            db.session.add(AppSetting(key="totp_pending_created", value=str(time.time())))
+            db.session.add(make_setting(key="totp_pending_created", value=str(time.time())))
         db.session.commit()
 
     if request.method == "POST":
@@ -101,8 +102,8 @@ def setup_2fa():
         if counter is None:
             flash("Код не подошёл. Проверьте время на устройстве и попробуйте снова.", "error")
         else:
-            db.session.add(AppSetting(key="totp_secret", value=pending.value))
-            db.session.add(AppSetting(key="totp_last_counter", value=str(counter)))
+            db.session.add(make_setting(key="totp_secret", value=pending.value))
+            db.session.add(make_setting(key="totp_last_counter", value=str(counter)))
             db.session.delete(pending)
             db.session.delete(created)
             db.session.commit()
@@ -111,7 +112,7 @@ def setup_2fa():
 
     uri = provisioning_uri(
         pending.value,
-        current_app.config["CRM_USERNAME"],
+        getattr(current_user, "email", current_app.config["CRM_USERNAME"]),
         "WorkSpace",
     )
     return render_template("settings/setup_2fa.html", secret=pending.value, uri=uri)
@@ -120,14 +121,14 @@ def setup_2fa():
 @bp.post("/2fa/disable")
 @login_required
 def disable_2fa():
-    secret = db.session.get(AppSetting, "totp_secret")
+    secret = get_setting("totp_secret")
     if not secret:
         return redirect(url_for("settings.index"))
     if verify_code(secret.value, request.form.get("code", "")) is None:
         flash("Введите действующий код, чтобы отключить 2FA.", "error")
         return redirect(url_for("settings.index"))
     for key in ("totp_secret", "totp_last_counter", "totp_pending_secret", "totp_pending_created"):
-        setting = db.session.get(AppSetting, key)
+        setting = get_setting(key)
         if setting:
             db.session.delete(setting)
     db.session.commit()

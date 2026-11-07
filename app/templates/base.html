@@ -19,6 +19,7 @@
             <details class="mobile-menu">
                 <summary aria-label="Открыть меню"><span aria-hidden="true">☰</span></summary>
                 <nav class="mobile-menu-content" aria-label="Меню WorkSpace">
+                    {% if current_user.is_admin %}<a href="{{ url_for('auth.users') }}">Пользователи</a>{% endif %}
                     <a href="{{ url_for('settings.index') }}">Настройки</a>
                     <form action="{{ url_for('auth.logout') }}" method="post">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -28,7 +29,8 @@
             </details>
         </header>
         <nav class="main-nav workspace-tabs" aria-label="Разделы WorkSpace">
-                <a href="{{ url_for('settings.index') }}" {% if request.blueprint == 'settings' %}aria-current="page"{% endif %}>Настройки</a>
+                {% if current_user.is_admin %}<a href="{{ url_for('auth.users') }}">Пользователи</a>{% endif %}
+                    <a href="{{ url_for('settings.index') }}" {% if request.blueprint == 'settings' %}aria-current="page"{% endif %}>Настройки</a>
                 <form action="{{ url_for('auth.logout') }}" method="post">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <button class="nav-button" type="submit">Выйти</button>
