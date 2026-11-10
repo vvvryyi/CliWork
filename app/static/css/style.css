@@ -563,3 +563,9 @@ legend { padding: 0 8px; font-weight: 750; }
 @media (max-width: 360px) {
     .client-detail-heading .client-card-actions .button, .client-detail-heading .client-card-actions select { font-size: .65rem; }
 }
+
+[data-color="purple"] { --label-color: #aa7bd5; }
+[data-color="brown"] { --label-color: #c29a78; }
+[data-color="blue"] { --label-color: #89b8f0; }
+[data-color="black"] { --label-color: #383838; }
+.color-label-badge[data-color="black"] { color: white; }

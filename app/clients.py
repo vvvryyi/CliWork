@@ -1,7 +1,7 @@
 import json
 import re
 from bisect import bisect_right
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from difflib import SequenceMatcher
 from pathlib import Path
 from uuid import uuid4
@@ -167,7 +167,11 @@ def rendered_history_entry(interaction):
 
 def build_history_text(interactions, now):
     entries = [rendered_history_entry(item) for item in interactions]
-    entries.append(normalize_interaction_text("", now))
+    today = utc_naive_to_local(now).date()
+    dated_today = any((item.show_history_date and history_entry_date(item) == today.strftime("%y%m%d")) or
+                      (parse_planning_details(interaction_text_body(item.text))[0] or datetime.min).date() == today
+                      for item in interactions)
+    entries.append("" if dated_today else normalize_interaction_text("", now))
     return HISTORY_DIVIDER.join(entries)
 
 
@@ -643,110 +647,115 @@ def delete_permanently(client_id):
 @bp.post("/<int:client_id>/d-comments", defaults={"history_kind": "d"}, endpoint="save_d_comments")
 @login_required
 def save_history(client_id, history_kind="general"):
+    from werkzeug.datastructures import MultiDict
     client = get_client_or_404(client_id)
+    trading = MultiDict((key[len("trading_"):], value) for key, value in request.form.items() if key.startswith("trading_"))
+    created_paths = []
+    try:
+        paths = persist_history(client, history_kind, request.form, request.files.getlist("files"), created_paths)
+        if history_kind == "general" and "history_text" in trading:
+            paths += persist_history(client, "d", trading, request.files.getlist("trading_files"), created_paths)
+        db.session.commit()
+        for path in paths:
+            path.unlink(missing_ok=True)
+    except ValueError as error:
+        db.session.rollback()
+        for path in created_paths:
+            path.unlink(missing_ok=True)
+        flash(str(error), "error")
+        overrides = {"submitted_history_kind": history_kind,
+                     "history_text" if history_kind == "general" else "d_history_text": request.form.get("history_text", "")}
+        if trading:
+            overrides["d_history_text"] = trading.get("history_text", "")
+        return render_client_detail(client, **overrides), 400
+    flash("Карточка сохранена.", "success")
+    return redirect(url_for("clients.detail", client_id=client.id, _anchor="d-comments") if history_kind == "d" else url_for("clients.index"))
+
+
+def persist_history(client, history_kind, form, files, created_paths):
     interactions = client_history(client, history_kind)
     is_general = history_kind == "general"
     if not is_general and client.client_group != "d" and not interactions:
         abort(404)
-    submitted_text = request.form.get("history_text", "")
-    files = request.files.getlist("files")
-    event_id = request.form.get("event_id", type=int) if is_general else None
+    submitted_text = form.get("history_text", "")
+    event_id = form.get("event_id", type=int) if is_general else None
     selected_event = db.session.get(CalendarEvent, event_id) if event_id else None
     if selected_event is None or selected_event.client_id != client.id:
         selected_event = None
-    try:
-        if request.form.get("history_ids", "") != ",".join(
-            str(item.id) for item in interactions
-        ):
-            raise ValueError("История изменилась. Обновите страницу перед сохранением.")
-        updates, new_text, new_show_date = parse_history_text(
-            submitted_text, interactions, utcnow(), request.form.get("history_sections")
-        )
-        color_fields = {f"comment_color_{item.id}" for item in interactions}
-        if any(key.startswith("comment_color_") and key not in color_fields for key in request.form):
-            raise ValueError("Комментарий не принадлежит этой истории. Обновите страницу.")
-        comment_colors = {
-            item.id: validate_color_label(request.form.get(f"comment_color_{item.id}", item.color_label))
-            for item in interactions
-        }
-        new_color = validate_color_label(request.form.get("new_comment_color", ""))
+    if form.get("history_ids", "") != ",".join(
+        str(item.id) for item in interactions
+    ):
+        raise ValueError("История изменилась. Обновите страницу перед сохранением.")
+    updates, new_text, new_show_date = parse_history_text(
+        submitted_text, interactions, utcnow(), form.get("history_sections")
+    )
+    color_fields = {f"comment_color_{item.id}" for item in interactions}
+    if any(key.startswith("comment_color_") and key not in color_fields for key in form):
+        raise ValueError("Комментарий не принадлежит этой истории. Обновите страницу.")
+    comment_colors = {
+        item.id: validate_color_label(form.get(f"comment_color_{item.id}", item.color_label))
+        for item in interactions
+    }
+    new_color = validate_color_label(form.get("new_comment_color", ""))
+    if is_general:
+        apply_client_workflow_form(client)
+    deleted_paths = []
+    for interaction, update in zip(interactions, updates):
+        if update is None:
+            deleted_paths.extend(remove_interaction(interaction))
+            continue
+        updated_text, show_date = update
+        interaction.color_label = comment_colors[interaction.id]
+        interaction.show_history_date = show_date
+        if interaction.text != updated_text or (interaction is interactions[-1] and interaction.calendar_event is None):
+            previous_text = interaction.text
+            interaction.text = updated_text
+            reschedule_interaction_event(client, interaction, previous_text)
+    submission_token = form.get("submission_token", "").strip()
+    already_saved = submission_token and db.session.scalar(
+        db.select(Interaction).where(Interaction.submission_token == submission_token)
+    )
+    if (interaction_text_body(new_text) or any(item.filename for item in files)) and not already_saved:
+        if not re.fullmatch(r"[A-Za-z0-9_-]{16,64}", submission_token):
+            submission_token = uuid4().hex
         if is_general:
-            apply_client_workflow_form(client)
-        deleted_paths = []
-        for interaction, update in zip(interactions, updates):
-            if update is None:
-                deleted_paths.extend(remove_interaction(interaction))
-                continue
-            updated_text, show_date = update
-            interaction.color_label = comment_colors[interaction.id]
-            interaction.show_history_date = show_date
-            if interaction.text != updated_text or (interaction is interactions[-1] and interaction.calendar_event is None):
-                previous_text = interaction.text
-                interaction.text = updated_text
-                reschedule_interaction_event(client, interaction, previous_text)
-        submission_token = request.form.get("submission_token", "").strip()
-        already_saved = submission_token and db.session.scalar(
-            db.select(Interaction).where(Interaction.submission_token == submission_token)
-        )
-        if (interaction_text_body(new_text) or any(item.filename for item in files)) and not already_saved:
-            if not re.fullmatch(r"[A-Za-z0-9_-]{16,64}", submission_token):
-                submission_token = uuid4().hex
-            if is_general:
-                interaction, _, _, _ = add_interaction(
-                    client,
-                    new_text,
-                    interaction_type=(
-                        request.form.get("interaction_type", "call")
-                        if request.form.get("interaction_type", "call") in INTERACTION_TYPES else "call"
-                    ),
-                    submission_token=submission_token,
-                    show_history_date=new_show_date,
-                )
-            else:
-                interaction = Interaction(
-                    client_id=client.id,
-                    history_kind="d",
-                    text=new_text if interaction_text_body(new_text) else "",
-                    interaction_type="documents",
-                    submission_token=submission_token,
-                    show_history_date=new_show_date or not interaction_text_body(new_text),
-                )
-                db.session.add(interaction)
-                db.session.flush()
-                complete_client_events(client.id, interaction)
-                reschedule_interaction_event(client, interaction)
-            interaction.color_label = new_color
-            save_uploads(files, client.id, interaction.id)
-            if selected_event is not None and selected_event.status in OPEN_EVENT_STATUSES and (selected_event.source_interaction is None or selected_event.source_interaction.history_kind == history_kind):
-                selected_event.status = "completed"
-                selected_event.completed_at = interaction.created_at
-                selected_event.completed_by_interaction_id = interaction.id
-        if is_general:
-            complete_due_quarterly_events(client.id)
-            regenerate_quarterly_events(
-                client, after_date=utc_naive_to_local(utcnow()).date()
+            interaction, _, _, _ = add_interaction(
+                client,
+                new_text,
+                interaction_type=(
+                    form.get("interaction_type", "call")
+                    if form.get("interaction_type", "call") in INTERACTION_TYPES else "call"
+                ),
+                submission_token=submission_token,
+                show_history_date=new_show_date,
             )
-        db.session.commit()
-        for path in deleted_paths:
-            path.unlink(missing_ok=True)
-    except ValueError as error:
-        db.session.rollback()
-        flash(str(error), "error")
-        return render_client_detail(
-            client,
-            selected_event,
-            **{
-                "submitted_history_kind": history_kind,
-                "history_text" if is_general else "d_history_text": submitted_text,
-                "interaction_token" if is_general else "d_interaction_token":
-                    request.form.get("submission_token", uuid4().hex),
-            },
-        ), 400
-    if not is_general:
-        flash("Торговля сохранена.", "success")
-        return redirect(url_for("clients.detail", client_id=client.id, _anchor="d-comments"))
-    flash("История клиента сохранена.", "success")
-    return redirect(url_for("clients.index"))
+        else:
+            interaction = Interaction(
+                client_id=client.id,
+                history_kind="d",
+                text=new_text if interaction_text_body(new_text) else "",
+                interaction_type="documents",
+                submission_token=submission_token,
+                show_history_date=new_show_date or not interaction_text_body(new_text),
+            )
+            db.session.add(interaction)
+            db.session.flush()
+            complete_client_events(client.id, interaction)
+            reschedule_interaction_event(client, interaction)
+        interaction.color_label = new_color
+        uploaded = save_uploads(files, client.id, interaction.id)
+        created_paths.extend(Path(item.file_path) for item in uploaded)
+        if selected_event is not None and selected_event.status in OPEN_EVENT_STATUSES and (selected_event.source_interaction is None or selected_event.source_interaction.history_kind == history_kind):
+            selected_event.status = "completed"
+            selected_event.completed_at = interaction.created_at
+            selected_event.completed_by_interaction_id = interaction.id
+    if is_general:
+        complete_due_quarterly_events(client.id)
+        regenerate_quarterly_events(
+            client, after_date=utc_naive_to_local(utcnow()).date()
+        )
+    return deleted_paths
+
 
 
 @bp.post("/<int:client_id>/interactions")

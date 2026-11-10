@@ -1,0 +1,9 @@
+{% extends 'base.html' %}
+{% block title %}Поиск по календарю — WorkSpace{% endblock %}
+{% block content %}
+<a class="back-link" href="{{ url_for('calendar.index') }}">← Календарь</a>
+<h1>Поиск по календарю</h1>
+{% include 'calendar/_search_form.html' %}
+{% if query_text|length < 3 %}<p class="muted">Введите не менее 3 символов.</p>
+{% else %}<div class="panel">{% for result in results %}<p><a href="{{ result.url }}"><strong>{{ result.title }}</strong></a>{% if result.date %} · {{ result.date|local_datetime }}{% endif %}<br><span class="pre-wrap">{{ result.text }}</span></p>{% else %}<p>Совпадений не найдено.</p>{% endfor %}</div>{% endif %}
+{% endblock %}

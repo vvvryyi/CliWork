@@ -414,7 +414,7 @@ document.querySelectorAll("textarea[data-history-editor]").forEach((editor) => {
         while (oldEnd > Math.max(start, suffixLimit) && newEnd > start && previousValue[oldEnd - 1] === editor.value[newEnd - 1]) {
             oldEnd--; newEnd--;
         }
-        const owner = start === 0 && oldEnd === previousValue.length
+        const owner = start === previousValue.length || (start === 0 && oldEnd === previousValue.length)
             ? originalSections.length - 1
             : owners[start] ?? owners.at(-1) ?? originalSections.length - 1;
         owners = owners.slice(0, start).concat(Array(newEnd - start).fill(owner), owners.slice(oldEnd));
@@ -1000,4 +1000,24 @@ if ("serviceWorker" in navigator && window.isSecureContext) {
     window.addEventListener("load", () => {
         navigator.serviceWorker.register("/service-worker.js");
     });
+}
+
+const combinedHistoryForm = document.getElementById?.("client-history-save");
+const tradingHistoryForm = document.getElementById?.("d-comments");
+if (combinedHistoryForm && tradingHistoryForm) {
+    combinedHistoryForm.addEventListener("submit", () => {
+        combinedHistoryForm.querySelectorAll("[data-trading-copy]").forEach((item) => item.remove());
+        for (const [name, value] of new FormData(tradingHistoryForm)) {
+            if (name === "files" || name === "csrf_token") continue;
+            const input = document.createElement("input");
+            input.type = "hidden"; input.name = `trading_${name}`; input.value = value;
+            input.dataset.tradingCopy = "1";
+            combinedHistoryForm.append(input);
+        }
+        tradingHistoryForm.querySelectorAll('input[type="file"]').forEach((input) => {
+            input.name = "trading_files";
+            input.setAttribute("form", "client-history-save");
+        });
+    });
+    tradingHistoryForm.addEventListener("submit", (event) => { event.preventDefault(); combinedHistoryForm.requestSubmit(); });
 }

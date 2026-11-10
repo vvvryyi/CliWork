@@ -56,7 +56,7 @@ def test_filter_contact_colors_in_groups_search_channels_and_archive(app, auth_c
     assert "Архив красный" in page and "Анна красная" not in page
     assert 'name="archived" value="1"' in page
     assert 'href="/clients/?archived=1"' in page
-    assert auth_client.get("/clients/?color_label=purple").status_code == 400
+    assert auth_client.get("/clients/?color_label=unknown_color").status_code == 400
 
 
 @pytest.mark.parametrize("kind,endpoint", [("general", "history"), ("d", "d-comments")])
@@ -110,14 +110,14 @@ def test_comment_labels_independent_and_preserved_through_editing(app, auth_clie
 
 
 def test_contact_and_comment_invalid_colors_roll_back(app, auth_client, sample_client):
-    assert auth_client.post("/clients/new", data={"full_name": "Невалидный", "color_label": "purple"}).status_code == 400
-    assert auth_client.post(f"/clients/{sample_client}/edit", data={"full_name": "Перезапись", "color_label": "purple"}).status_code == 400
+    assert auth_client.post("/clients/new", data={"full_name": "Невалидный", "color_label": "unknown_color"}).status_code == 400
+    assert auth_client.post(f"/clients/{sample_client}/edit", data={"full_name": "Перезапись", "color_label": "unknown_color"}).status_code == 400
     response = auth_client.post(f"/clients/{sample_client}/history", data={
-        "history_text": "Комментарий", "client_color_label": "red", "new_comment_color": "purple",
+        "history_text": "Комментарий", "client_color_label": "red", "new_comment_color": "unknown_color",
     })
     assert response.status_code == 400
     response = auth_client.post(f"/clients/{sample_client}/history", data={
-        "history_text": "Комментарий", "client_color_label": "purple", "new_comment_color": "red",
+        "history_text": "Комментарий", "client_color_label": "unknown_color", "new_comment_color": "red",
     })
     assert response.status_code == 400
     with app.app_context():

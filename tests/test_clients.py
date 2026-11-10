@@ -228,7 +228,7 @@ def test_history_uses_compact_date(auth_client, sample_client):
     )
     assert "──────────".encode() not in response.data
     assert "\n\u2063".encode() in response.data
-    assert re.search(rb'\d{6} </textarea>', response.data)
+    assert '\n\u2063</textarea>'.encode() in response.data
 
 
 def test_inline_history_edit_keeps_record_date_and_updates_its_event(

@@ -9,6 +9,7 @@
     <a class="button button-primary" href="{{ url_for('calendar.create_event', date=selected_date.isoformat()) }}">+ Дело</a>
 </div>
 
+{% include 'calendar/_search_form.html' %}
 <div class="calendar-toolbar">
     <div class="segmented">
         <a class="{% if view == 'day' %}active{% endif %}" href="{{ url_for('calendar.index', view='day', date=selected_date.isoformat()) }}">День</a>

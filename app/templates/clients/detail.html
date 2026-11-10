@@ -50,7 +50,7 @@
                 <div><button class="button button-primary" type="submit">Подготовить сообщение</button></div>
             </form>
         </details>
-        <form class="panel form-stack client-detail-form" method="post" action="{{ url_for('clients.save_history', client_id=client.id) }}" enctype="multipart/form-data" data-disable-on-submit>
+        <form id="client-history-save" class="panel form-stack client-detail-form" method="post" action="{{ url_for('clients.save_history', client_id=client.id) }}" enctype="multipart/form-data" data-disable-on-submit>
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <input type="hidden" name="workflow_fields_present" value="1">
             <input type="hidden" name="submission_token" value="{{ interaction_token }}">
@@ -154,7 +154,7 @@
                             <small data-file-status>До 20 МБ</small>
                         </div>
                         <button class="button button-small" type="button" data-history-edit>Редактировать</button>
-                        <button class="button button-primary" type="submit">Сохранить</button>
+
                     </div>
                 </div>
             </div>

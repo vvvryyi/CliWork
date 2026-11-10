@@ -158,3 +158,17 @@ test("replacing all history puts new text in a new record", () => {
     const field = history.editor.parentElement.children.find((child) => child.name === "history_sections");
     assert.deepEqual(JSON.parse(field.value), ["", "261105 Новый звонок 270831"]);
 });
+
+
+test("new text after a blank date slot belongs to the new record", () => {
+    const history = historyEditor(["red", ""], ["261110 Старая запись", ""], "1");
+    initialize([history]);
+    history.editor.setSelectionRange(history.editor.value.length, history.editor.value.length);
+    history.editor.emit("beforeinput");
+    history.editor.value += "Новый комментарий 301201";
+    history.editor.emit("input");
+    const field = history.editor.parentElement.children.find((item) => item.name === "history_sections");
+    const sections = JSON.parse(field.value);
+    assert.equal(sections[1], "Новый комментарий 301201");
+    assert.ok(sections[0].startsWith("261110 Старая запись"));
+});

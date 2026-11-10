@@ -1,0 +1,4 @@
+<form class="filter-bar" method="get" action="{{ url_for('calendar.search') }}">
+    <label class="grow"><span class="sr-only">Поиск по календарю</span><input type="search" name="q" minlength="3" maxlength="100" value="{{ query_text|default('') }}" placeholder="Поиск по делам, комментариям и фамилиям"></label>
+    <button class="button" type="submit">Найти</button>
+</form>

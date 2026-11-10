@@ -3,10 +3,10 @@ import re
 
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 from flask_login import login_required
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import joinedload, lazyload
 
 from .extensions import db
-from .models import CalendarEvent, Client, utcnow
+from .models import CalendarEvent, Client, DailyTask, GeneralTask, Interaction, utcnow
 from .task_service import daily_task_sort_key, delete_event_and_task, sync_task_from_event
 from .utils import (
     EVENT_TYPE_LABELS,
@@ -43,6 +43,46 @@ def local_day_bounds(day):
     start = local_to_utc_naive(f"{day.isoformat()}T00:00")
     end = local_to_utc_naive(f"{(day + timedelta(days=1)).isoformat()}T00:00")
     return start, end
+
+
+@bp.get("/search")
+@login_required
+def search():
+    query = request.args.get("q", "").strip()[:100]
+    results = []
+    if len(query) >= 3:
+        needle = query.casefold()
+        seen_tasks, seen_general, seen_comments = set(), set(), set()
+        events = db.session.scalars(db.select(CalendarEvent).options(
+            joinedload(CalendarEvent.client), joinedload(CalendarEvent.daily_task),
+            joinedload(CalendarEvent.general_task), joinedload(CalendarEvent.source_interaction).lazyload(Interaction.attachments)))
+        for event in events:
+            parts = [event.title, event.comment]
+            if event.client: parts.append(event.client.full_name)
+            if event.source_interaction: parts.append(event.source_interaction.text)
+            if event.daily_task: parts.append(event.daily_task.text)
+            if event.general_task: parts.extend([event.general_task.text, event.general_task.comment])
+            if not any(needle in (part or "").casefold() for part in parts): continue
+            if event.daily_task: seen_tasks.add(event.daily_task.id)
+            if event.general_task: seen_general.add(event.general_task.id)
+            if event.source_interaction: seen_comments.add(event.source_interaction.id)
+            url = url_for("clients.detail", client_id=event.client_id, event_id=event.id) if event.client_id else (url_for("tasks.general_detail", task_id=event.general_task.id) if event.general_task else url_for("calendar.edit_event", event_id=event.id))
+            results.append({"title": event.client.full_name if event.client else event.title, "text": " · ".join(part for part in parts if part), "date": event.starts_at, "url": url})
+        for model, seen, is_general in [(DailyTask, seen_tasks, False), (GeneralTask, seen_general, True)]:
+            for task in db.session.scalars(db.select(model)):
+                text = task.text + " " + (task.comment if is_general else "")
+                if task.id in seen or needle not in text.casefold(): continue
+                url = url_for("tasks.general_detail", task_id=task.id) if is_general else url_for("tasks.index", date=task.due_date.isoformat())
+                results.append({"title": task.text, "text": text, "date": None, "url": url})
+        for item, name in db.session.execute(db.select(Interaction, Client.full_name).options(lazyload(Interaction.attachments)).join(Client, Client.id == Interaction.client_id)):
+            if item.id in seen_comments or not (needle in item.text.casefold() or needle in name.casefold()): continue
+            results.append({"title": name, "text": item.text, "date": None, "url": url_for("clients.detail", client_id=item.client_id, _anchor=f"interaction-{item.id}")})
+        found_urls = {result["url"].split("?")[0].split("#")[0] for result in results}
+        for client_id, name, notes in db.session.execute(db.select(Client.id, Client.full_name, Client.notes)):
+            url = url_for("clients.detail", client_id=client_id)
+            if (needle in name.casefold() or needle in (notes or "").casefold()) and url not in found_urls:
+                results.append({"title": name, "text": notes or name, "date": None, "url": url})
+    return render_template("calendar/search.html", query_text=query, results=results)
 
 
 @bp.get("/")
