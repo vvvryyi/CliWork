@@ -50,7 +50,7 @@ def test_d_comments_are_independent_dated_and_idempotent(app, auth_client, d_cli
         contact.quarterly_reminder_mmdd = "1120"
         db.session.commit()
     page = auth_client.get(f"/clients/{d_client}").data.decode()
-    assert editor_text(page, "d-history-editor") == "261027 "
+    assert editor_text(page, "d-history-editor") == ""
     assert 'Основная история' in editor_text(page, "history-editor")
     assert page.count('<form') == page.count('</form>')
     payload = {"history_text": "261027 Документы на согласовании 301202", "submission_token": "d-comment-token-1234"}

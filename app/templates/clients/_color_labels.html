@@ -1,3 +1,15 @@
+{% macro contact_label_picker(client) -%}
+<details class="contact-label-picker color-picker">
+    <summary>Метки{% if client.label_values %} · {{ client.label_values|length }}{% endif %}</summary>
+    <input type="hidden" name="contact_labels_present" value="1">
+    <div class="contact-label-options">
+        {% for value, label in color_labels.items() %}
+        <label><input type="checkbox" name="contact_labels" value="{{ value }}" {% if value in client.label_values %}checked{% endif %}><span class="color-label-dot" data-color="{{ value }}"></span>{{ label }}</label>
+        {% endfor %}
+    </div>
+</details>
+{%- endmacro %}
+
 {% macro color_options(selected) -%}
     <option value="" {% if not selected %}selected{% endif %}>Без метки</option>
     {% for value, label in color_labels.items() %}

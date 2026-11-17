@@ -40,8 +40,8 @@ def test_contact_palette_saves_in_every_group(app, auth_client, sample_client, g
         db.session.get(Client, sample_client).client_group = group
         db.session.commit()
     page = auth_client.get(f"/clients/{sample_client}").data.decode()
-    assert 'name="client_color_label"' in page
-    assert 'data-color-option="red"' in page
+    assert 'name="contact_labels"' in page
+    assert 'name="contact_labels" value="red"' in page
     assert 'Метка контакта' not in page
     assert 'class="button" href="#client-message"' in page
     response = auth_client.post(f"/clients/{sample_client}/history", data={
@@ -63,7 +63,7 @@ def test_filter_palette_has_only_visible_swatches_and_short_names(auth_client):
     assert '>Каналы</option>' in page
     assert '>Все каналы</option>' not in page
     assert '>Метки</span>' in page
-    assert 'placeholder="ФИО"' in page
+    assert 'placeholder="ФИО"' not in page
     menu = re.search(r'<div class="color-picker-menu"[^>]*>(.*?)</div>', page, re.S).group(1)
     for button in re.findall(r'<button\b.*?</button>', menu, re.S):
         text = re.sub(r'<[^>]+>', '', button).strip()

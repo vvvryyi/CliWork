@@ -523,54 +523,14 @@ def test_archiving_client_hides_its_planned_events(app, auth_client, sample_clie
     assert '<span class="calendar-count">1</span>'.encode() not in response.data
 
 
-def test_client_categories_are_in_one_row_and_mutually_exclusive(
-    app, auth_client, sample_client
-):
-    response = auth_client.post(
-        f"/clients/{sample_client}/group",
-        data={"group": "a"},
-        follow_redirects=True,
-    )
-    assert "Группа А".encode() in response.data
-    with app.app_context():
-        assert db.session.get(Client, sample_client).client_group == "a"
-
-    listing = auth_client.get("/clients/")
-    labels = ("Д", "Б", "В", "Р", "М", "П", "А", "Н")
-    for label in labels:
-        assert f"<span>{label}</span>".encode() in listing.data
-    positions = [listing.data.index(f"<span>{label}</span>".encode()) for label in labels]
-    assert positions == sorted(positions)
-    assert "<span>Х</span>".encode() not in listing.data
-    assert b'data-client-segment-open="client-segment-a"' in listing.data
-    assert b'id="client-segment-a" data-client-segment-dialog' in listing.data
-    assert f'href="/clients/{sample_client}"'.encode() in listing.data
-    assert "Иван Петров".encode() in listing.data
-
-    detail = auth_client.get(f"/clients/{sample_client}")
-    assert b'<option value="b"' in detail.data
-    auth_client.post(
-        f"/clients/{sample_client}/group", data={"group": "b"}
-    )
-    with app.app_context():
-        assert db.session.get(Client, sample_client).client_group == "b"
-    listing = auth_client.get("/clients/")
-    assert b'data-client-segment-open="client-segment-b"' in listing.data
-    assert b'id="client-segment-b" data-client-segment-dialog' in listing.data
-    assert f'href="/clients/{sample_client}"'.encode() in listing.data
-    assert "Группа В".encode() in auth_client.get(f"/clients/{sample_client}").data
-
-    auth_client.post(
-        f"/clients/{sample_client}/group", data={"group": "p"}
-    )
-    with app.app_context():
-        assert db.session.get(Client, sample_client).client_group == "p"
-
-    auth_client.post(
-        f"/clients/{sample_client}/group", data={"group": "none"}
-    )
-    with app.app_context():
-        assert db.session.get(Client, sample_client).client_group == "none"
+def test_only_d_group_is_available(app, auth_client, sample_client):
+    assert auth_client.post(f"/clients/{sample_client}/group", data={"group": "d"}).status_code == 302
+    page = auth_client.get("/clients/").data.decode()
+    assert 'name="group" value="d"' in page
+    assert 'client-segment-dialog' not in page
+    for old in ["a", "b", "p", "v", "k", "r", "m"]:
+        assert auth_client.post(f"/clients/{sample_client}/group", data={"group": old}).status_code == 400
+    assert auth_client.post(f"/clients/{sample_client}/group", data={"group": "none"}).status_code == 302
 
 
 def test_new_interaction_completes_previous_event_and_creates_next(

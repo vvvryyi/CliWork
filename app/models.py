@@ -24,6 +24,12 @@ class Client(OwnedMixin, TimestampMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     full_name = db.Column(db.String(200), nullable=False, index=True)
     color_label = db.Column(db.String(20), nullable=False, default="", server_default="", index=True)
+    color_labels = db.Column(db.JSON, nullable=False, default=list, server_default="[]")
+
+    @property
+    def label_values(self):
+        return self.color_labels or ([self.color_label] if self.color_label else [])
+
     phone = db.Column(db.String(50), nullable=False, default="", index=True)
     email = db.Column(db.String(200), nullable=False, default="", index=True)
     additional_contacts = db.Column(db.Text, nullable=False, default="")

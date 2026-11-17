@@ -16,11 +16,11 @@ def test_card_header_has_four_controls(auth_client, sample_client):
     assert re.search(r'<select[^>]*name="group"', actions)
     assert 'data-client-group' in actions
     assert 'data-client-group-status' in page
-    assert '/static/css/style.css?v=25' in page
-    assert '/static/js/app.js?v=25' in page
+    assert '/static/css/style.css?v=26' in page
+    assert '/static/js/app.js?v=26' in page
 
 
-@pytest.mark.parametrize('group', ['none', 'd', 'v', 'b', 'r', 'm', 'p', 'a', 'k'])
+@pytest.mark.parametrize('group', ['none', 'd'])
 def test_group_switch_saves_and_returns_card(app, auth_client, sample_client, group):
     response = auth_client.post(f'/clients/{sample_client}/group', data={'group': group}, headers={'Accept': 'application/json'})
     assert response.status_code == 200

@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from 'clients/_color_labels.html' import color_picker, color_badge, history_colors with context %}
+{% from 'clients/_color_labels.html' import contact_label_picker, color_picker, color_badge, history_colors with context %}
 {% block title %}{{ client.full_name }} — WorkSpace{% endblock %}
 {% block content %}
 <div class="page-heading client-detail-heading">
@@ -9,7 +9,7 @@
             <span class="avatar avatar-large">{{ client.full_name[:1]|upper }}</span>
             <div>
                 <h1>{{ client.full_name }}</h1>
-                {{ color_badge(client.color_label) }}
+                {% for value in client.label_values %}{{ color_badge(value) }}{% endfor %}
                 {% if client.client_group in client_categories %}<span class="tag tag-success">Группа {{ client_categories[client.client_group] }}</span>{% endif %}
                 {% if client.preferred_channel %}
                     <span class="tag">Предпочитает {{ channel_labels.get(client.preferred_channel, client.preferred_channel) }}</span>
@@ -57,7 +57,7 @@
             <input type="hidden" name="history_ids" value="{{ interactions|map(attribute='id')|join(',') }}">
             {% if selected_event_id %}<input type="hidden" name="event_id" value="{{ selected_event_id }}">{% endif %}
             <div class="client-workflow client-workflow-panel">
-                {{ color_picker('client_color_label', client.color_label) }}
+                {{ contact_label_picker(client) }}
                 <div>
 
                     <div class="flag-grid">

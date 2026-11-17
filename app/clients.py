@@ -44,16 +44,7 @@ from .utils import (
 bp = Blueprint("clients", __name__, url_prefix="/clients")
 
 INTERACTION_TYPES = {"call", "meeting", "mailing", "message", "documents"}
-CLIENT_GROUP_LABELS = {
-    "d": "Д",
-    "v": "Б",
-    "b": "В",
-    "r": "Р",
-    "m": "М",
-    "p": "П",
-    "a": "А",
-    "k": "Н",
-}
+CLIENT_GROUP_LABELS = {"d": "Д"}
 CLIENT_GROUPS = set(CLIENT_GROUP_LABELS)
 CLIENT_FLAG_FIELDS = (
     "flag_f",
@@ -76,10 +67,25 @@ def get_client_or_404(client_id, include_archived=False):
     return client
 
 
+def apply_contact_labels(client):
+    if "contact_labels_present" in request.form:
+        values = list(dict.fromkeys(request.form.getlist("contact_labels")))
+        for value in values:
+            validate_color_label(value)
+        client.color_labels = [value for value in values if value]
+        client.color_label = client.color_labels[0] if client.color_labels else ""
+        return True
+    return False
+
+
 def apply_client_form(client):
-    if "color_label" in request.form:
+    if "color_label" in request.form or "contact_labels_present" in request.form:
         try:
-            client.color_label = validate_color_label(request.form["color_label"])
+            if apply_contact_labels(client):
+                pass
+            else:
+                client.color_label = validate_color_label(request.form["color_label"])
+                client.color_labels = [client.color_label] if client.color_label else []
         except ValueError as error:
             abort(400, description=str(error))
     client.full_name = request.form.get("full_name", "").strip()
@@ -95,8 +101,9 @@ def apply_client_form(client):
 
 
 def apply_client_workflow_form(client):
-    if "client_color_label" in request.form:
+    if not apply_contact_labels(client) and "client_color_label" in request.form:
         client.color_label = validate_color_label(request.form["client_color_label"])
+        client.color_labels = [client.color_label] if client.color_label else []
     for field in CLIENT_FLAG_FIELDS:
         setattr(client, field, field in request.form)
     percent_value = request.form.get("percent_value", "").strip()
@@ -165,13 +172,13 @@ def rendered_history_entry(interaction):
     return f"{history_entry_date(interaction)} {body}" if interaction.show_history_date else body
 
 
-def build_history_text(interactions, now):
+def build_history_text(interactions, now, prefill_date=True):
     entries = [rendered_history_entry(item) for item in interactions]
     today = utc_naive_to_local(now).date()
     dated_today = any((item.show_history_date and history_entry_date(item) == today.strftime("%y%m%d")) or
                       (parse_planning_details(interaction_text_body(item.text))[0] or datetime.min).date() == today
                       for item in interactions)
-    entries.append("" if dated_today else normalize_interaction_text("", now))
+    entries.append("" if dated_today or not prefill_date else normalize_interaction_text("", now))
     return HISTORY_DIVIDER.join(entries)
 
 
@@ -315,17 +322,19 @@ def index():
         if show_archived
         else Client.archived_at.is_(None)
     )
+    if request.args.get("group") == "d":
+        statement = statement.where(Client.client_group == "d")
     if channel:
         statement = statement.where(Client.preferred_channel == channel)
     if color_label:
-        statement = statement.where(Client.color_label == ("" if color_label == "unlabeled" else color_label))
+        statement = statement.where(Client.color_label == "" if color_label == "unlabeled" else db.or_(Client.color_label == color_label, db.cast(Client.color_labels, db.Text).contains('"' + color_label + '"')))
     clients = db.session.scalars(statement.order_by(Client.full_name)).all()
     if query_text:
         # SQLite's LOWER/ILIKE does not fold Cyrillic. Compare Unicode text
         # explicitly, and fetch comments as scalar columns without attachments.
         needle = query_text.casefold()
         comment_matches = set()
-        if len(query_text) >= 4 and clients:
+        if len(query_text) >= 3 and clients:
             rows = db.session.execute(
                 db.select(Interaction.client_id, Interaction.text).where(
                     Interaction.client_id.in_(statement.with_only_columns(Client.id))
@@ -334,18 +343,11 @@ def index():
             comment_matches = {client_id for client_id, text in rows if needle in (text or "").casefold()}
         clients = [item for item in clients if (
             any(needle in (value or "").casefold() for value in (item.full_name, item.phone, item.email))
-            or len(query_text) >= 4 and (item.id in comment_matches or needle in (item.notes or "").casefold())
+            or len(query_text) >= 3 and (item.id in comment_matches or needle in (item.notes or "").casefold())
         )]
     clients.sort(key=lambda item: item.full_name.casefold())
     grouped_by_category = {key: [] for key in CLIENT_GROUP_LABELS}
     alphabetical_clients = clients
-    if not show_archived and not query_text:
-        for item in clients:
-            if item.client_group in grouped_by_category:
-                grouped_by_category[item.client_group].append(item)
-        alphabetical_clients = [
-            item for item in clients if item.client_group not in CLIENT_GROUPS
-        ]
 
     client_groups = {}
     for client in alphabetical_clients:
@@ -359,6 +361,7 @@ def index():
         clients_by_category=grouped_by_category,
         client_groups=client_groups,
         query_text=query_text,
+        selected_group=request.args.get("group", ""),
         selected_channel=channel,
         selected_color_label=color_label,
         show_archived=show_archived,
@@ -478,7 +481,7 @@ def render_client_detail(client, selected_event=None, **overrides):
         history_text=build_history_text(interactions, now),
         interaction_token=uuid4().hex,
         d_comments=d_comments,
-        d_history_text=build_history_text(d_comments, now),
+        d_history_text=build_history_text(d_comments, now, prefill_date=False),
         d_interaction_token=uuid4().hex,
         client_categories=CLIENT_GROUP_LABELS,
         selected_event_id=selected_event.id if selected_event else None,
@@ -538,7 +541,7 @@ def search_excerpt(text, query, context=70):
 @login_required
 def search_interactions():
     query_text = request.args.get("q", "").strip()[:100]
-    if len(query_text) < 4:
+    if len(query_text) < 3:
         return jsonify({"query": query_text, "results": []})
 
     results = []

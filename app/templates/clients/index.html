@@ -20,10 +20,8 @@
 
 <form class="filter-bar contact-filters" method="get">
     {% if show_archived %}<input type="hidden" name="archived" value="1">{% endif %}
-    <label class="grow">
-        <span class="sr-only">Поиск</span>
-        <input name="q" type="search" value="{{ query_text }}" placeholder="ФИО">
-    </label>
+    {% if query_text %}<input type="hidden" name="q" value="{{ query_text }}">{% endif %}
+    <button class="button{% if selected_group == 'd' %} is-selected{% endif %}" type="submit" name="group" value="d">Д</button>
     {{ color_picker('color_label', selected_color_label, filter=true) }}
 
     <button class="button" type="submit">Найти</button>
@@ -36,39 +34,10 @@
             {% endfor %}
         </select>
     </label>
-    {% if query_text or selected_channel or selected_color_label %}
+    {% if query_text or selected_channel or selected_color_label or selected_group %}
         <a class="button button-ghost" href="{{ url_for('clients.index', archived=1 if show_archived else None) }}">Сбросить</a>
     {% endif %}
 </form>
-
-{% if not show_archived and not query_text %}
-    <div class="client-segments">
-        {% for group_key, title in client_categories.items() %}
-            {% set grouped_clients = clients_by_category[group_key] %}
-            <button class="alphabet-group client-segment" type="button" data-client-segment-open="client-segment-{{ group_key }}" aria-haspopup="dialog" aria-controls="client-segment-{{ group_key }}">
-                <span>{{ title }}</span><small>{{ grouped_clients|length }}</small>
-            </button>
-            <dialog class="client-segment-dialog" id="client-segment-{{ group_key }}" data-client-segment-dialog>
-                <div class="client-segment-dialog-header">
-                    <div>
-                        <h2>Группа {{ title }}</h2>
-                        <p class="muted">Клиентов: {{ grouped_clients|length }}</p>
-                    </div>
-                    <button class="dialog-close" type="button" aria-label="Закрыть группу {{ title }}" data-client-segment-close>×</button>
-                </div>
-                <div class="client-segment-dialog-list">
-                    {% for client in grouped_clients %}
-                        <div class="alphabet-client">
-                            <a href="{{ url_for('clients.detail', client_id=client.id) }}">{{ client.full_name }} {{ color_badge(client.color_label) }}</a>
-                        </div>
-                    {% else %}
-                        <p class="muted segment-empty">В этой группе пока нет клиентов.</p>
-                    {% endfor %}
-                </div>
-            </dialog>
-        {% endfor %}
-    </div>
-{% endif %}
 
 {% if client_groups %}
     <div class="alphabet-list">
@@ -78,7 +47,7 @@
                 <div class="alphabet-names">
                     {% for client in grouped_clients %}
                         <div class="alphabet-client">
-                            <a href="{{ url_for('clients.detail', client_id=client.id) }}">{{ client.full_name }} {{ color_badge(client.color_label) }}</a>
+                            <a href="{{ url_for('clients.detail', client_id=client.id) }}">{{ client.full_name }} {% for value in client.label_values %}{{ color_badge(value) }}{% endfor %}</a>
                             {% if show_archived %}
                                 <div class="archive-actions">
                                     <form action="{{ url_for('clients.restore', client_id=client.id) }}" method="post">
@@ -109,7 +78,7 @@
     <div class="search-dialog-header">
         <div>
             <h2>Поиск контактов</h2>
-            <p class="muted">Поиск по имени и комментариям всех активных контактов — от 4 символов.</p>
+            <p class="muted">Поиск по имени и комментариям всех активных контактов — от 3 символов.</p>
         </div>
         <button class="dialog-close" type="button" aria-label="Закрыть поиск" data-search-close>×</button>
     </div>
@@ -121,7 +90,7 @@
         <button class="button button-primary" type="submit">Найти</button>
     </form>
     <div class="search-results" data-search-results aria-live="polite">
-        <div class="empty-state">Введите не менее 4 символов для поиска.</div>
+        <div class="empty-state">Введите не менее 3 символов для поиска.</div>
     </div>
 </dialog>
 {% endif %}

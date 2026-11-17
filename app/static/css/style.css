@@ -569,3 +569,15 @@ legend { padding: 0 8px; font-weight: 750; }
 [data-color="blue"] { --label-color: #89b8f0; }
 [data-color="black"] { --label-color: #383838; }
 .color-label-badge[data-color="black"] { color: white; }
+
+.contact-label-options { position: absolute; z-index: 20; top: 100%; left: 0; display: grid; gap: 8px; min-width: 240px; padding: 12px; border: 1px solid var(--line); border-radius: 9px; background: white; box-shadow: var(--shadow); }
+.contact-label-options label { display: flex; align-items: center; gap: 8px; }
+.contact-label-options input { width: 18px; min-height: 18px; height: 18px; }
+.contact-filters > button[name="group"] { width: 110px; }
+.contact-filters .is-selected { border-color: var(--primary); }
+@media (max-width: 650px) { .contact-filters > button[name="group"] { width: 100%; order: 0; } }
+
+@media (min-width: 651px) {
+    .contact-filters { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .contact-filters > button[name="group"], .contact-filters > .button, .contact-filters > .color-picker, .contact-filters > label { width: 100%; }
+}

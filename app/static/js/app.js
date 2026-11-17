@@ -504,9 +504,9 @@ function renderSearchResults(items) {
 
 async function runInteractionSearch() {
     const query = searchInput?.value.trim() || "";
-    if (query.length < 4) {
+    if (query.length < 3) {
         searchRequest?.abort();
-        setSearchMessage("Введите не менее 4 символов для поиска.");
+        setSearchMessage("Введите не менее 3 символов для поиска.");
         return;
     }
     searchRequest?.abort();

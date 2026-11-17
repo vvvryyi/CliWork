@@ -32,7 +32,7 @@ def test_unicode_search_matches_name_and_both_comment_streams_once(app, auth_cli
     filtered = auth_client.get('/clients/?q=ГОВО&color_label=red').data.decode()
     assert f'href="/clients/{ids[1]}"' in filtered
     assert f'href="/clients/{ids[0]}"' not in filtered
-    assert auth_client.get('/clients/search?q=гов').get_json()['results'] == []
+    assert len(auth_client.get('/clients/search?q=гов').get_json()['results']) == 3
 
 
 def test_search_returns_all_matching_contacts_and_literal_substrings(app, auth_client):

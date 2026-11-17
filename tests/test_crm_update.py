@@ -132,7 +132,7 @@ def test_leaving_group_d_removes_open_reminders_and_preserves_anchor(app, auth_c
         f"/clients/{sample_client}/history",
         data={"history_text": "", "quarterly_reminder_mmdd": "0918"},
     )
-    auth_client.post(f"/clients/{sample_client}/group", data={"group": "a"})
+    auth_client.post(f"/clients/{sample_client}/group", data={"group": "none"})
     # The hidden field is absent when saving another group's card.
     auth_client.post(f"/clients/{sample_client}/history", data={"history_text": ""})
     with app.app_context():
